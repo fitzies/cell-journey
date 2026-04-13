@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Home, CalendarDays, User, ClipboardCheck, Users } from "lucide-react";
 import { JoinGroupFlow } from "@/components/join-group-flow";
+import { OnboardingFlow } from "@/components/onboarding-flow";
 
 const memberTabs = [
   { href: "/", label: "Home", icon: Home },
@@ -34,6 +35,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) return null;
+
+  // New user — show onboarding before anything else
+  if (!user.serviceAttending) {
+    return <OnboardingFlow userName={user.name ?? ""} />;
+  }
 
   // No membership or not active — show join flow
   if (!membership || membership.status !== "active") {

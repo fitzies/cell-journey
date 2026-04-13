@@ -26,6 +26,14 @@ export const metadata: Metadata = {
   title: "Cell Journey",
   description:
     "Church cell group attendance tracking for members, leaders, and admins.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Cell Journey",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 export default function RootLayout({
@@ -48,6 +56,11 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js')`,
+          }}
+        />
         <ConvexAuthNextjsServerProvider>
           <ConvexClientProvider>
             <ThemeProvider
