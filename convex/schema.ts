@@ -36,6 +36,7 @@ export default defineSchema({
     resolvedBy: v.optional(v.id("users")), // leader who approved/rejected
   })
     .index("by_user", ["userId"])
+    .index("by_user_and_status", ["userId", "status"])
     .index("by_group", ["groupId"])
     .index("by_user_and_group", ["userId", "groupId"])
     .index("by_group_and_status", ["groupId", "status"]),
