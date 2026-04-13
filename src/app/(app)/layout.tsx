@@ -50,7 +50,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col min-h-svh">
-      <main className="flex-1 pb-16">{children}</main>
+      <main className="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))]">{children}</main>
       <TabBar tabs={tabs} />
     </div>
   );
@@ -65,14 +65,14 @@ function TabBar({
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-[env(safe-area-inset-bottom)]">
-      <div className="flex items-center justify-around h-14">
+      <div className="flex items-center justify-around h-16">
         {tabs.map(({ href, label, icon: Icon }) => {
           const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <Link
               key={href}
               href={href}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs transition-colors ${
+              className={`flex flex-col items-center gap-0.5 px-3 py-2.5 text-xs transition-colors ${
                 isActive
                   ? "text-foreground"
                   : "text-muted-foreground hover:text-foreground"
