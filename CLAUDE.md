@@ -39,6 +39,28 @@ Cell Journey is a church attendance app serving ~50 cell groups with 10–40 mem
 - `pnpm lint` — run linter
 - `pnpm dlx convex dev` — start Convex dev server
 
+## Route Structure
+
+```
+src/app/
+├── (auth)/
+│   └── sign-in/page.tsx       ← auth page (unauthenticated users redirected here)
+├── (app)/                     ← mobile layout with bottom tab bar
+│   ├── layout.tsx             ← tab bar: 3 tabs (member) or 4 tabs (leader) based on role
+│   ├── page.tsx               ← Home
+│   ├── schedule/page.tsx
+│   ├── profile/page.tsx
+│   ├── attendance/page.tsx    ← leader only
+│   └── members/page.tsx       ← leader only
+└── admin/                     ← desktop sidebar layout (separate layout.tsx)
+    ├── layout.tsx
+    └── page.tsx
+```
+
+- Root `/` redirects: unauthenticated → `/sign-in`, authenticated → `/` (app) or `/admin` based on role
+- Route groups `(auth)` and `(app)` provide separate layouts without affecting URLs
+- All role-based tab visibility is handled in `(app)/layout.tsx`
+
 ## Code Conventions
 
 - Use App Router (`app/` directory)
