@@ -1,14 +1,17 @@
+"use client";
+
+import { useAuthActions } from "@convex-dev/auth/react";
 import { Button } from "@/components/ui/button";
 
 export default function SignInPage() {
+  const { signIn } = useAuthActions();
+
   return (
     <div className="min-h-svh flex flex-col items-center justify-center px-6">
       <div className="w-full max-w-sm flex flex-col items-center gap-8">
         {/* Logo / wordmark */}
         <div className="flex flex-col items-center gap-2 text-center">
-          <div className="w-10 h-10 rounded-xl bg-foreground flex items-center justify-center">
-            <span className="text-background font-semibold text-sm">CJ</span>
-          </div>
+          <img src="/icon.svg" alt="Cell Journey" className="w-10 h-10" />
           <h1 className="text-2xl font-semibold tracking-tight">Cell Journey</h1>
           <p className="text-sm text-muted-foreground">
             COSBT Cell Group Attendance
@@ -17,13 +20,13 @@ export default function SignInPage() {
 
         {/* Auth buttons */}
         <div className="w-full flex flex-col gap-3">
-          <Button className="w-full h-11 gap-2" variant="outline">
+          <Button
+            className="w-full h-11 gap-2"
+            variant="outline"
+            onClick={() => signIn("google")}
+          >
             <GoogleIcon />
             Continue with Google
-          </Button>
-          <Button className="w-full h-11 gap-2" variant="outline">
-            <FacebookIcon />
-            Continue with Facebook
           </Button>
         </div>
       </div>
@@ -49,17 +52,6 @@ function GoogleIcon() {
       <path
         d="M8 3.18c1.22 0 2.31.42 3.17 1.24l2.37-2.37A7.94 7.94 0 0 0 8 0 8 8 0 0 0 1 4.37l2.75 2.07A4.77 4.77 0 0 1 8 3.18Z"
         fill="#EA4335"
-      />
-    </svg>
-  );
-}
-
-function FacebookIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <path
-        d="M16 8a8 8 0 1 0-9.25 7.9V10.3H4.72V8h2.03V6.24c0-2 1.19-3.1 3-3.1.88 0 1.8.16 1.8.16v1.98h-1.01c-1 0-1.3.62-1.3 1.25V8h2.22l-.35 2.3H9.25V15.9A8 8 0 0 0 16 8Z"
-        fill="#1877F2"
       />
     </svg>
   );

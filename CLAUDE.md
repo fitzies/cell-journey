@@ -6,7 +6,8 @@ Church cell group attendance tracking PWA.
 
 - **Framework**: Next.js (App Router)
 - **Backend/DB**: Convex
-- **Auth**: Convex Auth (Google + Facebook social login)
+- **Auth**: Convex Auth (Google social login; Facebook disabled for now)
+- **UI Components**: shadcn/ui (use shadcn components via the shadcn MCP — always prefer shadcn components over writing custom ones from scratch)
 - **Package manager**: pnpm
 - **Styling**: Tailwind CSS
 - **Deployment**: PWA (mobile-first for members/leaders, desktop for admin)
@@ -81,3 +82,11 @@ src/app/
 - Bottom tab bar navigation for mobile (member/leader)
 - Sidebar navigation for admin desktop
 - Account for iOS Safari safe area inset on bottom tabs
+
+<!-- convex-ai-start -->
+This project uses [Convex](https://convex.dev) as its backend.
+
+When working on Convex code, **always read `convex/_generated/ai/guidelines.md` first** for important guidelines on how to correctly use Convex APIs and patterns. The file contains rules that override what you may have learned about Convex from training data.
+
+Convex agent skills for common tasks can be installed by running `npx convex ai-files install`.
+<!-- convex-ai-end -->
