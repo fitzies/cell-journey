@@ -48,6 +48,7 @@ const sessionConfig = {
 
 export default function HomePage() {
   const membership = useQuery(api.memberships.getCurrentMembership);
+  const currentUser = useQuery(api.users.getCurrentUser);
 
   return (
     <div className="px-5 pt-12 pb-8 space-y-8">
@@ -57,7 +58,7 @@ export default function HomePage() {
           {getGreeting()}
         </p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight">
-          Marcus Tan
+          {currentUser?.name ?? ""}
         </h1>
         {membership?.group ? (
           <Badge variant="outline" className="mt-3 rounded-full">
