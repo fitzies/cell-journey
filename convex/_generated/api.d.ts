@@ -14,6 +14,7 @@ import type * as events from "../events.js";
 import type * as groups from "../groups.js";
 import type * as http from "../http.js";
 import type * as profiles from "../profiles.js";
+import type * as seed from "../seed.js";
 
 import type {
   ApiFromModules,
@@ -28,6 +29,7 @@ declare const fullApi: ApiFromModules<{
   groups: typeof groups;
   http: typeof http;
   profiles: typeof profiles;
+  seed: typeof seed;
 }>;
 
 /**
