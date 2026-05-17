@@ -22,6 +22,25 @@ export const getMyGroup = query({
   },
 });
 
+export const previewGroupByCode = query({
+  args: { code: v.string() },
+  handler: async (ctx, args) => {
+    await requireCurrentProfile(ctx);
+    const group = await ctx.db
+      .query("groups")
+      .withIndex("by_code", (q) => q.eq("code", args.code.trim()))
+      .unique();
+    if (!group || !group.isActive) return null;
+
+    const leader = group.leaderProfileId ? await ctx.db.get(group.leaderProfileId) : null;
+    return {
+      _id: group._id,
+      name: group.name,
+      leaderName: leader?.preferredName || leader?.fullName || null,
+    };
+  },
+});
+
 export const requestToJoinByCode = mutation({
   args: { code: v.string() },
   handler: async (ctx, args) => {
