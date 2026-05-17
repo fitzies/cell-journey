@@ -16,6 +16,9 @@ const singaporeRegion = v.union(
   v.literal("west"),
   v.literal("central"),
   v.literal("northeast"),
+  v.literal("northwest"),
+  v.literal("southeast"),
+  v.literal("southwest"),
 );
 const joinRequestStatus = v.union(
   v.literal("pending"),

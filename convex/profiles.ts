@@ -10,6 +10,9 @@ const singaporeRegion = v.union(
   v.literal("west"),
   v.literal("central"),
   v.literal("northeast"),
+  v.literal("northwest"),
+  v.literal("southeast"),
+  v.literal("southwest"),
 );
 
 async function requireAuthUserId(ctx: QueryCtx | MutationCtx) {
@@ -100,6 +103,18 @@ export const current = query({
   args: {},
   handler: async (ctx) => {
     return await getCurrentProfile(ctx);
+  },
+});
+
+export const currentOrNull = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    return await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
   },
 });
 

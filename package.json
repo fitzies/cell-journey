@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "packageManager": "pnpm@10.0.0",
   "scripts": {
-    "dev": "echo \"No apps initialized yet\"",
-    "build": "echo \"No apps initialized yet\"",
-    "lint": "echo \"No apps initialized yet\"",
-    "typecheck": "echo \"No apps initialized yet\""
+    "dev": "pnpm --filter mobile start",
+    "build": "echo \"No production build configured yet\"",
+    "lint": "pnpm --filter mobile lint",
+    "typecheck": "pnpm --filter mobile exec tsc --noEmit --pretty false && pnpm exec tsc -p convex/tsconfig.json --noEmit --pretty false"
   },
   "dependencies": {
     "@auth/core": "0.37.0",
