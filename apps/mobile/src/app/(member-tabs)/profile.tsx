@@ -1,2 +1,2 @@
-import PlaceholderScreen from '@/components/PlaceholderScreen';
-export default function Screen(){ return <PlaceholderScreen title="Member Profile"/>; }
+import ProfileTab from '@/components/profile-tab';
+export default function Screen() { return <ProfileTab />; }
