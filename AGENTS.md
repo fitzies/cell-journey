@@ -56,14 +56,15 @@ Prefer email OTP/code over email magic links for mobile UX. Phone OTP is not pla
 
 ## Onboarding and Group Join Flow
 
-Members join via a group code:
+Members join via the current mobile onboarding flow:
 
 1. User signs in.
-2. User completes onboarding profile.
+2. User completes required profile details: full name, services attending, Singapore region.
 3. User enters a group code.
-4. A pending join request is created.
-5. Leader approves or rejects the request.
-6. While pending, show a polished pending approval state with group name/context.
+4. User confirms the matched group.
+5. A pending join request is created.
+6. Leader approves or rejects the request.
+7. While pending, show a polished persistent pending approval state with group name/context.
 
 If a member leaves a group or a leader removes/kicks them:
 
@@ -84,11 +85,12 @@ Required for MVP:
   - West
   - Central
   - Northeast
+  - Northwest
+  - Southeast
+  - Southwest
 - Group code for member onboarding
 
-Optional:
-
-- Preferred name
+Preferred name is not part of onboarding for now. It may be added later as an editable profile field.
 
 Users may edit their own profile fields after onboarding except role/group membership.
 

@@ -1,0 +1,298 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Cell Journey · member screens</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&family=Newsreader:opsz,wght,ital@6..72,300..600,0;6..72,300..600,1&display=swap" rel="stylesheet"><style>
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:#e8e3db;color:#1d1814;font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-feature-settings:"cv11"}
+.page{padding:56px clamp(20px,4vw,64px) 96px}
+.intro{max-width:1080px;margin:0 auto 48px}
+.kicker{font:600 11px/1 IBM Plex Mono,monospace;letter-spacing:.22em;text-transform:uppercase;color:#7a7066}
+.intro h1{margin:16px 0;font:380 clamp(46px,6.5vw,76px)/.95 Fraunces,serif;letter-spacing:-.04em}
+.intro h1 em{font-family:Newsreader,serif;font-style:italic;font-weight:400}
+.intro p{max-width:620px;color:#7a6f64;font-size:16px;line-height:1.6}
+.section{max-width:1880px;margin:0 auto 64px}
+.section h2{font:600 11px/1 IBM Plex Mono,monospace;letter-spacing:.22em;text-transform:uppercase;color:#7a7066;margin:0 0 32px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:48px;align-items:start;justify-items:center}
+.card-wrap{display:grid;gap:14px;justify-items:center}
+.label{display:flex;align-items:baseline;gap:10px;color:#7a7066}
+.label b{font:600 11px/1 IBM Plex Mono,monospace;letter-spacing:.16em;text-transform:uppercase;color:#1d1814}
+.label span{font:500 11px/1 IBM Plex Mono,monospace;letter-spacing:.12em;color:#a39a90;text-transform:uppercase}
+
+/* ---- iPhone mockup ---- */
+.iphone{
+  position:relative;width:380px;height:780px;border-radius:56px;
+  background:linear-gradient(150deg,#3a3a3a 0%,#0e0e0e 38%,#1a1a1a 70%,#000 100%);
+  padding:11px;
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255,255,255,.08),
+    inset 0 1px 0 rgba(255,255,255,.15),
+    inset 0 -1px 0 rgba(255,255,255,.05),
+    0 32px 64px -20px rgba(20,15,10,.4),
+    0 14px 32px -12px rgba(20,15,10,.3);
+}
+.iphone::before{content:"";position:absolute;inset:7px;border-radius:51px;background:linear-gradient(135deg,#5a5a5a 0%,#1a1a1a 50%,#3d3d3d 100%);z-index:0}
+.iphone .btn-l,.iphone .btn-r{position:absolute;background:linear-gradient(90deg,#1a1a1a,#3a3a3a 40%,#1a1a1a);border-radius:2px}
+.iphone .silent{left:-2px;top:108px;width:4px;height:30px}
+.iphone .volup{left:-2px;top:158px;width:4px;height:54px}
+.iphone .voldn{left:-2px;top:224px;width:4px;height:54px}
+.iphone .power{right:-2px;top:188px;width:4px;height:90px}
+
+.screen{position:relative;width:100%;height:100%;border-radius:47px;overflow:hidden;background:var(--bg);color:var(--fg);display:flex;flex-direction:column;z-index:1}
+.warm{--bg:#f6f1ea;--fg:#1d1814;--muted:#8a7f73;--line:#e6ddd0;--soft:#efe7da;--card:#fffcf6;--accent:#5d4030;--accent-ink:#fff7ee;--leaf:#3f6b54;--leaf-soft:#dbe6df;--sun:#a8814d;--rose:#9F3A2F;--rose-soft:#f0dad6}
+.night{--bg:#0e0e0e;--fg:#f0ece4;--muted:#7e776e;--line:#222;--soft:#1a1a1a;--card:#171717;--accent:#caa57a;--accent-ink:#0e0e0e;--leaf:#7aa68f;--leaf-soft:#1f2a25;--sun:#caa57a;--rose:#e08d80;--rose-soft:#2a1a1a}
+
+.island{position:absolute;left:50%;top:11px;transform:translateX(-50%);width:118px;height:35px;border-radius:20px;background:#000;z-index:5}
+.statusbar{position:relative;display:flex;justify-content:space-between;align-items:center;padding:18px 32px 0;font:600 14.5px/1 SF Pro Display,Inter,system-ui;color:var(--fg)}
+.statusbar .right{display:flex;gap:6px;align-items:center}
+
+/* ---- App header ---- */
+.appHeader{padding:46px 22px 18px;background:var(--bg)}
+.appHeader .row{display:flex;align-items:center;gap:12px}
+.avatar{width:44px;height:44px;border-radius:50%;background:var(--leaf-soft);color:var(--leaf);display:grid;place-items:center;font:600 16px Inter,sans-serif;flex:none}
+.avatar.accent{background:var(--accent);color:var(--accent-ink);font:380 18px/1 Fraunces,serif}
+.hello{flex:1;min-width:0}
+.hello .name{font:700 18px/1.1 Inter,sans-serif;letter-spacing:-.02em}
+.hello .role{margin-top:4px;font:600 10.5px/1 IBM Plex Mono,monospace;letter-spacing:.18em;color:var(--muted);text-transform:uppercase}
+.bell{width:42px;height:42px;border-radius:50%;background:var(--card);border:1px solid var(--line);display:grid;place-items:center;position:relative;flex:none}
+.bell::after{content:"";position:absolute;top:11px;right:11px;width:6px;height:6px;border-radius:50%;background:var(--rose);border:1.5px solid var(--card)}
+.bell svg{width:18px;height:18px;stroke:var(--fg);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---- body ---- */
+.body{flex:1;padding:0 22px 36px;overflow:hidden;position:relative}
+.scroll{height:100%;overflow:hidden}
+
+/* ---- section ---- */
+.sectionHead{display:flex;justify-content:space-between;align-items:center;margin:22px 0 12px}
+.sectionHead .title{font:700 17px/1 Inter,sans-serif;letter-spacing:-.025em;color:var(--fg)}
+.sectionHead .link{font:600 13px Inter,sans-serif;color:var(--accent)}
+.badge{padding:5px 10px;border-radius:999px;background:var(--soft);font:600 9.5px/1 IBM Plex Mono,monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.badge.warm{background:var(--leaf-soft);color:var(--leaf)}
+
+/* ---- accent hero card ---- */
+.heroCard{
+  position:relative;border-radius:24px;padding:22px 22px 20px;
+  background:var(--accent);color:var(--accent-ink);overflow:hidden;
+}
+.heroCard::before{content:"";position:absolute;right:-50px;bottom:-50px;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,.06)}
+.heroCard::after{content:"";position:absolute;right:60px;bottom:-90px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.04)}
+.heroCard .when{font-size:13px;opacity:.8;position:relative}
+.heroCard h3{margin:6px 0 16px;font:700 22px/1.2 Inter,sans-serif;letter-spacing:-.02em;position:relative}
+.locChip{display:inline-flex;align-items:center;gap:8px;padding:8px 13px;border-radius:999px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.15);font:500 12.5px Inter,sans-serif;position:relative}
+.locChip svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.heroBtn{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:18px;height:44px;border-radius:999px;background:#fff;color:var(--accent);font:600 14.5px Inter,sans-serif;letter-spacing:-.01em;border:0;width:100%;position:relative}
+.night .heroBtn{background:var(--accent-ink);color:var(--accent)}
+
+/* ---- generic card ---- */
+.cardBox{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px}
+.cardBox.flat{padding:14px 16px}
+.row{display:flex;align-items:center;gap:12px}
+.between{justify-content:space-between}
+.h3{font:600 15px/1.3 Inter,sans-serif;letter-spacing:-.015em;color:var(--fg)}
+.small{font-size:12.5px;color:var(--muted);line-height:1.4}
+
+/* ---- quick actions grid ---- */
+.quickGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.quickCard{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px 14px;display:grid;gap:14px}
+.quickCard .ic{width:36px;height:36px;border-radius:50%;background:var(--leaf-soft);color:var(--leaf);display:grid;place-items:center}
+.quickCard .ic svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.quickCard .lbl{font:600 13.5px Inter,sans-serif;letter-spacing:-.01em;color:var(--fg)}
+
+/* ---- info row inside card ---- */
+.infoRow{display:flex;align-items:center;gap:14px;padding:10px 0}
+.infoRow + .infoRow{border-top:1px solid var(--line)}
+.infoIcon{width:34px;height:34px;border-radius:11px;background:var(--soft);display:grid;place-items:center;flex:none}
+.infoIcon svg{width:16px;height:16px;stroke:var(--fg);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.infoTxt{flex:1;min-width:0}
+.infoTxt .k{font-size:11.5px;color:var(--muted);letter-spacing:.02em}
+.infoTxt .v{font:600 14px Inter,sans-serif;color:var(--fg);margin-top:2px}
+
+/* ---- list row ---- */
+.listRow{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--card);border:1px solid var(--line);border-radius:16px}
+.listRow .ic{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;flex:none}
+.listRow.ok .ic{background:var(--leaf-soft);color:var(--leaf)}
+.listRow.miss .ic{background:var(--soft);color:var(--muted)}
+.listRow .ic svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.listRow .grow{flex:1;min-width:0}
+.listRow .name{font:600 14.5px Inter,sans-serif;color:var(--fg);letter-spacing:-.01em}
+.listRow .when{font:600 10.5px/1 IBM Plex Mono,monospace;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin-top:5px}
+.statusPill{padding:5px 10px;border-radius:8px;font:600 10.5px/1 IBM Plex Mono,monospace;letter-spacing:.12em;text-transform:uppercase}
+.statusPill.ok{background:var(--leaf-soft);color:var(--leaf)}
+.statusPill.miss{background:var(--soft);color:var(--muted)}
+
+/* ---- secondary CTA ---- */
+.ghostBtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:50px;border-radius:14px;background:var(--card);border:1px solid var(--line);color:var(--fg);font:600 14px Inter,sans-serif;letter-spacing:-.01em;margin-top:18px}
+.ghostBtn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ghostBtn.danger{color:var(--rose)}
+
+/* ---- field row ---- */
+.fieldRow{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}
+.fieldRow:last-child{border-bottom:0}
+.fieldRow .k{font-size:13.5px;color:var(--muted)}
+.fieldRow .v{display:flex;align-items:center;gap:8px;font:500 14px Inter,sans-serif;color:var(--fg)}
+.chev{color:var(--muted);font-size:14px}
+
+/* ---- attendance hero ---- */
+.attRate{font:380 56px/1 Fraunces,serif;letter-spacing:-.04em}
+.attRate sub{font-size:22px;color:var(--muted);font-family:Inter,sans-serif;letter-spacing:0;vertical-align:baseline}
+
+/* ---- date pill (schedule) ---- */
+.datePill{flex:none;width:48px;text-align:center;padding:10px 0;border-radius:14px;background:var(--soft)}
+.datePill .d{font:700 18px/1 Inter,sans-serif}
+.datePill .m{font:600 9.5px/1 IBM Plex Mono,monospace;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin-top:5px}
+
+
+/* ---- tabbar ---- */
+.tabbar{position:absolute;left:24px;right:24px;bottom:24px;height:60px;border-radius:20px;background:var(--card);border:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);align-items:center;box-shadow:0 12px 24px -8px rgba(0,0,0,.08)}
+.night .tabbar{background:#1a1a1a;box-shadow:0 12px 24px -6px rgba(0,0,0,.5)}
+.tab{position:relative;display:grid;place-items:center;height:60px;color:var(--muted)}
+.tab svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tab.on{color:var(--fg)}
+.tab.on::before{content:"";position:absolute;top:8px;width:18px;height:3px;border-radius:3px;background:var(--accent)}
+
+@media(max-width:460px){.grid{grid-template-columns:1fr;gap:64px}.iphone{transform:scale(.86);transform-origin:top center;margin-bottom:-110px}.page{padding-inline:12px}}
+</style></head><body><main class="page">
+
+<section class="intro">
+  <div class="kicker">Cell Journey · member screens</div>
+  <h1>Friendly, <em>clear</em>, calm.</h1>
+  <p>Same Quiet Chapel / Night Mono palette as onboarding, applied to a card-driven member layout: a personal header, a personal header, one accent hero, supporting cards, and icon-only navigation.</p>
+</section>
+
+<section class="section"><h2>Light · Quiet Chapel</h2><div class="grid" id="light"></div></section>
+<section class="section"><h2>Dark · Night Mono</h2><div class="grid" id="dark"></div></section>
+
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11 12 5l8 6v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6"/><path d="M5 20c1.5-3.4 4.2-5 7-5s5.5 1.6 7 5"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 17h12l-1.6-2.3V10a4.4 4.4 0 0 0-8.8 0v4.7L6 17z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11.3A7 7 0 0 0 5 9.7C5 14.8 12 21 12 21z"/><circle cx="12" cy="10" r="2.6"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 4v3M12 17v3M4 12h3M17 12h3M6 6l2 2M16 16l2 2M6 18l2-2M16 8l2-2"/></symbol>
+<symbol id="i-cal-add" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4M12 13v4M10 15h4"/></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24"><path d="M4 6.5h16v10H10l-4 3v-3H4z"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+<symbol id="i-leave" viewBox="0 0 24 24"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M16 8l4 4-4 4M20 12H10"/></symbol>
+<symbol id="sb-cell" viewBox="0 0 20 14"><path d="M2 12V8M6 12V6M10 12V4M14 12V2M18 12V0" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none"/></symbol>
+<symbol id="sb-wifi" viewBox="0 0 20 14"><path d="M3 5.5a10 10 0 0 1 14 0M6 8.5a6 6 0 0 1 8 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/><circle cx="10" cy="11.5" r="1.2" fill="currentColor"/></symbol>
+<symbol id="sb-bat" viewBox="0 0 26 14"><rect x="1" y="2" width="22" height="10" rx="2.5" stroke="currentColor" stroke-width="1" fill="none" opacity=".5"/><rect x="3" y="4" width="16" height="6" rx="1" fill="currentColor"/><rect x="24" y="5.5" width="1.5" height="3" rx=".5" fill="currentColor" opacity=".5"/></symbol>
+</defs></svg>
+
+<script>
+const tabs=['Home','Attendance','Profile'];
+const tabIcon={Home:'i-home',Attendance:'i-check',Profile:'i-user'};
+function tabbar(active){return `<div class="tabbar">${tabs.map(t=>`<div class="tab ${t===active?'on':''}" aria-label="${t}"><svg><use href="#${tabIcon[t]}"/></svg></div>`).join('')}</div>`}
+function status(){return `<div class="statusbar"><span>9:41</span><div class="right"><svg style="width:16px;height:11px"><use href="#sb-cell"/></svg><svg style="width:16px;height:11px"><use href="#sb-wifi"/></svg><svg style="width:26px;height:14px"><use href="#sb-bat"/></svg></div></div>`}
+function header(name,role){return `<div class="appHeader"><div class="row"><div class="avatar accent">JT</div><div class="hello"><div class="name">Hi, ${name}</div><div class="role">${role}</div></div><div class="bell"><svg><use href="#i-bell"/></svg></div></div></div>`}
+
+const screens={
+Home:`
+${header('Jordan','Member · East Cell')}
+<div class="body"><div class="scroll">
+
+  <div class="sectionHead"><div class="title">Upcoming Meeting</div><span class="badge warm">This Week</span></div>
+  <div class="heroCard">
+    <div class="when">Thursday, 23 May · 7:30 PM</div>
+    <h3>Cell Gathering</h3>
+    <span class="locChip"><svg><use href="#i-pin"/></svg> Tampines Central</span>
+    <button class="heroBtn">View Details</button>
+  </div>
+
+  <div class="quickGrid">
+    <div class="quickCard"><div class="ic"><svg><use href="#i-check"/></svg></div><div class="lbl">Self Check-in</div></div>
+    <div class="quickCard"><div class="ic"><svg><use href="#i-cal"/></svg></div><div class="lbl">View Schedule</div></div>
+  </div>
+
+  <div class="sectionHead"><div class="title">My Group</div></div>
+  <div class="cardBox flat"><div class="row between">
+    <div class="row" style="gap:14px"><div class="infoIcon" style="background:var(--leaf-soft);color:var(--leaf)"><svg><use href="#i-user"/></svg></div>
+    <div><div class="h3">Thursday East Cell</div><div class="small" style="margin-top:3px">12 active members</div></div></div>
+    <span class="chev">›</span>
+  </div></div>
+
+</div></div>`,
+
+Attendance:`
+${header('Jordan','Member · East Cell')}
+<div class="body"><div class="scroll">
+
+  <div class="sectionHead"><div class="title">Your Attendance</div><span class="badge warm">Active</span></div>
+
+  <div class="cardBox" style="padding:22px 20px">
+    <div class="row between" style="align-items:flex-end">
+      <div>
+        <div class="attRate">82<sub>%</sub></div>
+        <div class="small" style="margin-top:6px">9 of 11 gatherings</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font:600 11px/1 IBM Plex Mono,monospace;letter-spacing:.16em;color:var(--leaf);text-transform:uppercase">↑ 4 wk streak</div>
+        <div class="small" style="margin-top:5px">Since Mar 2026</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sectionHead"><div class="title">My History</div><span class="link">View All</span></div>
+  <div style="display:grid;gap:10px">
+    <div class="listRow ok"><div class="ic"><svg><use href="#i-check"/></svg></div>
+      <div class="grow"><div class="name">Cell Gathering</div><div class="when">May 16 · Confirmed</div></div>
+      <span class="statusPill ok">Attended</span></div>
+    <div class="listRow ok"><div class="ic"><svg><use href="#i-check"/></svg></div>
+      <div class="grow"><div class="name">Prayer Night</div><div class="when">May 09 · Self-marked</div></div>
+      <span class="statusPill ok">Attended</span></div>
+    <div class="listRow miss"><div class="ic"><svg><use href="#i-x"/></svg></div>
+      <div class="grow"><div class="name">Cell Gathering</div><div class="when">May 02</div></div>
+      <span class="statusPill miss">Missed</span></div>
+  </div>
+
+  <button class="ghostBtn"><svg><use href="#i-msg"/></svg> Contact Leader</button>
+
+</div></div>`,
+
+Profile:`
+${header('Jordan','Member · East Cell')}
+<div class="body"><div class="scroll">
+
+  <div class="sectionHead"><div class="title">Profile</div></div>
+
+  <div class="heroCard" style="padding:20px">
+    <div class="row" style="gap:14px;position:relative">
+      <div class="avatar" style="width:54px;height:54px;background:rgba(255,255,255,.16);color:#fff;font:380 22px/1 Fraunces,serif">JT</div>
+      <div class="grow" style="min-width:0">
+        <div style="font:700 18px/1.1 Inter,sans-serif">Jordan Tan</div>
+        <div style="font-size:13px;opacity:.75;margin-top:4px">Thursday East Cell · Amelia Lim</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sectionHead"><div class="title">Details</div><span class="link">Edit</span></div>
+  <div class="cardBox" style="padding:4px 18px">
+    <div class="fieldRow"><span class="k">Full name</span><span class="v">Jordan Tan <span class="chev">›</span></span></div>
+    <div class="fieldRow"><span class="k">Services</span><span class="v">Sat 5, Sun 10 <span class="chev">›</span></span></div>
+    <div class="fieldRow"><span class="k">Region</span><span class="v">East <span class="chev">›</span></span></div>
+    <div class="fieldRow"><span class="k">Notifications</span><span class="v">On <span class="chev">›</span></span></div>
+  </div>
+
+  <button class="ghostBtn danger"><svg><use href="#i-leave"/></svg> Leave Group</button>
+
+</div></div>`
+};
+
+function phone(name,i,theme){
+  return `<article class="card-wrap">
+    <div class="iphone">
+      <span class="btn-l silent"></span>
+      <span class="btn-l volup"></span>
+      <span class="btn-l voldn"></span>
+      <span class="btn-r power"></span>
+      <div class="screen ${theme}">
+        <div class="island"></div>
+        ${status()}
+        ${screens[name]}
+      </div>
+    </div>
+    <div class="label"><b>${name}</b><span>${theme==='night'?'night mono':'quiet chapel'}</span></div>
+  </article>`
+}
+light.innerHTML=tabs.map((s,i)=>phone(s,i,'warm')).join('');
+dark.innerHTML=tabs.map((s,i)=>phone(s,i,'night')).join('');
+</script></body></html>
