@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { internalMutation, type MutationCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 
 /**
  * Dev-only helpers callable from the Convex dashboard ("Run a function").
@@ -61,6 +62,43 @@ export const approveByUserId = internalMutation({
  *   Function: seed:promoteToLeader
  *   Args: { "userId": "<users _id>", "groupId": "<groups _id>" }
  */
+async function promoteProfileToLeaderForGroup(
+  ctx: MutationCtx,
+  profile: Doc<"userProfiles">,
+  groupId: Id<"groups">,
+) {
+  const group = await ctx.db.get(groupId);
+  if (!group) throw new Error("Group not found");
+
+  const now = Date.now();
+
+  if (profile.activeMembershipId) {
+    const activeMembership = await ctx.db.get(profile.activeMembershipId);
+    if (activeMembership?.status === "active") {
+      await ctx.db.patch(activeMembership._id, {
+        status: "left",
+        endedAt: now,
+        endedByProfileId: profile._id,
+        endReason: "promotedToLeader",
+      });
+    }
+  }
+
+  await ctx.db.patch(profile._id, {
+    role: "leader",
+    leaderGroupId: groupId,
+    currentGroupId: undefined,
+    activeMembershipId: undefined,
+    onboardingStatus: "approved",
+    updatedAt: now,
+  });
+  await ctx.db.patch(groupId, {
+    leaderProfileId: profile._id,
+    updatedAt: now,
+  });
+  return { profileId: profile._id, groupId };
+}
+
 export const promoteToLeader = internalMutation({
   args: { userId: v.id("users"), groupId: v.id("groups") },
   handler: async (ctx, { userId, groupId }) => {
@@ -70,20 +108,24 @@ export const promoteToLeader = internalMutation({
       .unique();
     if (!profile) throw new Error("No userProfile found for that userId");
 
-    const group = await ctx.db.get(groupId);
-    if (!group) throw new Error("Group not found");
+    return await promoteProfileToLeaderForGroup(ctx, profile, groupId);
+  },
+});
 
-    const now = Date.now();
-    await ctx.db.patch(profile._id, {
-      role: "leader",
-      leaderGroupId: groupId,
-      onboardingStatus: "approved",
-      updatedAt: now,
-    });
-    await ctx.db.patch(groupId, {
-      leaderProfileId: profile._id,
-      updatedAt: now,
-    });
-    return { profileId: profile._id, groupId };
+/**
+ * Promote an existing userProfile to leader of a given group.
+ * Use this when you have the userProfiles _id from the dashboard.
+ *
+ * Usage in dashboard:
+ *   Function: seed:promoteProfileToLeader
+ *   Args: { "profileId": "<userProfiles _id>", "groupId": "<groups _id>" }
+ */
+export const promoteProfileToLeader = internalMutation({
+  args: { profileId: v.id("userProfiles"), groupId: v.id("groups") },
+  handler: async (ctx, { profileId, groupId }) => {
+    const profile = await ctx.db.get(profileId);
+    if (!profile) throw new Error("No userProfile found for that profileId");
+
+    return await promoteProfileToLeaderForGroup(ctx, profile, groupId);
   },
 });

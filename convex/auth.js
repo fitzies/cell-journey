@@ -9,6 +9,13 @@ function isAllowedRedirect(redirectTo) {
   if (redirectTo.startsWith("exp://")) return true; // Expo Go
   if (redirectTo.startsWith("http://localhost")) return true; // web dev
   if (redirectTo.startsWith("https://localhost")) return true;
+
+  const allowedWebOrigins = (process.env.WEB_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  if (allowedWebOrigins.some((origin) => redirectTo.startsWith(origin))) return true;
+
   return false;
 }
 

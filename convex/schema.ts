@@ -98,7 +98,8 @@ export default defineSchema({
   })
     .index("by_profile", ["profileId"])
     .index("by_group_status", ["groupId", "status"])
-    .index("by_profile_status", ["profileId", "status"]),
+    .index("by_profile_status", ["profileId", "status"])
+    .index("by_status", ["status"]),
 
   memberships: defineTable({
     profileId: v.id("userProfiles"),
