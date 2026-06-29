@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LoadingState } from '@/components/onboarding/ui';
+import { EditProfileSheet } from '@/components/profile/EditProfileSheet';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
 import { api } from '@/lib/api';
 
@@ -34,6 +35,7 @@ export default function MemberProfileScreen() {
   const services = useQuery(api.groups.listServices, {});
   const leaveGroup = useMutation(api.groups.leaveCurrentGroup);
   const [busy, setBusy] = useState<'leave' | 'signOut' | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   const serviceNames = useMemo(() => {
     if (!profile || !services) return [];
@@ -114,10 +116,12 @@ export default function MemberProfileScreen() {
         </View>
 
         <View style={styles.actions}>
+          <ActionButton label="Edit profile details" filled disabled={!profile || busy !== null} onPress={() => setEditOpen(true)} />
           <ActionButton label={busy === 'leave' ? 'Leaving…' : 'Leave current group'} danger disabled={!group || busy !== null} onPress={confirmLeave} />
           <ActionButton label={busy === 'signOut' ? 'Signing out…' : 'Sign out'} disabled={busy !== null} onPress={handleSignOut} />
         </View>
       </ScrollView>
+      <EditProfileSheet visible={editOpen} profile={profile} services={services} onClose={() => setEditOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -137,7 +141,7 @@ function InfoCard({ title, detail, mark }: { title: string; detail: string; mark
   );
 }
 
-function ActionButton({ label, onPress, danger, disabled }: { label: string; onPress: () => void; danger?: boolean; disabled?: boolean }) {
+function ActionButton({ label, onPress, danger, disabled, filled }: { label: string; onPress: () => void; danger?: boolean; disabled?: boolean; filled?: boolean }) {
   const t = useAppTheme();
   return (
     <Pressable
@@ -145,10 +149,10 @@ function ActionButton({ label, onPress, danger, disabled }: { label: string; onP
       disabled={disabled}
       style={({ pressed }) => [
         styles.action,
-        { borderColor: t.line, backgroundColor: t.surface, opacity: disabled ? 0.45 : 1, transform: [{ scale: pressed && !disabled ? 0.985 : 1 }] },
+        { borderColor: filled ? t.accent : t.line, backgroundColor: filled ? t.accent : t.surface, opacity: disabled ? 0.45 : 1, transform: [{ scale: pressed && !disabled ? 0.985 : 1 }] },
       ]}
     >
-      <Text style={[styles.actionText, { color: danger ? t.danger : t.ink }]}>{label}</Text>
+      <Text style={[styles.actionText, { color: filled ? t.accentInk : danger ? t.danger : t.ink }]}>{label}</Text>
     </Pressable>
   );
 }

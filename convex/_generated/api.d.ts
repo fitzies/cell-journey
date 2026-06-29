@@ -14,6 +14,7 @@ import type * as auth from "../auth.js";
 import type * as events from "../events.js";
 import type * as groups from "../groups.js";
 import type * as http from "../http.js";
+import type * as joinRequestFlow from "../joinRequestFlow.js";
 import type * as profiles from "../profiles.js";
 import type * as seed from "../seed.js";
 
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   events: typeof events;
   groups: typeof groups;
   http: typeof http;
+  joinRequestFlow: typeof joinRequestFlow;
   profiles: typeof profiles;
   seed: typeof seed;
 }>;

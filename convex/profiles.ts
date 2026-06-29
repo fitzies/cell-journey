@@ -71,6 +71,7 @@ function getOnboardingStatus(profile: Doc<"userProfiles">) {
   if (!profile.fullName?.trim() || !profile.singaporeRegion || profile.serviceIds.length === 0) {
     return "profileIncomplete" as const;
   }
+  if (profile.role === "leader") return "approved" as const;
   if (profile.currentGroupId && profile.activeMembershipId) return "approved" as const;
   return profile.onboardingStatus === "pendingApproval" ? "pendingApproval" : "needsGroup";
 }

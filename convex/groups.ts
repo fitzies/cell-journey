@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { approvePendingJoinRequest, rejectPendingJoinRequest } from "./joinRequestFlow";
 import { requireCurrentProfile, requireLeaderProfile } from "./profiles";
 
 export const listServices = query({
@@ -115,39 +116,10 @@ export const approveJoinRequest = mutation({
   args: { joinRequestId: v.id("joinRequests") },
   handler: async (ctx, args) => {
     const leader = await requireLeaderProfile(ctx);
-    const request = await ctx.db.get(args.joinRequestId);
-    if (!request || request.groupId !== leader.leaderGroupId || request.status !== "pending") {
-      throw new Error("Join request not found");
-    }
-
-    const member = await ctx.db.get(request.profileId);
-    if (!member) throw new Error("Member profile not found");
-    const active = await ctx.db
-      .query("memberships")
-      .withIndex("by_profile_status", (q) => q.eq("profileId", member._id).eq("status", "active"))
-      .unique();
-    if (active) throw new Error("Member is already in a group");
-
-    const now = Date.now();
-    const membershipId = await ctx.db.insert("memberships", {
-      profileId: member._id,
-      groupId: request.groupId,
-      status: "active",
-      joinedAt: now,
-      joinRequestId: request._id,
-    });
-    await ctx.db.patch(request._id, {
-      status: "approved",
-      reviewedAt: now,
+    return await approvePendingJoinRequest(ctx, args.joinRequestId, {
+      expectedGroupId: leader.leaderGroupId!,
       reviewedByProfileId: leader._id,
     });
-    await ctx.db.patch(member._id, {
-      currentGroupId: request.groupId,
-      activeMembershipId: membershipId,
-      onboardingStatus: "approved",
-      updatedAt: now,
-    });
-    return await ctx.db.get(membershipId);
   },
 });
 
@@ -155,19 +127,11 @@ export const rejectJoinRequest = mutation({
   args: { joinRequestId: v.id("joinRequests"), reason: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const leader = await requireLeaderProfile(ctx);
-    const request = await ctx.db.get(args.joinRequestId);
-    if (!request || request.groupId !== leader.leaderGroupId || request.status !== "pending") {
-      throw new Error("Join request not found");
-    }
-    const now = Date.now();
-    await ctx.db.patch(request._id, {
-      status: "rejected",
-      reviewedAt: now,
+    return await rejectPendingJoinRequest(ctx, args.joinRequestId, {
+      expectedGroupId: leader.leaderGroupId!,
       reviewedByProfileId: leader._id,
-      rejectionReason: args.reason,
+      reason: args.reason,
     });
-    await ctx.db.patch(request.profileId, { onboardingStatus: "needsGroup", updatedAt: now });
-    return null;
   },
 });
 

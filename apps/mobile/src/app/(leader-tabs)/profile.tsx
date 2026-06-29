@@ -2,8 +2,9 @@ import { useAuthActions } from '@convex-dev/auth/react';
 import { useQuery } from 'convex/react';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { LoadingState } from '@/components/onboarding/ui';
+import { EditProfileSheet } from '@/components/profile/EditProfileSheet';
 import { ActionButton, Card, LeaderScreen, Mark, RowCard, SectionHeader } from '@/components/leader/ui';
 import { fonts, useAppTheme } from '@/constants/tokens';
 import { api } from '@/lib/api';
@@ -25,6 +26,7 @@ export default function LeaderProfileScreen() {
   const group = useQuery(api.groups.getMyGroup, {});
   const services = useQuery(api.groups.listServices, {});
   const [busy, setBusy] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const serviceNames = useMemo(() => {
     if (!profile || !services) return [];
@@ -60,6 +62,10 @@ export default function LeaderProfileScreen() {
         </View>
       </Card>
 
+      <View style={{ marginTop: 14 }}>
+        <ActionButton filled label="Edit profile details" disabled={!profile || busy} onPress={() => setEditOpen(true)} />
+      </View>
+
       <SectionHeader title="Assignment" />
       <RowCard mark={<Mark>⌁</Mark>} title={group?.name ?? 'No assigned group'} detail={group ? 'You lead this group' : 'Ask the app owner to assign your group in Convex.'} />
 
@@ -73,6 +79,8 @@ export default function LeaderProfileScreen() {
       <View style={{ marginTop: 30 }}>
         <ActionButton label={busy ? 'Signing out…' : 'Sign out'} disabled={busy} onPress={handleSignOut} />
       </View>
+
+      <EditProfileSheet visible={editOpen} profile={profile} services={services} onClose={() => setEditOpen(false)} />
     </LeaderScreen>
   );
 }

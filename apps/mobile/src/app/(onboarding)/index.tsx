@@ -25,9 +25,13 @@ export default function OnboardingGate() {
   if (isLoading) return <LoadingState />;
   if (!isAuthenticated) return <Redirect href="/(auth)" />;
   if (profile === undefined || profile === null) return <LoadingState />;
-  if (profile.onboardingStatus === 'approved') {
-    return <Redirect href={profile.role === 'leader' ? '/(leader-tabs)' : '/(member-tabs)'} />;
+  if (profile.role === 'leader') {
+    if (!profile.fullName?.trim() || !profile.singaporeRegion || profile.serviceIds.length === 0) {
+      return <Redirect href="/(onboarding)/profile" />;
+    }
+    return <Redirect href={profile.leaderGroupId ? '/(leader-tabs)' : '/(onboarding)/leader-setup'} />;
   }
+  if (profile.onboardingStatus === 'approved') return <Redirect href="/(member-tabs)" />;
   if (profile.onboardingStatus === 'pendingApproval') return <Redirect href="/(onboarding)/pending" />;
   if (profile.onboardingStatus === 'needsGroup') return <Redirect href="/(onboarding)/group-code" />;
   return <Redirect href="/(onboarding)/profile" />;

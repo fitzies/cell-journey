@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { approvePendingJoinRequest, rejectPendingJoinRequest } from "./joinRequestFlow";
 import type { Doc, Id } from "./_generated/dataModel";
 
 const MAX_ROWS = 250;
@@ -178,6 +179,37 @@ export const listPendingJoinRequests = query({
       rows.push({ request, profile: profile ? publicProfile(profile) : null, group });
     }
     return rows;
+  },
+});
+
+export const approveJoinRequest = mutation({
+  args: { joinRequestId: v.id("joinRequests") },
+  handler: async (ctx, args) => {
+    const { userId } = await requireAdmin(ctx);
+    const reviewer = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    return await approvePendingJoinRequest(ctx, args.joinRequestId, {
+      reviewedByProfileId: reviewer?._id ?? null,
+    });
+  },
+});
+
+export const rejectJoinRequest = mutation({
+  args: { joinRequestId: v.id("joinRequests"), reason: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const { userId } = await requireAdmin(ctx);
+    const reviewer = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    return await rejectPendingJoinRequest(ctx, args.joinRequestId, {
+      reviewedByProfileId: reviewer?._id ?? null,
+      reason: args.reason,
+    });
   },
 });
 

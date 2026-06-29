@@ -25,15 +25,19 @@ export default function ProfileScreen() {
     if (!region) return;
     setSaving(true);
     try {
-      await update({ fullName, preferredName: preferredName || undefined, singaporeRegion: region, serviceIds: selected });
-      router.push('/(onboarding)/group-code');
+      const updated = await update({ fullName, preferredName: preferredName || undefined, singaporeRegion: region, serviceIds: selected });
+      if (updated?.role === 'leader') {
+        router.replace(updated.leaderGroupId ? '/(leader-tabs)' : '/(onboarding)/leader-setup');
+        return;
+      }
+      router.replace('/(onboarding)/group-code');
     } finally {
       setSaving(false);
     }
   };
-  const back = step ? () => setStep(step - 1) : () => router.replace('/(onboarding)');
+  const back = () => setStep(step - 1);
   const disabled = (step === 0 && !fullName.trim()) || (step === 1 && selected.length === 0) || (step === 2 && !region) || saving;
-  const common = { onBack: back, onCta: next, cta: saving ? 'Saving…' : 'Continue', ctaDisabled: disabled, progress: (step + 1) / 6, animationKey: step };
+  const common = { onBack: step > 0 ? back : undefined, fullWidthProgress: step === 0, onCta: next, cta: saving ? 'Saving…' : 'Continue', ctaDisabled: disabled, progress: (step + 1) / 6, animationKey: step };
   if (step === 0) return <OnboardingShell {...common} eyebrow="YOUR NAME" title="What’s your full name?" hint="Use the name your leader would know."><Field value={fullName} onChangeText={setFullName} autoCapitalize="words" autoFocus /></OnboardingShell>;
   if (step === 1) return <OnboardingShell {...common} eyebrow="SERVICES" title="Which service do you attend?" hint="Pick one or more."><View style={{ gap: 9 }}>{rows.map(s => <OptionPill key={s._id} label={s.name} selected={selected.includes(s._id)} onPress={() => setSelected(x => x.includes(s._id) ? x.filter(id => id !== s._id) : [...x, s._id])} />)}</View></OnboardingShell>;
   return <OnboardingShell {...common} eyebrow="REGION" title="Where are you based?" hint="Choose your Singapore region."><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 9 }}>{regions.map(r => <Chip key={r} label={labels[r]} selected={region === r} onPress={() => setRegion(r)} />)}</View></OnboardingShell>;

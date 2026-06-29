@@ -33,7 +33,7 @@ export function useStaggerReveal(count: number, opts: { delay?: number; initialD
   return { values, animStyle };
 }
 
-export function OnboardingShell({ children, eyebrow, title, hint, cta, onCta, ctaDisabled, onBack, pending = false, hideProgress = false, footer, progress = 0.55, animationKey, bottomContent }: PropsWithChildren<{ eyebrow?: string; title: string; hint?: string; cta?: string; onCta?: () => void; ctaDisabled?: boolean; onBack?: () => void; pending?: boolean; hideProgress?: boolean; footer?: ReactNode; progress?: number; animationKey?: string | number; bottomContent?: ReactNode }>) {
+export function OnboardingShell({ children, eyebrow, title, hint, cta, onCta, ctaDisabled, onBack, pending = false, hideProgress = false, fullWidthProgress = false, footer, progress = 0.55, animationKey, bottomContent }: PropsWithChildren<{ eyebrow?: string; title: string; hint?: string; cta?: string; onCta?: () => void; ctaDisabled?: boolean; onBack?: () => void; pending?: boolean; hideProgress?: boolean; fullWidthProgress?: boolean; footer?: ReactNode; progress?: number; animationKey?: string | number; bottomContent?: ReactNode }>) {
   const t = useAppTheme();
   const bodyAnim = usePageEntrance(animationKey);
   const reveal = useStaggerReveal(4, { initialDelay: 70, animationKey });
@@ -46,7 +46,7 @@ export function OnboardingShell({ children, eyebrow, title, hint, cta, onCta, ct
   const width = progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
   return <KeyboardAvoidingView style={[styles.root, { backgroundColor: t.background }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}> 
-    {!pending && !hideProgress && <SafeAreaView edges={['top']}><View style={styles.top}>{onBack ? <BackCircle onPress={onBack} /> : <View style={styles.spacer} />}<View style={[styles.rail, { backgroundColor: t.line }]}><Animated.View style={[styles.fill, { backgroundColor: t.accent, width }]} /></View><View style={styles.spacer} /></View></SafeAreaView>}
+    {!pending && !hideProgress && <SafeAreaView edges={['top']}><View style={styles.top}>{onBack ? <BackCircle onPress={onBack} /> : fullWidthProgress ? null : <View style={styles.spacer} />}<View style={[styles.rail, { backgroundColor: t.line }]}><Animated.View style={[styles.fill, { backgroundColor: t.accent, width }]} /></View>{fullWidthProgress ? null : <View style={styles.spacer} />}</View></SafeAreaView>}
     {hideProgress && <SafeAreaView edges={['top']} />}
     <Animated.View style={[styles.animatedBody, bodyAnim]}>
       <ScrollView contentContainerStyle={[styles.body, pending && styles.pendingBody]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
