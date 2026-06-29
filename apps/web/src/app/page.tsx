@@ -443,26 +443,83 @@ function UserTableRow({ row, groups }: { row: UserRow; groups: GroupRow[] }) {
 }
 
 function RequestsPanel({ requests }: { requests: RequestRows | undefined }) {
+  const approveJoinRequest = useMutation(api.admin.approveJoinRequest);
+  const rejectJoinRequest = useMutation(api.admin.rejectJoinRequest);
+  const [busyRequest, setBusyRequest] = useState<{ id: Id<"joinRequests">; action: "approve" | "reject" } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function approveRequest(joinRequestId: Id<"joinRequests">) {
+    setError(null);
+    setBusyRequest({ id: joinRequestId, action: "approve" });
+    try {
+      await approveJoinRequest({ joinRequestId });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not approve request");
+    } finally {
+      setBusyRequest(null);
+    }
+  }
+
+  async function rejectRequest(joinRequestId: Id<"joinRequests">) {
+    setError(null);
+    setBusyRequest({ id: joinRequestId, action: "reject" });
+    try {
+      await rejectJoinRequest({ joinRequestId });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not reject request");
+    } finally {
+      setBusyRequest(null);
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="font-serif text-2xl tracking-[-0.04em]">Join requests</CardTitle>
-        <CardDescription>Quick visibility only. Leaders can still approve from mobile.</CardDescription>
+        <CardDescription>Approve pending member requests from web, or reject requests that should not join this group.</CardDescription>
       </CardHeader>
       <CardContent>
+        {error ? <div className="mb-4 rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div> : null}
         {!requests ? <EmptyLine text="Loading requests…" /> : requests.length === 0 ? <EmptyLine text="No pending join requests." /> : (
           <div className="space-y-3">
-            {requests.map((row) => (
-              <div key={row.request._id} className="rounded-3xl border bg-background p-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-semibold">{row.profile?.preferredName || row.profile?.fullName || "Unnamed member"}</p>
-                    <p className="text-sm text-muted-foreground">Requested {row.group?.name ?? "Unknown group"}</p>
+            {requests.map((row) => {
+              const isBusy = busyRequest?.id === row.request._id;
+              return (
+                <div key={row.request._id} className="rounded-3xl border bg-background p-4">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-semibold">{row.profile?.preferredName || row.profile?.fullName || "Unnamed member"}</p>
+                      <p className="text-sm text-muted-foreground">Requested {row.group?.name ?? "Unknown group"}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                      <Badge variant="secondary">Pending</Badge>
+                      <Button size="sm" disabled={busyRequest !== null} onClick={() => void approveRequest(row.request._id)}>
+                        {isBusy && busyRequest?.action === "approve" ? "Approving…" : "Approve"}
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="outline" disabled={busyRequest !== null}>Reject</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Reject join request?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This only rejects the pending request. If {row.profile?.preferredName || row.profile?.fullName || "this member"} is still waiting, they can enter another code.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => void rejectRequest(row.request._id)}>
+                              {isBusy && busyRequest?.action === "reject" ? "Rejecting…" : "Reject"}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </div>
-                  <Badge variant="secondary">Pending</Badge>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardContent>
