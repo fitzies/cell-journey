@@ -1,0 +1,22 @@
+{
+  "name": "@cell-journey/theme",
+  "version": "0.0.0",
+  "private": true,
+  "sideEffects": [
+    "*.css"
+  ],
+  "exports": {
+    "./index.css": "./index.css",
+    "./mobile": {
+      "types": "./mobile.ts",
+      "default": "./mobile.ts"
+    },
+    "./web": {
+      "types": "./web.ts",
+      "default": "./web.ts"
+    }
+  },
+  "scripts": {
+    "sync": "node scripts/generate-mobile-theme.mjs"
+  }
+}

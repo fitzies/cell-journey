@@ -3,15 +3,20 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
+    "prestart": "node ../../packages/theme/scripts/generate-mobile-theme.mjs",
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
+    "preandroid": "node ../../packages/theme/scripts/generate-mobile-theme.mjs",
     "android": "expo start --android",
+    "preios": "node ../../packages/theme/scripts/generate-mobile-theme.mjs",
     "ios": "expo start --ios",
+    "preweb": "node ../../packages/theme/scripts/generate-mobile-theme.mjs",
     "web": "expo start --web",
     "lint": "expo lint"
   },
   "dependencies": {
     "@babel/runtime": "^7.29.2",
+    "@cell-journey/theme": "workspace:*",
     "@convex-dev/auth": "^0.0.92",
     "@expo-google-fonts/dm-sans": "^0.4.2",
     "@expo-google-fonts/fraunces": "^0.4.1",

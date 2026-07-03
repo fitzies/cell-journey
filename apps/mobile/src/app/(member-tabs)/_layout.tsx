@@ -6,9 +6,12 @@ import { SolarTabIcon, type SolarTabIconName } from '@/components/solar-tab-icon
 import { useAppTheme } from '@/constants/tokens';
 
 function tabIcon(name: SolarTabIconName) {
-  return ({ color, focused }: { color: string; focused: boolean }) => (
-    <SolarTabIcon name={name} color={color} focused={focused} />
-  );
+  function TabIcon({ color, focused }: { color: string; focused: boolean }) {
+    return <SolarTabIcon name={name} color={color} focused={focused} />;
+  }
+
+  TabIcon.displayName = `${name}TabIcon`;
+  return TabIcon;
 }
 
 const homeIcon = tabIcon('home');

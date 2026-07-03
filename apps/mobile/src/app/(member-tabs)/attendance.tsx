@@ -20,10 +20,6 @@ function formatPercent(rate: number | null) {
   return Math.round(rate * 100).toString();
 }
 
-function formatEventDate(ms: number) {
-  return new Intl.DateTimeFormat('en-SG', { day: '2-digit', month: 'short' }).format(ms);
-}
-
 function formatEventMeta(ms: number) {
   return new Intl.DateTimeFormat('en-SG', {
     weekday: 'short',

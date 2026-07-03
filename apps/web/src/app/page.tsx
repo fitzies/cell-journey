@@ -6,6 +6,8 @@ import type { FunctionReturnType } from "convex/server";
 import { CheckCircle2, CircleAlert, LogOut, Plus, Search, Shield, UserRoundCog, UsersRound } from "lucide-react";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 
+import { ModeToggle } from "@/components/mode-toggle";
+import { ThemePresetSelect } from "@/components/theme-preset-select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,7 +42,7 @@ export default function AdminPage() {
   if (!isAuthenticated) return <SignInScreen />;
   if (!me?.isAdmin) return <NoAccess reason={me?.reason ?? "notAllowed"} email={me?.email ?? null} />;
 
-  return <AdminDashboard adminName={me.name || me.email || "Admin"} />;
+  return <AdminDashboard />;
 }
 
 function LoadingScreen() {
@@ -114,7 +116,7 @@ function NoAccess({ reason, email }: { reason: string; email: string | null }) {
   );
 }
 
-function AdminDashboard({ adminName }: { adminName: string }) {
+function AdminDashboard() {
   const { signOut } = useAuthActions();
   const [search, setSearch] = useState("");
   const users = useQuery(api.admin.listUsers, { search, limit: 200 });
@@ -134,8 +136,9 @@ function AdminDashboard({ adminName }: { adminName: string }) {
             <h1 className="mt-3 max-w-2xl font-serif text-4xl leading-none tracking-[-0.055em] sm:text-5xl">Set up groups without the noise.</h1>
             <p className="mt-4 max-w-xl text-sm leading-6 opacity-80">Create groups, promote leaders, and move members while preserving history.</p>
           </div>
-          <div className="flex items-center gap-3">
-            <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground">{adminName}</Badge>
+          <div className="flex flex-wrap items-center gap-3">
+            <ThemePresetSelect />
+            <ModeToggle />
             <Button variant="secondary" onClick={() => void signOut()}>
               <LogOut className="h-4 w-4" /> Sign out
             </Button>
