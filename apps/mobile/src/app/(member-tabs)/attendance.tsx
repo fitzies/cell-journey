@@ -9,7 +9,8 @@ type HistoryRow = {
   event: {
     _id: string;
     title: string;
-    location: string;
+    location?: string;
+    venue?: string;
     startAt: number;
   };
   status: string;
@@ -109,7 +110,7 @@ function HistoryCard({ row }: { row: HistoryRow }) {
       <View style={styles.cardBody}>
         <Text style={[styles.cardLabel, { color: t.muted }]}>{formatEventMeta(row.event.startAt)}</Text>
         <Text style={[styles.cardTitle, { color: t.ink }]}>{row.event.title}</Text>
-        <Text style={[styles.cardLocation, { color: t.muted }]} numberOfLines={1}>{row.event.location}</Text>
+        <Text style={[styles.cardLocation, { color: t.muted }]} numberOfLines={1}>{row.event.venue || row.event.location || 'Venue TBC'}</Text>
       </View>
       <View style={[styles.statusPill, { backgroundColor: present ? t.selected : t.soft }]}>
         <Text style={[styles.statusText, { color: present ? t.success : t.muted }]}>{present ? 'Present' : 'Absent'}</Text>

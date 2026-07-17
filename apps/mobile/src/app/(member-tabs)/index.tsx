@@ -10,7 +10,8 @@ import { api } from '@/lib/api';
 type EventRow = {
   _id: string;
   title: string;
-  location: string;
+  location?: string;
+  venue?: string;
   startAt: number;
   endAt: number;
 };
@@ -103,7 +104,7 @@ export default function MemberHomeScreen() {
           <View style={styles.heroGlow} />
           <Text style={[styles.nextKicker, { color: t.accentInk }]}>{next ? `${formatDay(next.startAt)} · ${formatTimeRange(next.startAt, next.endAt)}` : 'NO EVENT SCHEDULED'}</Text>
           <Text style={[styles.nextTitle, { color: t.accentInk }]}>{next?.title ?? 'A quiet week for now.'}</Text>
-          <Text style={[styles.nextLocation, { color: t.accentInk }]}>{next?.location ?? 'Your next gathering will appear here once scheduled.'}</Text>
+          <Text style={[styles.nextLocation, { color: t.accentInk }]}>{next ? next.venue || next.location || 'Venue TBC' : 'Your next gathering will appear here once scheduled.'}</Text>
           {next ? (
             <Pressable
               onPress={checkIn}

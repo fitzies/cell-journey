@@ -43,7 +43,7 @@ export default function LeaderHomeScreen() {
         <Card accent>
           <Text style={{ color: t.accentInk, opacity: 0.76, fontFamily: fonts.bodyBold, fontSize: 11, letterSpacing: 1.6, textTransform: 'uppercase' }}>{formatDay(next.startAt)} · {formatTimeRange(next.startAt, next.endAt)}</Text>
           <Text style={{ color: t.accentInk, marginTop: 8, fontFamily: fonts.bodyBold, fontSize: 26, lineHeight: 31, letterSpacing: -0.7 }}>{next.title}</Text>
-          <Text style={{ color: t.accentInk, marginTop: 8, opacity: 0.82, fontFamily: fonts.body, fontSize: 14 }}>{next.location}</Text>
+          <Text style={{ color: t.accentInk, marginTop: 8, opacity: 0.82, fontFamily: fonts.body, fontSize: 14 }}>{next.venue || next.location || 'Venue TBC'}</Text>
         </Card>
       ) : (
         <RowCard mark={<Mark>◇</Mark>} title="No upcoming event" detail="Create one from the Schedule tab when you’re ready." />

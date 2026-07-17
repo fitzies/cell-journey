@@ -1,5 +1,7 @@
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useMutation, useQuery } from 'convex/react';
+import * as DocumentPicker from 'expo-document-picker';
+import { File as ExpoFile } from 'expo-file-system';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,11 +9,15 @@ import { LoadingState } from '@/components/onboarding/ui';
 import { ActionButton, EmptyState, LeaderScreen, RowCard, SectionHeader } from '@/components/leader/ui';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
 import { formatDateParts, formatDay, formatTimeRange, nextFridayEvening, startOfToday } from '@/lib/date';
+import { MAX_EVENT_IMPORT_FILE_BYTES, parseEventImport, type EventImportPreview } from '@/lib/event-import';
 import { api, type Doc, type Id } from '@/lib/api';
 
 type EventForm = {
   title: string;
-  location: string;
+  venue: string;
+  word: string;
+  worship: string;
+  remarks: string;
   date: string;
   startTime: string;
   endTime: string;
@@ -55,14 +61,18 @@ function formatReadableDate(value: string) {
 }
 
 function formatReadableTime(value: string) {
-  return new Intl.DateTimeFormat('en-SG', { hour: 'numeric', minute: '2-digit' }).format(dateFromTimeInput({ title: '', location: '', date: formatDateInput(startOfToday()), startTime: value, endTime: value }, value));
+  const form = { title: '', venue: '', word: '', worship: '', remarks: '', date: formatDateInput(startOfToday()), startTime: value, endTime: value };
+  return new Intl.DateTimeFormat('en-SG', { hour: 'numeric', minute: '2-digit' }).format(dateFromTimeInput(form, value));
 }
 
 function defaultForm(): EventForm {
   const startAt = nextFridayEvening();
   return {
-    title: 'Cell Gathering',
-    location: '',
+    title: 'Cell Group',
+    venue: '',
+    word: '',
+    worship: '',
+    remarks: '',
     date: formatDateInput(startAt),
     startTime: formatTimeInput(startAt),
     endTime: formatTimeInput(startAt + 2 * 60 * 60 * 1000),
@@ -72,18 +82,19 @@ function defaultForm(): EventForm {
 function formFromEvent(event: Doc<'events'>): EventForm {
   return {
     title: event.title,
-    location: event.location,
+    venue: event.venue ?? event.location ?? '',
+    word: event.word ?? '',
+    worship: event.worship ?? '',
+    remarks: event.remarks ?? '',
     date: formatDateInput(event.startAt),
     startTime: formatTimeInput(event.startAt),
     endTime: formatTimeInput(event.endAt),
   };
 }
 
-function parseEventForm(form: EventForm, earliestStartAt: number): { ok: true; value: { title: string; location: string; startAt: number; endAt: number } } | { ok: false; message: string } {
+function parseEventForm(form: EventForm, earliestStartAt: number): { ok: true; value: { title: string; venue: string; word: string; worship: string; remarks: string; startAt: number; endAt: number } } | { ok: false; message: string } {
   const title = form.title.trim();
-  const location = form.location.trim();
   if (!title) return { ok: false, message: 'Add a title for this gathering.' };
-  if (!location) return { ok: false, message: 'Add a location, even if it is TBC.' };
 
   const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(form.date.trim());
   if (!dateMatch) return { ok: false, message: 'Use the date format YYYY-MM-DD.' };
@@ -110,7 +121,18 @@ function parseEventForm(form: EventForm, earliestStartAt: number): { ok: true; v
   if (start.getTime() < earliestStartAt) return { ok: false, message: 'Events must be scheduled for today or later.' };
   if (end.getTime() <= start.getTime()) return { ok: false, message: 'End time must be after the start time.' };
 
-  return { ok: true, value: { title, location, startAt: start.getTime(), endAt: end.getTime() } };
+  return {
+    ok: true,
+    value: {
+      title,
+      venue: form.venue.trim(),
+      word: form.word.trim(),
+      worship: form.worship.trim(),
+      remarks: form.remarks.trim(),
+      startAt: start.getTime(),
+      endAt: end.getTime(),
+    },
+  };
 }
 
 export default function LeaderScheduleScreen() {
@@ -119,11 +141,15 @@ export default function LeaderScheduleScreen() {
   const [editingId, setEditingId] = useState<Id<'events'> | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pickingFile, setPickingFile] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importPreview, setImportPreview] = useState<EventImportPreview | null>(null);
   const [busyEventId, setBusyEventId] = useState<Id<'events'> | null>(null);
   const profile = useQuery(api.profiles.current, {});
   const hasGroup = Boolean(profile?.leaderGroupId);
   const events = useQuery(api.events.listMine, { from, limit: 30 });
   const create = useMutation(api.events.create);
+  const importEvents = useMutation(api.events.importMine);
   const update = useMutation(api.events.update);
   const cancel = useMutation(api.events.cancel);
 
@@ -138,6 +164,8 @@ export default function LeaderScheduleScreen() {
       </LeaderScreen>
     );
   }
+
+  const eventRows = events ?? [];
 
   const openCreateForm = () => {
     setEditingId(null);
@@ -175,6 +203,53 @@ export default function LeaderScheduleScreen() {
     }
   };
 
+  const pickImportFile = async () => {
+    setPickingFile(true);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result.canceled) return;
+
+      const asset = result.assets[0];
+      if (!asset) throw new Error('No file was selected.');
+      if (asset.size && asset.size > MAX_EVENT_IMPORT_FILE_BYTES) throw new Error('Choose a file smaller than 5 MB.');
+
+      const data = asset.file
+        ? await asset.file.arrayBuffer()
+        : await new ExpoFile(asset.uri).arrayBuffer();
+      if (data.byteLength > MAX_EVENT_IMPORT_FILE_BYTES) throw new Error('Choose a file smaller than 5 MB.');
+      setImportPreview(parseEventImport(data, asset.name));
+    } catch (err) {
+      Alert.alert('Could not read file', err instanceof Error ? err.message : 'Choose a CSV or XLSX file and try again.');
+    } finally {
+      setPickingFile(false);
+    }
+  };
+
+  const confirmImport = async () => {
+    if (!importPreview) return;
+    const validEvents = importPreview.rows.flatMap((row) => row.event ? [row.event] : []);
+    if (validEvents.length !== importPreview.rows.length) return;
+
+    setImporting(true);
+    try {
+      const result = await importEvents({
+        sourceType: importPreview.sourceType,
+        fileName: importPreview.fileName,
+        events: validEvents,
+      });
+      setImportPreview(null);
+      Alert.alert('Events imported', `${result.insertedCount} ${result.insertedCount === 1 ? 'event is' : 'events are'} now in the schedule.`);
+    } catch (err) {
+      Alert.alert('Could not import events', err instanceof Error ? err.message : 'Nothing was imported. Please try again.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const startEdit = (event: Doc<'events'>) => {
     setEditingId(event._id);
     setForm(formFromEvent(event));
@@ -204,12 +279,15 @@ export default function LeaderScheduleScreen() {
 
   return (
     <LeaderScreen eyebrow="Schedule" title="Plan gatherings." hint="Keep the schedule clean. Add details only when you need them.">
-      <ActionButton filled label="Create event" onPress={openCreateForm} />
+      <View style={styles.topActions}>
+        <View style={styles.topAction}><ActionButton filled label="Create event" disabled={pickingFile || importing} onPress={openCreateForm} /></View>
+        <View style={styles.topAction}><ActionButton label={pickingFile ? 'Opening…' : 'Import CSV / XLSX'} disabled={pickingFile || importing} onPress={pickImportFile} /></View>
+      </View>
 
-      <SectionHeader title="Upcoming events" meta={`${events.length} total`} />
-      {events.length ? (
+      <SectionHeader title="Upcoming events" meta={`${eventRows.length} total`} />
+      {eventRows.length ? (
         <View style={{ gap: 10 }}>
-          {events.map((event) => (
+          {eventRows.map((event) => (
             <EventRow
               key={event._id}
               event={event}
@@ -232,6 +310,14 @@ export default function LeaderScheduleScreen() {
         onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
         onSubmit={submitForm}
         onClose={closeForm}
+      />
+      <ImportPreviewModal
+        preview={importPreview}
+        importing={importing}
+        onConfirm={confirmImport}
+        onClose={() => {
+          if (!importing) setImportPreview(null);
+        }}
       />
     </LeaderScreen>
   );
@@ -285,8 +371,12 @@ function EventFormModal({ visible, form, editingTitle, saving, onChange, onSubmi
 
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetBody}>
             <View style={styles.formGrid}>
-              <FormField label="Title" value={form.title} onChangeText={(title) => onChange({ title })} placeholder="Cell Gathering" returnKeyType="next" editable={!saving} />
-              <FormField label="Location" value={form.location} onChangeText={(location) => onChange({ location })} placeholder="Home, church room, or TBC" returnKeyType="next" editable={!saving} />
+              <FormField label="Title" value={form.title} onChangeText={(title) => onChange({ title })} placeholder="Cell Group" returnKeyType="next" editable={!saving} />
+              <FormField label="Venue" value={form.venue} onChangeText={(venue) => onChange({ venue })} placeholder="Home or meeting room (optional)" returnKeyType="next" editable={!saving} />
+              <View style={styles.timeRow}>
+                <FormField label="Word" value={form.word} onChangeText={(word) => onChange({ word })} placeholder="Name (optional)" returnKeyType="next" editable={!saving} containerStyle={styles.timeField} />
+                <FormField label="Worship" value={form.worship} onChangeText={(worship) => onChange({ worship })} placeholder="Name (optional)" returnKeyType="next" editable={!saving} containerStyle={styles.timeField} />
+              </View>
               {Platform.OS === 'ios' ? (
                 <CompactPickerField label="Date" value={dateFromInput(form.date)} mode="date" disabled={saving} minimumDate={new Date(startOfToday())} onChange={(selected) => updateFromPicker('date', selected)} />
               ) : (
@@ -305,6 +395,16 @@ function EventFormModal({ visible, form, editingTitle, saving, onChange, onSubmi
                   </>
                 )}
               </View>
+              <FormField
+                label="Remarks"
+                value={form.remarks}
+                onChangeText={(remarks) => onChange({ remarks })}
+                placeholder="Anything members should know (optional)"
+                multiline
+                textAlignVertical="top"
+                editable={!saving}
+                style={styles.notesInput}
+              />
             </View>
 
             {Platform.OS === 'android' && pickerField ? (
@@ -317,7 +417,7 @@ function EventFormModal({ visible, form, editingTitle, saving, onChange, onSubmi
               />
             ) : null}
 
-            <Text style={[styles.helper, { color: t.muted }]}>Choose native date and time controls. End time must be after start time.</Text>
+            <Text style={[styles.helper, { color: t.muted }]}>Title, date, and times are required. Venue, Word, Worship, and Remarks can be left empty.</Text>
             <View style={styles.formActions}>
               <ActionButton filled label={saving ? 'Saving…' : editing ? 'Save changes' : 'Create event'} disabled={saving} onPress={onSubmit} />
               <ActionButton label="Not now" disabled={saving} onPress={onClose} />
@@ -325,6 +425,73 @@ function EventFormModal({ visible, form, editingTitle, saving, onChange, onSubmi
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+function ImportPreviewModal({ preview, importing, onConfirm, onClose }: { preview: EventImportPreview | null; importing: boolean; onConfirm: () => void; onClose: () => void }) {
+  const t = useAppTheme();
+  const insets = useSafeAreaInsets();
+  if (!preview) return null;
+
+  const invalidCount = preview.rows.filter((row) => row.errors.length > 0).length;
+  const warningCount = preview.rows.filter((row) => row.warnings.length > 0).length;
+  const readyCount = preview.rows.length - invalidCount;
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalRoot}>
+        <Pressable style={styles.modalBackdrop} onPress={onClose} />
+        <View style={[styles.sheet, styles.importSheet, { backgroundColor: t.surface, borderColor: t.line, paddingBottom: Math.max(18, insets.bottom + 10) }]}>
+          <View style={[styles.sheetHandle, { backgroundColor: t.line }]} />
+          <View style={styles.sheetHeader}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[styles.formEyebrow, { color: invalidCount ? t.danger : t.accent }]}>Import preview</Text>
+              <Text style={[styles.formTitle, { color: t.ink }]} numberOfLines={1}>{preview.fileName}</Text>
+              <Text style={[styles.previewSummary, { color: t.muted }]}>
+                {invalidCount
+                  ? `${invalidCount} ${invalidCount === 1 ? 'row needs' : 'rows need'} attention · nothing will import yet`
+                  : `${readyCount} ${readyCount === 1 ? 'event' : 'events'} ready · ${preview.sourceType.toUpperCase()}${warningCount ? ` · ${warningCount} past` : ''}`}
+              </Text>
+            </View>
+            <Pressable disabled={importing} onPress={onClose} hitSlop={10} style={({ pressed }) => [styles.closeButton, { backgroundColor: t.soft, opacity: importing ? 0.45 : 1, transform: [{ scale: pressed && !importing ? 0.96 : 1 }] }]}>
+              <Text style={[styles.closeText, { color: t.ink }]}>×</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.previewList}>
+            {preview.rows.map((row) => {
+              const valid = row.errors.length === 0;
+              const hasWarning = row.warnings.length > 0;
+              const details = row.event ? [
+                row.event.venue ? `Venue · ${row.event.venue}` : null,
+                row.event.word ? `Word · ${row.event.word}` : null,
+                row.event.worship ? `Worship · ${row.event.worship}` : null,
+              ].filter(Boolean) : [];
+              return (
+                <View key={row.sourceRow} style={[styles.previewRow, { backgroundColor: t.background, borderColor: valid ? hasWarning ? t.accent : t.line : t.danger }]}>
+                  <View style={[styles.previewMark, { backgroundColor: valid ? t.soft : t.danger }]}>
+                    <Text style={[styles.previewMarkText, { color: valid ? t.accent : t.accentInk }]}>{valid ? hasWarning ? '•' : '✓' : '!'}</Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.previewTitle, { color: t.ink }]} numberOfLines={1}>{row.title}</Text>
+                    <Text style={[styles.previewMeta, { color: t.muted }]}>{row.dateLabel} · {row.timeLabel} · row {row.sourceRow}</Text>
+                    {details.map((detail) => <Text key={detail} style={[styles.previewDetail, { color: t.muted }]}>{detail}</Text>)}
+                    {row.event?.remarks ? <Text style={[styles.previewRemarks, { color: t.ink }]}>{row.event.remarks}</Text> : null}
+                    {row.warnings.map((warning) => <Text key={warning} style={[styles.previewWarning, { color: t.accent }]}>{warning}</Text>)}
+                    {row.errors.map((error) => <Text key={error} style={[styles.previewError, { color: t.danger }]}>{error}</Text>)}
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+
+          <View style={styles.previewActions}>
+            <ActionButton filled label={importing ? 'Importing…' : `Import ${readyCount} ${readyCount === 1 ? 'event' : 'events'}`} disabled={importing || invalidCount > 0} onPress={onConfirm} />
+            <ActionButton label={invalidCount ? 'Close and fix file' : 'Not now'} disabled={importing} onPress={onClose} />
+          </View>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -389,12 +556,23 @@ function FormField({ label, containerStyle, ...props }: { label: string; contain
 function EventRow({ event, disabled, busy, onEdit, onCancel }: { event: Doc<'events'>; disabled: boolean; busy: boolean; onEdit: () => void; onCancel: () => void }) {
   const t = useAppTheme();
   const date = formatDateParts(event.startAt);
+  const venue = event.venue ?? event.location;
+  const detail = [
+    `${formatDay(event.startAt)} · ${formatTimeRange(event.startAt, event.endAt)}`,
+    venue,
+  ].filter(Boolean).join('\n');
+  const people = [
+    event.word ? `Word · ${event.word}` : null,
+    event.worship ? `Worship · ${event.worship}` : null,
+  ].filter(Boolean).join('   ');
   return (
     <RowCard
       mark={<View style={[styles.dateMark, { backgroundColor: t.soft }]}><Text style={[styles.dateDay, { color: t.ink }]}>{date.day}</Text><Text style={[styles.dateMonth, { color: t.muted }]}>{date.month}</Text></View>}
       title={event.title}
-      detail={`${formatDay(event.startAt)} · ${formatTimeRange(event.startAt, event.endAt)}\n${event.location}`}
+      detail={detail}
     >
+      {people ? <Text style={[styles.eventExtra, { color: t.muted }]}>{people}</Text> : null}
+      {event.remarks ? <Text style={[styles.eventRemarks, { color: t.ink }]}>{event.remarks}</Text> : null}
       <View style={styles.rowActions}>
         <View style={styles.rowAction}><ActionButton label="Edit" disabled={disabled} onPress={onEdit} /></View>
         <View style={styles.rowAction}><ActionButton label={busy ? 'Cancelling…' : 'Cancel'} danger disabled={disabled} onPress={onCancel} /></View>
@@ -404,9 +582,12 @@ function EventRow({ event, disabled, busy, onEdit, onCancel }: { event: Doc<'eve
 }
 
 const styles = StyleSheet.create({
+  topActions: { flexDirection: 'row', gap: 8 },
+  topAction: { flex: 1, minWidth: 0 },
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.34)' },
   sheet: { maxHeight: '88%', borderTopLeftRadius: 30, borderTopRightRadius: 30, borderWidth: 1, paddingTop: 10, paddingHorizontal: 20, paddingBottom: 18 },
+  importSheet: { maxHeight: '92%' },
   sheetHandle: { alignSelf: 'center', width: 42, height: 4, borderRadius: 999, marginBottom: 16 },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   sheetBody: { paddingTop: 18, paddingBottom: 8 },
@@ -419,6 +600,7 @@ const styles = StyleSheet.create({
   disabledField: { opacity: 0.58 },
   label: { marginBottom: 7, fontFamily: fonts.bodyBold, fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase' },
   input: { minHeight: 50, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 14, fontFamily: fonts.bodySemiBold, fontSize: 15.5 },
+  notesInput: { minHeight: 88, paddingTop: 13, paddingBottom: 13 },
   compactPickerBox: { minHeight: 50, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 8, alignItems: 'flex-start', justifyContent: 'center' },
   pickerButton: { minHeight: 50, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   pickerValue: { flex: 1, fontFamily: fonts.bodySemiBold, fontSize: 15.5 },
@@ -428,9 +610,23 @@ const styles = StyleSheet.create({
   timeField: { minWidth: 0 },
   helper: { marginTop: 12, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
   formActions: { marginTop: 16, gap: 9 },
+  previewSummary: { marginTop: 7, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
+  previewList: { paddingTop: 18, paddingBottom: 12, gap: 9 },
+  previewRow: { borderWidth: 1, borderRadius: radius.lg, padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 11 },
+  previewMark: { width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  previewMarkText: { fontFamily: fonts.bodyBold, fontSize: 14 },
+  previewTitle: { fontFamily: fonts.bodySemiBold, fontSize: 15 },
+  previewMeta: { marginTop: 4, fontFamily: fonts.body, fontSize: 12.5, lineHeight: 17 },
+  previewDetail: { marginTop: 3, fontFamily: fonts.body, fontSize: 12.5, lineHeight: 17 },
+  previewRemarks: { marginTop: 5, fontFamily: fonts.body, fontSize: 12.5, lineHeight: 17 },
+  previewWarning: { marginTop: 5, fontFamily: fonts.bodySemiBold, fontSize: 12.5, lineHeight: 17 },
+  previewError: { marginTop: 5, fontFamily: fonts.bodySemiBold, fontSize: 12.5, lineHeight: 17 },
+  previewActions: { gap: 9 },
   dateMark: { width: 48, borderRadius: 16, paddingVertical: 9, alignItems: 'center' },
   dateDay: { fontFamily: fonts.bodyBold, fontSize: 18 },
   dateMonth: { marginTop: 3, fontFamily: fonts.bodyBold, fontSize: 10, letterSpacing: 1.1 },
+  eventExtra: { marginTop: 9, fontFamily: fonts.bodySemiBold, fontSize: 12.5, lineHeight: 18 },
+  eventRemarks: { marginTop: 5, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
   rowActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
   rowAction: { flex: 1 },
 });

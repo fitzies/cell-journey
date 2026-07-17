@@ -8,7 +8,11 @@ import { api } from '@/lib/api';
 type EventRow = {
   _id: string;
   title: string;
-  location: string;
+  location?: string;
+  venue?: string;
+  word?: string;
+  worship?: string;
+  remarks?: string;
   startAt: number;
   endAt: number;
 };
@@ -86,6 +90,7 @@ export default function MemberScheduleScreen() {
 function NextEvent({ event }: { event: EventRow }) {
   const t = useAppTheme();
   const date = formatDateParts(event.startAt);
+  const people = [event.word ? `Word · ${event.word}` : null, event.worship ? `Worship · ${event.worship}` : null].filter(Boolean).join('   ');
   return (
     <View style={[styles.hero, { backgroundColor: t.accent }]}>
       <View style={styles.heroGlow} />
@@ -93,8 +98,10 @@ function NextEvent({ event }: { event: EventRow }) {
       <Text style={[styles.heroTitle, { color: t.accentInk }]}>{event.title}</Text>
       <View style={styles.heroMetaRow}>
         <View style={styles.heroPill}><Text style={[styles.heroPillText, { color: t.accentInk }]}>○ {formatTimeRange(event.startAt, event.endAt)}</Text></View>
-        <View style={styles.heroPill}><Text style={[styles.heroPillText, { color: t.accentInk }]}>⌁ {event.location}</Text></View>
+        <View style={styles.heroPill}><Text style={[styles.heroPillText, { color: t.accentInk }]}>⌁ {event.venue || event.location || 'Venue TBC'}</Text></View>
       </View>
+      {people ? <Text style={[styles.heroDetails, { color: t.accentInk }]}>{people}</Text> : null}
+      {event.remarks ? <Text style={[styles.heroRemarks, { color: t.accentInk }]}>{event.remarks}</Text> : null}
     </View>
   );
 }
@@ -102,6 +109,7 @@ function NextEvent({ event }: { event: EventRow }) {
 function EventCard({ event }: { event: EventRow }) {
   const t = useAppTheme();
   const date = formatDateParts(event.startAt);
+  const people = [event.word ? `Word · ${event.word}` : null, event.worship ? `Worship · ${event.worship}` : null].filter(Boolean).join('   ');
   return (
     <View style={[styles.card, { backgroundColor: t.surface, borderColor: t.line }]}>
       <View style={[styles.datePill, { backgroundColor: t.soft }]}>
@@ -111,7 +119,9 @@ function EventCard({ event }: { event: EventRow }) {
       <View style={styles.cardBody}>
         <Text style={[styles.cardLabel, { color: t.muted }]}>{formatDayLabel(event.startAt)} · {formatTimeRange(event.startAt, event.endAt)}</Text>
         <Text style={[styles.cardTitle, { color: t.ink }]}>{event.title}</Text>
-        <Text style={[styles.cardLocation, { color: t.muted }]} numberOfLines={1}>{event.location}</Text>
+        <Text style={[styles.cardLocation, { color: t.muted }]} numberOfLines={1}>{event.venue || event.location || 'Venue TBC'}</Text>
+        {people ? <Text style={[styles.cardPeople, { color: t.muted }]} numberOfLines={1}>{people}</Text> : null}
+        {event.remarks ? <Text style={[styles.cardRemarks, { color: t.ink }]} numberOfLines={2}>{event.remarks}</Text> : null}
       </View>
     </View>
   );
@@ -142,6 +152,8 @@ const styles = StyleSheet.create({
   heroMetaRow: { marginTop: 18, gap: 8, alignItems: 'flex-start' },
   heroPill: { borderRadius: radius.pill, paddingHorizontal: 13, paddingVertical: 8, backgroundColor: 'rgba(255,255,255,0.13)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   heroPillText: { fontFamily: fonts.bodyMedium, fontSize: 12.5 },
+  heroDetails: { marginTop: 12, opacity: 0.82, fontFamily: fonts.bodySemiBold, fontSize: 12.5, lineHeight: 18 },
+  heroRemarks: { marginTop: 5, opacity: 0.82, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
   section: { marginTop: 28 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   sectionTitle: { fontFamily: fonts.bodyBold, fontSize: 18, letterSpacing: -0.3 },
@@ -155,6 +167,8 @@ const styles = StyleSheet.create({
   cardLabel: { fontFamily: fonts.bodyBold, fontSize: 10.5, letterSpacing: 1.4, textTransform: 'uppercase' },
   cardTitle: { marginTop: 5, fontFamily: fonts.bodySemiBold, fontSize: 16, letterSpacing: -0.25 },
   cardLocation: { marginTop: 4, fontFamily: fonts.body, fontSize: 13.5 },
+  cardPeople: { marginTop: 4, fontFamily: fonts.bodySemiBold, fontSize: 12.5 },
+  cardRemarks: { marginTop: 4, fontFamily: fonts.body, fontSize: 12.5, lineHeight: 17 },
   empty: { borderWidth: 1, borderRadius: 24, padding: 20, minHeight: 188, justifyContent: 'center' },
   emptyMark: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
   emptyTitle: { fontFamily: fonts.bodyBold, fontSize: 19, letterSpacing: -0.3 },
