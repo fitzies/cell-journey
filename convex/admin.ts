@@ -1,4 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { approvePendingJoinRequest, rejectPendingJoinRequest } from "./joinRequestFlow";
@@ -78,6 +79,40 @@ function publicProfile(profile: Doc<"userProfiles">) {
     activeMembershipId: profile.activeMembershipId ?? null,
     createdAt: profile.createdAt,
     updatedAt: profile.updatedAt,
+  };
+}
+
+function effectiveAttendanceStatus(attendance: Doc<"attendance"> | undefined) {
+  return attendance?.finalStatus ?? attendance?.memberSubmittedStatus ?? null;
+}
+
+function attendanceTotals(
+  events: Doc<"events">[],
+  memberships: Doc<"memberships">[],
+  attendanceByEventAndProfile: Map<string, Doc<"attendance">>,
+) {
+  let present = 0;
+  let expected = 0;
+
+  for (const event of events) {
+    const eligibleMemberships = memberships.filter(
+      (membership) =>
+        membership.joinedAt <= event.startAt &&
+        (membership.endedAt === undefined || membership.endedAt >= event.startAt),
+    );
+
+    expected += eligibleMemberships.length;
+    for (const membership of eligibleMemberships) {
+      const attendance = attendanceByEventAndProfile.get(`${event._id}:${membership.profileId}`);
+      if (effectiveAttendanceStatus(attendance) === "present") present += 1;
+    }
+  }
+
+  return {
+    present,
+    expected,
+    absent: Math.max(expected - present, 0),
+    rate: expected === 0 ? null : present / expected,
   };
 }
 
@@ -161,6 +196,93 @@ export const listGroups = query({
     }
 
     return rows;
+  },
+});
+
+export const listGroupAttendance = query({
+  args: {
+    from: v.number(),
+    to: v.number(),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+
+    const to = Math.min(args.to, Date.now());
+    const requestedWindow = Math.max(to - args.from, 1);
+    const window = Math.min(requestedWindow, 366 * 24 * 60 * 60 * 1000);
+    const from = to - window;
+    const previousFrom = from - window;
+    const groupPage = await ctx.db.query("groups").order("asc").paginate(args.paginationOpts);
+    const rows = [];
+
+    for (const group of groupPage.page) {
+      const events = await ctx.db
+        .query("events")
+        .withIndex("by_group_start", (q) =>
+          q.eq("groupId", group._id).gte("startAt", previousFrom).lte("startAt", to),
+        )
+        .order("desc")
+        .take(160);
+      const completedEvents = events.filter((event) => !event.cancelledAt && event.endAt <= to);
+      const currentEvents = completedEvents.filter((event) => event.startAt >= from);
+      const previousEvents = completedEvents.filter(
+        (event) => event.startAt >= previousFrom && event.startAt < from,
+      );
+
+      const memberships = await ctx.db
+        .query("memberships")
+        .withIndex("by_group", (q) => q.eq("groupId", group._id))
+        .take(1000);
+      const attendanceRows = completedEvents.length === 0
+        ? []
+        : await ctx.db
+            .query("attendance")
+            .withIndex("by_group", (q) => q.eq("groupId", group._id))
+            .order("desc")
+            .take(1500);
+      const relevantEventIds = new Set(completedEvents.map((event) => event._id));
+      const attendanceByEventAndProfile = new Map<string, Doc<"attendance">>();
+
+      for (const attendance of attendanceRows) {
+        if (relevantEventIds.has(attendance.eventId)) {
+          attendanceByEventAndProfile.set(
+            `${attendance.eventId}:${attendance.profileId}`,
+            attendance,
+          );
+        }
+      }
+
+      const current = attendanceTotals(currentEvents, memberships, attendanceByEventAndProfile);
+      const previous = attendanceTotals(previousEvents, memberships, attendanceByEventAndProfile);
+      const leader = group.leaderProfileId ? await ctx.db.get(group.leaderProfileId) : null;
+      const lastEvent = currentEvents[0] ?? null;
+
+      rows.push({
+        group: {
+          _id: group._id,
+          name: group.name,
+          code: group.code,
+          isActive: group.isActive,
+        },
+        leaderName: leader?.preferredName || leader?.fullName || null,
+        activeMemberCount: memberships.filter((membership) => membership.status === "active").length,
+        eventCount: currentEvents.length,
+        presentCount: current.present,
+        absentCount: current.absent,
+        expectedCount: current.expected,
+        attendanceRate: current.rate,
+        previousAttendanceRate: previous.rate,
+        rateChange:
+          current.rate === null || previous.rate === null ? null : current.rate - previous.rate,
+        lastEvent: lastEvent
+          ? { _id: lastEvent._id, title: lastEvent.title, startAt: lastEvent.startAt }
+          : null,
+        isComplete: events.length < 160 && memberships.length < 1000 && attendanceRows.length < 1500,
+      });
+    }
+
+    return { ...groupPage, page: rows };
   },
 });
 

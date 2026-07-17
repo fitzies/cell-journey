@@ -113,6 +113,7 @@ export default defineSchema({
   })
     .index("by_profile_status", ["profileId", "status"])
     .index("by_group_status", ["groupId", "status"])
+    .index("by_group", ["groupId"])
     .index("by_profile_group", ["profileId", "groupId"]),
 
   events: defineTable({
@@ -153,6 +154,7 @@ export default defineSchema({
     .index("by_event", ["eventId"])
     .index("by_profile", ["profileId"])
     .index("by_membership", ["membershipId"])
+    .index("by_group", ["groupId"])
     .index("by_group_profile", ["groupId", "profileId"]),
 
   pushTokens: defineTable({
