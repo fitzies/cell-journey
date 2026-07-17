@@ -45,7 +45,8 @@ export default defineSchema({
     // Links product profile data to the Convex Auth managed users table.
     userId: v.id("users"),
 
-    // New profiles default to role "member" in future creation mutations.
+    // Deprecated compatibility fields for clients deployed before multi-group support.
+    // Authorization and capabilities come from memberships and groups.leaderProfileId.
     role,
     onboardingStatus,
 
@@ -99,6 +100,7 @@ export default defineSchema({
     .index("by_profile", ["profileId"])
     .index("by_group_status", ["groupId", "status"])
     .index("by_profile_status", ["profileId", "status"])
+    .index("by_profile_and_group_and_status", ["profileId", "groupId", "status"])
     .index("by_status", ["status"]),
 
   memberships: defineTable({
@@ -112,6 +114,7 @@ export default defineSchema({
     joinRequestId: v.optional(v.id("joinRequests")),
   })
     .index("by_profile_status", ["profileId", "status"])
+    .index("by_profile_and_group_and_status", ["profileId", "groupId", "status"])
     .index("by_group_status", ["groupId", "status"])
     .index("by_group", ["groupId"])
     .index("by_profile_group", ["profileId", "groupId"]),

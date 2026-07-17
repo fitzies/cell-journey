@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { GroupSwitcher, ModeSwitchButton, useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { EditProfileSheet } from '@/components/profile/EditProfileSheet';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
@@ -31,9 +32,10 @@ export default function MemberProfileScreen() {
   const t = useAppTheme();
   const { signOut } = useAuthActions();
   const profile = useQuery(api.profiles.current, {});
-  const group = useQuery(api.groups.getMyGroup, {});
+  const { context, selectedMemberGroup } = useGroups();
+  const group = selectedMemberGroup?.group ?? null;
   const services = useQuery(api.groups.listServices, {});
-  const leaveGroup = useMutation(api.groups.leaveCurrentGroup);
+  const leaveGroup = useMutation(api.groups.leaveGroup);
   const [busy, setBusy] = useState<'leave' | 'signOut' | null>(null);
   const [editOpen, setEditOpen] = useState(false);
 
@@ -42,7 +44,7 @@ export default function MemberProfileScreen() {
     return services.filter((service) => profile.serviceIds.includes(service._id)).map((service) => service.name);
   }, [profile, services]);
 
-  if (profile === undefined || group === undefined || services === undefined) return <LoadingState />;
+  if (profile === undefined || context === undefined || services === undefined) return <LoadingState />;
 
   const displayName = profile?.preferredName?.trim() || profile?.fullName?.trim() || 'Member';
   const region = profile?.singaporeRegion ? regionLabels[profile.singaporeRegion] : 'Not set';
@@ -50,7 +52,7 @@ export default function MemberProfileScreen() {
   const confirmLeave = () => {
     Alert.alert(
       'Leave this group?',
-      'You’ll return to the group-code step. Your past attendance stays saved.',
+      context.memberGroups.length > 1 ? 'Your other groups stay active. Past attendance remains saved.' : 'Your past attendance stays saved.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -59,7 +61,8 @@ export default function MemberProfileScreen() {
           onPress: async () => {
             setBusy('leave');
             try {
-              await leaveGroup();
+              if (!group) return;
+              await leaveGroup({ groupId: group._id });
               router.replace('/(onboarding)');
             } catch (err) {
               Alert.alert('Could not leave group', err instanceof Error ? err.message : 'Please try again.');
@@ -102,8 +105,9 @@ export default function MemberProfileScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: t.ink }]}>Cell group</Text>
-          <InfoCard title={group?.name ?? 'No active group'} detail={group ? 'Approved member' : 'Not currently assigned'} mark="⌁" />
+          <Text style={[styles.sectionTitle, { color: t.ink }]}>Cell groups</Text>
+          <GroupSwitcher mode="member" />
+          <InfoCard title={group?.name ?? 'No active group'} detail={`${context.memberGroups.length} active membership${context.memberGroups.length === 1 ? '' : 's'}`} mark="⌁" />
         </View>
 
         <View style={styles.section}>
@@ -117,7 +121,10 @@ export default function MemberProfileScreen() {
 
         <View style={styles.actions}>
           <ActionButton label="Edit profile details" filled disabled={!profile || busy !== null} onPress={() => setEditOpen(true)} />
-          <ActionButton label={busy === 'leave' ? 'Leaving…' : 'Leave current group'} danger disabled={!group || busy !== null} onPress={confirmLeave} />
+          <ActionButton label="Join another group" disabled={busy !== null} onPress={() => router.push('/(onboarding)/group-code')} />
+          {context.pendingRequests.length > 0 ? <ActionButton label={`Pending requests (${context.pendingRequests.length})`} disabled={busy !== null} onPress={() => router.push('/(onboarding)/pending')} /> : null}
+          <ModeSwitchButton current="member" />
+          <ActionButton label={busy === 'leave' ? 'Leaving…' : 'Leave selected group'} danger disabled={!group || busy !== null} onPress={confirmLeave} />
           <ActionButton label={busy === 'signOut' ? 'Signing out…' : 'Sign out'} disabled={busy !== null} onPress={handleSignOut} />
         </View>
       </ScrollView>

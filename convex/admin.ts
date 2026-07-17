@@ -16,7 +16,7 @@ type AuthUser = Doc<"users"> & {
 function allowedAdminEmails() {
   return (process.env.ADMIN_EMAILS ?? "")
     .split(",")
-    .map((email) => email.trim().toLowerCase())
+    .map((email: string) => email.trim().toLowerCase())
     .filter(Boolean);
 }
 
@@ -95,15 +95,19 @@ function attendanceTotals(
   let expected = 0;
 
   for (const event of events) {
-    const eligibleMemberships = memberships.filter(
-      (membership) =>
-        membership.joinedAt <= event.startAt &&
-        (membership.endedAt === undefined || membership.endedAt >= event.startAt),
+    const eligibleProfiles = new Set(
+      memberships
+        .filter(
+          (membership) =>
+            membership.joinedAt <= event.startAt &&
+            (membership.endedAt === undefined || membership.endedAt >= event.startAt),
+        )
+        .map((membership) => membership.profileId),
     );
 
-    expected += eligibleMemberships.length;
-    for (const membership of eligibleMemberships) {
-      const attendance = attendanceByEventAndProfile.get(`${event._id}:${membership.profileId}`);
+    expected += eligibleProfiles.size;
+    for (const profileId of eligibleProfiles) {
+      const attendance = attendanceByEventAndProfile.get(`${event._id}:${profileId}`);
       if (effectiveAttendanceStatus(attendance) === "present") present += 1;
     }
   }
@@ -152,9 +156,28 @@ export const listUsers = query({
     for (const profile of profiles) {
       const user = await userSummary(ctx, profile.userId);
       const displayName = profile.preferredName || profile.fullName || user.name || user.email || "Unnamed user";
-      const currentGroupName = await groupName(ctx, profile.currentGroupId);
-      const leaderGroupName = await groupName(ctx, profile.leaderGroupId);
-      const haystack = [displayName, user.email, profile.role, currentGroupName, leaderGroupName]
+      const memberships = await ctx.db
+        .query("memberships")
+        .withIndex("by_profile_status", (q) =>
+          q.eq("profileId", profile._id).eq("status", "active"),
+        )
+        .take(100);
+      const memberGroups = [];
+      for (const membership of memberships) {
+        const group = await ctx.db.get(membership.groupId);
+        if (group) memberGroups.push({ membershipId: membership._id, groupId: group._id, name: group.name });
+      }
+      const ledGroupDocs = await ctx.db
+        .query("groups")
+        .withIndex("by_leader", (q) => q.eq("leaderProfileId", profile._id))
+        .take(100);
+      const ledGroups = ledGroupDocs.map((group) => ({ groupId: group._id, name: group.name }));
+      const haystack = [
+        displayName,
+        user.email,
+        ...memberGroups.map((group) => group.name),
+        ...ledGroups.map((group) => group.name),
+      ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -165,8 +188,10 @@ export const listUsers = query({
         profile: publicProfile(profile),
         user,
         displayName,
-        currentGroupName,
-        leaderGroupName,
+        memberGroups,
+        ledGroups,
+        currentGroupName: memberGroups[0]?.name ?? null,
+        leaderGroupName: ledGroups[0]?.name ?? null,
       });
     }
 
@@ -388,6 +413,53 @@ export const updateGroup = mutation({
   },
 });
 
+async function syncCompatibilityRole(ctx: MutationCtx, profileId: Id<"userProfiles">) {
+  const profile = await ctx.db.get(profileId);
+  if (!profile) return;
+  const ledGroup = await ctx.db
+    .query("groups")
+    .withIndex("by_leader", (q) => q.eq("leaderProfileId", profileId))
+    .first();
+  const membership = await ctx.db
+    .query("memberships")
+    .withIndex("by_profile_status", (q) =>
+      q.eq("profileId", profileId).eq("status", "active"),
+    )
+    .first();
+  const pending = await ctx.db
+    .query("joinRequests")
+    .withIndex("by_profile_status", (q) =>
+      q.eq("profileId", profileId).eq("status", "pending"),
+    )
+    .first();
+  const compatibilityMembership = profile.activeMembershipId
+    ? await ctx.db.get(profile.activeMembershipId)
+    : null;
+  const shouldReplaceCompatibilityMembership =
+    !compatibilityMembership ||
+    compatibilityMembership.profileId !== profile._id ||
+    compatibilityMembership.status !== "active" ||
+    compatibilityMembership.groupId !== profile.currentGroupId;
+  const profileComplete = Boolean(
+    profile.fullName?.trim() && profile.singaporeRegion && profile.serviceIds.length > 0,
+  );
+  await ctx.db.patch(profileId, {
+    role: ledGroup ? "leader" : "member",
+    leaderGroupId: ledGroup?._id,
+    ...(shouldReplaceCompatibilityMembership
+      ? { activeMembershipId: membership?._id, currentGroupId: membership?.groupId }
+      : {}),
+    onboardingStatus: !profileComplete
+      ? "profileIncomplete"
+      : ledGroup || membership
+        ? "approved"
+        : pending
+          ? "pendingApproval"
+          : "needsGroup",
+    updatedAt: Date.now(),
+  });
+}
+
 export const setGroupLeader = mutation({
   args: {
     groupId: v.id("groups"),
@@ -397,77 +469,51 @@ export const setGroupLeader = mutation({
     await requireAdmin(ctx);
     const group = await ctx.db.get(args.groupId);
     if (!group) throw new Error("Group not found");
-    const now = Date.now();
-
-    if (group.leaderProfileId && group.leaderProfileId !== args.profileId) {
-      await ctx.db.patch(group.leaderProfileId, {
-        role: "member",
-        leaderGroupId: undefined,
-        onboardingStatus: "needsGroup",
-        updatedAt: now,
-      });
+    const previousLeaderId = group.leaderProfileId;
+    if (args.profileId) {
+      const profile = await ctx.db.get(args.profileId);
+      if (!profile) throw new Error("Profile not found");
     }
 
-    if (args.profileId === null) {
-      await ctx.db.patch(group._id, { leaderProfileId: undefined, updatedAt: now });
-      return null;
-    }
-
-    const profile = await ctx.db.get(args.profileId);
-    if (!profile) throw new Error("Profile not found");
-
-    if (profile.leaderGroupId && profile.leaderGroupId !== group._id) {
-      const previousGroup = await ctx.db.get(profile.leaderGroupId);
-      if (previousGroup?.leaderProfileId === profile._id) {
-        await ctx.db.patch(previousGroup._id, { leaderProfileId: undefined, updatedAt: now });
-      }
-    }
-
-    if (profile.activeMembershipId) {
-      const membership = await ctx.db.get(profile.activeMembershipId);
-      if (membership?.status === "active") {
-        await ctx.db.patch(membership._id, {
-          status: "left",
-          endedAt: now,
-          endReason: "promotedToLeader",
-        });
-      }
-    }
-
-    await ctx.db.patch(profile._id, {
-      role: "leader",
-      leaderGroupId: group._id,
-      currentGroupId: undefined,
-      activeMembershipId: undefined,
-      onboardingStatus: "approved",
-      updatedAt: now,
+    await ctx.db.patch(group._id, {
+      leaderProfileId: args.profileId ?? undefined,
+      updatedAt: Date.now(),
     });
-    await ctx.db.patch(group._id, { leaderProfileId: profile._id, updatedAt: now });
+    if (previousLeaderId && previousLeaderId !== args.profileId) {
+      await syncCompatibilityRole(ctx, previousLeaderId);
+    }
+    if (args.profileId) await syncCompatibilityRole(ctx, args.profileId);
     return null;
   },
 });
 
+export const removeGroupLeader = mutation({
+  args: { groupId: v.id("groups") },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const group = await ctx.db.get(args.groupId);
+    if (!group) throw new Error("Group not found");
+    const previousLeaderId = group.leaderProfileId;
+    await ctx.db.patch(group._id, { leaderProfileId: undefined, updatedAt: Date.now() });
+    if (previousLeaderId) await syncCompatibilityRole(ctx, previousLeaderId);
+    return null;
+  },
+});
+
+/** Legacy global demotion is safe only for a profile leading one group. */
 export const demoteLeader = mutation({
   args: { profileId: v.id("userProfiles") },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    const profile = await ctx.db.get(args.profileId);
-    if (!profile) throw new Error("Profile not found");
-    const now = Date.now();
-
-    if (profile.leaderGroupId) {
-      const group = await ctx.db.get(profile.leaderGroupId);
-      if (group?.leaderProfileId === profile._id) {
-        await ctx.db.patch(group._id, { leaderProfileId: undefined, updatedAt: now });
-      }
+    const groups = await ctx.db
+      .query("groups")
+      .withIndex("by_leader", (q) => q.eq("leaderProfileId", args.profileId))
+      .take(2);
+    if (groups.length > 1) throw new Error("Remove leadership from a specific group");
+    if (groups[0]) {
+      await ctx.db.patch(groups[0]._id, { leaderProfileId: undefined, updatedAt: Date.now() });
     }
-
-    await ctx.db.patch(profile._id, {
-      role: "member",
-      leaderGroupId: undefined,
-      onboardingStatus: profile.currentGroupId && profile.activeMembershipId ? "approved" : "needsGroup",
-      updatedAt: now,
-    });
+    await syncCompatibilityRole(ctx, args.profileId);
     return null;
   },
 });
@@ -483,57 +529,78 @@ export const assignMemberToGroup = mutation({
     const group = await ctx.db.get(args.groupId);
     if (!profile) throw new Error("Profile not found");
     if (!group || !group.isActive) throw new Error("Active group not found");
-    if (profile.role === "leader") throw new Error("Demote this leader before assigning member group membership");
-    if (profile.currentGroupId === group._id && profile.activeMembershipId) return null;
+
+    const existing = await ctx.db
+      .query("memberships")
+      .withIndex("by_profile_and_group_and_status", (q) =>
+        q.eq("profileId", profile._id).eq("groupId", group._id).eq("status", "active"),
+      )
+      .unique();
+    const pending = await ctx.db
+      .query("joinRequests")
+      .withIndex("by_profile_and_group_and_status", (q) =>
+        q.eq("profileId", profile._id).eq("groupId", group._id).eq("status", "pending"),
+      )
+      .unique();
 
     const now = Date.now();
-    if (profile.activeMembershipId) {
-      const oldMembership = await ctx.db.get(profile.activeMembershipId);
-      if (oldMembership?.status === "active") {
-        await ctx.db.patch(oldMembership._id, {
-          status: "left",
-          endedAt: now,
-          endReason: "adminMoved",
-        });
-      }
+    if (!existing) {
+      await ctx.db.insert("memberships", {
+        profileId: profile._id,
+        groupId: group._id,
+        status: "active",
+        joinedAt: now,
+        ...(pending ? { joinRequestId: pending._id } : {}),
+      });
     }
-
-    const membershipId = await ctx.db.insert("memberships", {
-      profileId: profile._id,
-      groupId: group._id,
-      status: "active",
-      joinedAt: now,
-    });
-    await ctx.db.patch(profile._id, {
-      currentGroupId: group._id,
-      activeMembershipId: membershipId,
-      onboardingStatus: "approved",
-      updatedAt: now,
-    });
+    if (pending) {
+      await ctx.db.patch(pending._id, { status: "approved", reviewedAt: now });
+    }
+    await syncCompatibilityRole(ctx, profile._id);
     return null;
   },
 });
 
+export const removeMembership = mutation({
+  args: { profileId: v.id("userProfiles"), groupId: v.id("groups") },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_profile_and_group_and_status", (q) =>
+        q.eq("profileId", args.profileId).eq("groupId", args.groupId).eq("status", "active"),
+      )
+      .unique();
+    if (!membership) return null;
+    await ctx.db.patch(membership._id, {
+      status: "removed",
+      endedAt: Date.now(),
+      endReason: "removedByAdmin",
+    });
+    await syncCompatibilityRole(ctx, args.profileId);
+    return null;
+  },
+});
+
+/** Legacy removal is safe only for a profile with one active membership. */
 export const removeMemberFromGroup = mutation({
   args: { profileId: v.id("userProfiles") },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    const profile = await ctx.db.get(args.profileId);
-    if (!profile) throw new Error("Profile not found");
-    if (!profile.activeMembershipId) return null;
-
-    const now = Date.now();
-    await ctx.db.patch(profile.activeMembershipId, {
+    const memberships = await ctx.db
+      .query("memberships")
+      .withIndex("by_profile_status", (q) =>
+        q.eq("profileId", args.profileId).eq("status", "active"),
+      )
+      .take(2);
+    if (memberships.length > 1) throw new Error("Select a specific group membership to remove");
+    if (!memberships[0]) return null;
+    await ctx.db.patch(memberships[0]._id, {
       status: "removed",
-      endedAt: now,
+      endedAt: Date.now(),
       endReason: "removedByAdmin",
     });
-    await ctx.db.patch(profile._id, {
-      currentGroupId: undefined,
-      activeMembershipId: undefined,
-      onboardingStatus: "needsGroup",
-      updatedAt: now,
-    });
+    await syncCompatibilityRole(ctx, args.profileId);
     return null;
   },
 });

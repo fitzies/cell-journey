@@ -37,9 +37,9 @@ cell-journey/
 
 - MVP supports **members** and **leaders** only.
 - Admin dashboard comes later.
-- One authenticated user has exactly **one role**: `member` or `leader`.
-- One member belongs to exactly **one current group**.
-- One leader leads exactly **one group**.
+- Membership and leadership are independent capabilities; a user may be both a member and a leader.
+- One user may hold active memberships in multiple groups.
+- One user may lead multiple groups, while each group has at most one leader.
 - Groups are created manually by the owner/developer in Convex for MVP.
 - Leader assignment is manually configured in Convex for MVP.
 - Historical records must remain intact when users leave or are removed from groups.
@@ -56,7 +56,7 @@ Prefer email OTP/code over email magic links for mobile UX. Phone OTP is not pla
 
 ## Onboarding and Group Join Flow
 
-Members join via the current mobile onboarding flow:
+Users join groups through the mobile onboarding and profile flows:
 
 1. User signs in.
 2. User completes required profile details: full name, services attending, Singapore region.
@@ -64,13 +64,15 @@ Members join via the current mobile onboarding flow:
 4. User confirms the matched group.
 5. A pending join request is created.
 6. Leader approves or rejects the request.
-7. While pending, show a polished persistent pending approval state with group name/context.
+7. While pending, show a polished pending approval state with group name/context.
+
+Users may submit pending requests to multiple groups. Once they have one active membership, additional pending requests do not block normal app access.
 
 If a member leaves a group or a leader removes/kicks them:
 
-- User loses current membership.
-- Historical attendance remains tied to old group/events.
-- User returns to the group-code step of onboarding, with existing profile answers preserved.
+- Only the targeted membership ends; other memberships and leadership assignments remain active.
+- Historical attendance remains tied to the old membership/group/events.
+- The user returns to the group-code step only when they have no memberships or leadership assignments, with existing profile answers preserved.
 
 ## Onboarding/Profile Fields
 
@@ -110,8 +112,9 @@ Do not distinguish regular vs special events in MVP unless explicitly requested 
 
 Permissions:
 
-- Leaders create/edit/delete events for their own group.
-- Members view events for their group.
+- Leaders create/edit/delete events for any group they lead.
+- Members view events for any group where they have an active membership.
+- Mobile screens use an explicit selected-group context.
 
 ## Attendance
 
@@ -147,13 +150,13 @@ Present includes:
 
 Leader mobile app must support:
 
-- View own group dashboard
-- Create/edit/delete events
+- Switch between and view dashboards for all groups they lead
+- Create/edit/delete events in the selected led group
 - Mark group attendance for events
 - Confirm/override member self-attendance
 - Approve/reject join requests
-- View member list
-- Remove/kick members
+- View member lists
+- Remove/kick members from the selected group
 - View basic member attendance summaries
 
 ## Member MVP Features
@@ -161,13 +164,14 @@ Leader mobile app must support:
 Member mobile app must support:
 
 - Complete onboarding
-- Join group by code
-- See pending approval state
-- View group schedule/events
-- Self-submit attendance during allowed event window
-- View personal attendance rate/history
-- Edit own profile fields except role/group
-- Leave current group
+- Join multiple groups by code
+- See and manage multiple pending approval states
+- Switch between group schedules/events
+- Self-submit attendance during the allowed event window
+- View per-group personal attendance rate/history
+- Edit own profile fields except relationship assignments
+- Leave one selected group without affecting other memberships
+- Switch between member and leader modes when both capabilities are available
 
 ## Mobile App UX Decisions
 
@@ -182,6 +186,8 @@ Initial approved-user tabs:
 
 - Member: Home, Schedule, Attendance, Profile
 - Leader: Home, Attendance, Schedule, Members, Profile
+
+Users select one group at a time within each mode. The selected group is UI state, not canonical membership data.
 
 ## Notifications
 

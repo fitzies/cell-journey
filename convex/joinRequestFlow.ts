@@ -1,7 +1,7 @@
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 
-type ReviewOptions = {
+export type ReviewOptions = {
   expectedGroupId?: Id<"groups">;
   reviewedByProfileId?: Id<"userProfiles"> | null;
 };
@@ -13,7 +13,9 @@ async function requirePendingRequest(
 ) {
   const request = await ctx.db.get(joinRequestId);
   if (!request || request.status !== "pending") throw new Error("Join request not found");
-  if (expectedGroupId && request.groupId !== expectedGroupId) throw new Error("Join request not found");
+  if (expectedGroupId && request.groupId !== expectedGroupId) {
+    throw new Error("Join request not found");
+  }
   return request;
 }
 
@@ -22,22 +24,61 @@ export async function approvePendingJoinRequest(
   joinRequestId: Id<"joinRequests">,
   options: ReviewOptions = {},
 ) {
-  const request = await requirePendingRequest(ctx, joinRequestId, options.expectedGroupId);
-
+  const request = await ctx.db.get(joinRequestId);
+  if (!request || (request.status !== "pending" && request.status !== "approved")) {
+    throw new Error("Join request not found");
+  }
+  if (options.expectedGroupId && request.groupId !== options.expectedGroupId) {
+    throw new Error("Join request not found");
+  }
   const group = await ctx.db.get(request.groupId);
   if (!group || !group.isActive) throw new Error("Active group not found");
 
   const member = await ctx.db.get(request.profileId);
   if (!member) throw new Error("Member profile not found");
-  if (member.role === "leader") throw new Error("Leaders cannot be approved as group members");
 
-  const active = await ctx.db
+  const existing = await ctx.db
     .query("memberships")
-    .withIndex("by_profile_status", (q) => q.eq("profileId", member._id).eq("status", "active"))
+    .withIndex("by_profile_and_group_and_status", (q) =>
+      q
+        .eq("profileId", member._id)
+        .eq("groupId", request.groupId)
+        .eq("status", "active"),
+    )
     .unique();
-  if (active) throw new Error("Member is already in a group");
 
   const now = Date.now();
+  if (request.status === "approved") {
+    if (!existing) throw new Error("Approved request has no active membership");
+    return existing;
+  }
+  if (existing) {
+    await ctx.db.patch(request._id, {
+      status: "approved",
+      reviewedAt: now,
+      ...(options.reviewedByProfileId
+        ? { reviewedByProfileId: options.reviewedByProfileId }
+        : {}),
+    });
+    const pointer = member.activeMembershipId
+      ? await ctx.db.get(member.activeMembershipId)
+      : null;
+    if (
+      !pointer ||
+      pointer.profileId !== member._id ||
+      pointer.status !== "active" ||
+      pointer.groupId !== member.currentGroupId
+    ) {
+      await ctx.db.patch(member._id, {
+        currentGroupId: existing.groupId,
+        activeMembershipId: existing._id,
+        onboardingStatus: "approved",
+        updatedAt: now,
+      });
+    }
+    return existing;
+  }
+
   const membershipId = await ctx.db.insert("memberships", {
     profileId: member._id,
     groupId: request.groupId,
@@ -49,11 +90,24 @@ export async function approvePendingJoinRequest(
   await ctx.db.patch(request._id, {
     status: "approved",
     reviewedAt: now,
-    ...(options.reviewedByProfileId ? { reviewedByProfileId: options.reviewedByProfileId } : {}),
+    ...(options.reviewedByProfileId
+      ? { reviewedByProfileId: options.reviewedByProfileId }
+      : {}),
   });
+  const compatibilityMembership = member.activeMembershipId
+    ? await ctx.db.get(member.activeMembershipId)
+    : null;
+  const hasValidCompatibilityPair = Boolean(
+    compatibilityMembership &&
+      compatibilityMembership.profileId === member._id &&
+      compatibilityMembership.status === "active" &&
+      compatibilityMembership.groupId === member.currentGroupId,
+  );
   await ctx.db.patch(member._id, {
-    currentGroupId: request.groupId,
-    activeMembershipId: membershipId,
+    // Compatibility pointers are a paired legacy default, never authorization.
+    ...(!hasValidCompatibilityPair
+      ? { currentGroupId: request.groupId, activeMembershipId: membershipId }
+      : {}),
     onboardingStatus: "approved",
     updatedAt: now,
   });
@@ -70,23 +124,47 @@ export async function rejectPendingJoinRequest(
   const member = await ctx.db.get(request.profileId);
   if (!member) throw new Error("Member profile not found");
 
-  const active = await ctx.db
-    .query("memberships")
-    .withIndex("by_profile_status", (q) => q.eq("profileId", member._id).eq("status", "active"))
-    .unique();
   const reason = options.reason?.trim();
   const now = Date.now();
-
   await ctx.db.patch(request._id, {
     status: "rejected",
     reviewedAt: now,
-    ...(options.reviewedByProfileId ? { reviewedByProfileId: options.reviewedByProfileId } : {}),
+    ...(options.reviewedByProfileId
+      ? { reviewedByProfileId: options.reviewedByProfileId }
+      : {}),
     ...(reason ? { rejectionReason: reason } : {}),
   });
 
-  if (member.role === "member" && !member.leaderGroupId && !active && !member.currentGroupId && !member.activeMembershipId) {
-    await ctx.db.patch(member._id, { onboardingStatus: "needsGroup", updatedAt: now });
-  }
+  const activeMembership = await ctx.db
+    .query("memberships")
+    .withIndex("by_profile_status", (q) =>
+      q.eq("profileId", member._id).eq("status", "active"),
+    )
+    .first();
+  const anotherPending = await ctx.db
+    .query("joinRequests")
+    .withIndex("by_profile_status", (q) =>
+      q.eq("profileId", member._id).eq("status", "pending"),
+    )
+    .first();
+  const ledGroup = await ctx.db
+    .query("groups")
+    .withIndex("by_leader", (q) => q.eq("leaderProfileId", member._id))
+    .first();
+
+  const profileComplete = Boolean(
+    member.fullName?.trim() && member.singaporeRegion && member.serviceIds.length > 0,
+  );
+  await ctx.db.patch(member._id, {
+    onboardingStatus: !profileComplete
+      ? "profileIncomplete"
+      : activeMembership || ledGroup
+        ? "approved"
+        : anotherPending
+          ? "pendingApproval"
+          : "needsGroup",
+    updatedAt: now,
+  });
 
   return null;
 }

@@ -1,6 +1,7 @@
 import { useQuery } from 'convex/react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { GroupSwitcher, useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
 import { api } from '@/lib/api';
@@ -51,10 +52,11 @@ function formatDateParts(ms: number) {
 
 export default function MemberScheduleScreen() {
   const t = useAppTheme();
-  const group = useQuery(api.groups.getMyGroup, {});
-  const events = useQuery(api.events.listMine, { from: startOfToday(), limit: 30 });
+  const { context, selectedMemberGroup } = useGroups();
+  const group = selectedMemberGroup?.group ?? null;
+  const events = useQuery(api.events.listForGroup, group ? { groupId: group._id, from: startOfToday(), limit: 30 } : 'skip');
 
-  if (group === undefined || events === undefined) return <LoadingState />;
+  if (context === undefined || !group || events === undefined) return <LoadingState />;
 
   const upcoming = events as EventRow[];
   const next = upcoming[0];
@@ -69,6 +71,7 @@ export default function MemberScheduleScreen() {
           <Text style={[styles.hint, { color: t.muted }]}>Upcoming gatherings for {group?.name ?? 'your group'}.</Text>
         </View>
 
+        <GroupSwitcher mode="member" />
         {next ? <NextEvent event={next} /> : <EmptySchedule />}
 
         {rest.length > 0 ? (

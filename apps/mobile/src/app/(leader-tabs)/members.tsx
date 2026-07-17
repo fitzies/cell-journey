@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from 'convex/react';
 import { useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
+import { GroupSwitcher, useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { ActionButton, EmptyState, LeaderScreen, Mark, RowCard, SectionHeader, StatPill } from '@/components/leader/ui';
 import { api, type Doc, type Id } from '@/lib/api';
@@ -10,19 +11,19 @@ const regionLabels: Record<string, string> = {
 };
 
 export default function LeaderMembersScreen() {
-  const profile = useQuery(api.profiles.current, {});
-  const hasGroup = Boolean(profile?.leaderGroupId);
-  const pending = useQuery(api.groups.listPendingJoinRequests, hasGroup ? {} : 'skip');
-  const members = useQuery(api.groups.listMyMembers, hasGroup ? {} : 'skip');
+  const { context, selectedLeaderGroup: group } = useGroups();
+  const hasGroup = Boolean(group);
+  const pending = useQuery(api.groups.listPendingJoinRequestsForGroup, group ? { groupId: group._id } : 'skip');
+  const members = useQuery(api.groups.listMembers, group ? { groupId: group._id } : 'skip');
   const services = useQuery(api.groups.listServices, {});
   const approve = useMutation(api.groups.approveJoinRequest);
   const reject = useMutation(api.groups.rejectJoinRequest);
-  const remove = useMutation(api.groups.removeMember);
+  const remove = useMutation(api.groups.removeMemberFromGroupById);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const serviceMap = useMemo(() => new Map((services ?? []).map((service) => [service._id, service.name])), [services]);
 
-  if (profile === undefined || services === undefined || (hasGroup && (pending === undefined || members === undefined))) return <LoadingState />;
+  if (context === undefined || services === undefined || (hasGroup && (pending === undefined || members === undefined))) return <LoadingState />;
 
   if (!hasGroup) {
     return (
@@ -55,11 +56,11 @@ export default function LeaderMembersScreen() {
   };
 
   const removeMember = (profileRow: Doc<'userProfiles'>) => {
-    Alert.alert('Remove member?', `${profileRow.fullName ?? 'This member'} will return to the group-code step. History stays saved.`, [
+    Alert.alert('Remove member?', `${profileRow.fullName ?? 'This member'} will leave ${group?.name ?? 'this group'}. Other memberships and history stay saved.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: async () => {
         setBusyId(profileRow._id);
-        try { await remove({ profileId: profileRow._id }); }
+        try { if (group) await remove({ groupId: group._id, profileId: profileRow._id }); }
         catch (err) { Alert.alert('Could not remove', err instanceof Error ? err.message : 'Please try again.'); }
         finally { setBusyId(null); }
       } },
@@ -75,6 +76,7 @@ export default function LeaderMembersScreen() {
 
   return (
     <LeaderScreen eyebrow="Members" title="Care for your group." hint="Approve requests and keep your active member list tidy.">
+      <GroupSwitcher mode="leader" />
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <StatPill label="Active" value={memberRows.length} />
         <StatPill label="Pending" value={pendingRows.length} />

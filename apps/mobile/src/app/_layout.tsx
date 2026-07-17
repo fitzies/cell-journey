@@ -5,6 +5,7 @@ import { Platform, Text, useColorScheme, View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { useFonts, Fraunces_400Regular, Fraunces_400Regular_Italic } from '@expo-google-fonts/fraunces';
 import { DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
+import { GroupContextProvider } from '@/components/group-context';
 import { convex } from '@/lib/convex';
 
 const secureStorage = {
@@ -23,9 +24,11 @@ export default function RootLayout() {
       client={convex}
       storage={Platform.OS === 'ios' || Platform.OS === 'android' ? secureStorage : undefined}
     >
-      <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack screenOptions={{ headerShown: false }} />
-      </ThemeProvider>
+      <GroupContextProvider>
+        <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack screenOptions={{ headerShown: false }} />
+        </ThemeProvider>
+      </GroupContextProvider>
     </ConvexAuthProvider>
   );
 }

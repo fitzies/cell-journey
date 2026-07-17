@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from 'convex/react';
 import { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
+import { GroupSwitcher, useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { ActionButton, EmptyState, LeaderScreen, Mark, RowCard, SectionHeader } from '@/components/leader/ui';
 import { fonts, useAppTheme } from '@/constants/tokens';
@@ -11,16 +12,16 @@ export default function LeaderAttendanceScreen() {
   const t = useAppTheme();
   const [from] = useState(() => startOfToday());
   const [selectedId, setSelectedId] = useState<Id<'events'> | null>(null);
-  const profile = useQuery(api.profiles.current, {});
-  const hasGroup = Boolean(profile?.leaderGroupId);
-  const events = useQuery(api.events.listMine, { from, limit: 20 });
-  const members = useQuery(api.groups.listMyMembers, hasGroup ? {} : 'skip');
+  const { context, selectedLeaderGroup: group } = useGroups();
+  const hasGroup = Boolean(group);
+  const events = useQuery(api.events.listForGroup, group ? { groupId: group._id, from, limit: 20 } : 'skip');
+  const members = useQuery(api.groups.listMembers, group ? { groupId: group._id } : 'skip');
   const selectedEvent = events?.find((event) => event._id === selectedId) ?? events?.[0] ?? null;
   const attendance = useQuery(api.attendance.listForEvent, selectedEvent && hasGroup ? { eventId: selectedEvent._id } : 'skip');
   const mark = useMutation(api.attendance.markForMember);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  if (profile === undefined || events === undefined || (hasGroup && (members === undefined || (selectedEvent && attendance === undefined)))) return <LoadingState />;
+  if (context === undefined || (hasGroup && (events === undefined || members === undefined || (selectedEvent && attendance === undefined)))) return <LoadingState />;
 
   if (!hasGroup) {
     return (
@@ -30,6 +31,7 @@ export default function LeaderAttendanceScreen() {
     );
   }
 
+  const eventRows = events ?? [];
   const memberRows = members ?? [];
   const attendanceRows = attendance ?? [];
   const statusByProfile = new Map(attendanceRows.map((row) => [row.profileId, row.finalStatus ?? row.memberSubmittedStatus ?? null]));
@@ -48,10 +50,11 @@ export default function LeaderAttendanceScreen() {
 
   return (
     <LeaderScreen eyebrow="Attendance" title="Mark the room." hint="Choose an event, then record who was present.">
+      <GroupSwitcher mode="leader" />
       <SectionHeader title="Event" />
-      {events.length ? (
+      {eventRows.length ? (
         <View style={{ gap: 8 }}>
-          {events.slice(0, 4).map((event) => {
+          {eventRows.slice(0, 4).map((event) => {
             const selected = selectedEvent?._id === event._id;
             return (
               <Pressable key={event._id} onPress={() => setSelectedId(event._id)} style={({ pressed }) => ({ borderWidth: 1, borderColor: selected ? t.accent : t.line, backgroundColor: selected ? t.selected : t.surface, borderRadius: 18, padding: 14, transform: [{ scale: pressed ? 0.99 : 1 }] })}>

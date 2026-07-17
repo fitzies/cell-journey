@@ -1,9 +1,11 @@
-import { useConvexAuth } from 'convex/react';
+import { useConvexAuth, useQuery } from 'convex/react';
 import { Redirect, Tabs } from 'expo-router';
 import { useMemo } from 'react';
+import { useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { SolarTabIcon, type SolarTabIconName } from '@/components/solar-tab-icon';
 import { useAppTheme } from '@/constants/tokens';
+import { api } from '@/lib/api';
 
 function tabIcon(name: SolarTabIconName) {
   function TabIcon({ color, focused }: { color: string; focused: boolean }) {
@@ -25,6 +27,8 @@ const profileOptions = { title: 'Profile', tabBarIcon: profileIcon };
 
 export default function MemberTabs() {
   const { isAuthenticated, isLoading } = useConvexAuth();
+  const profile = useQuery(api.profiles.currentOrNull, isAuthenticated ? {} : 'skip');
+  const { context } = useGroups();
   const t = useAppTheme();
   const screenOptions = useMemo(() => ({
     headerShown: false,
@@ -40,8 +44,11 @@ export default function MemberTabs() {
     },
     tabBarItemStyle: { justifyContent: 'center' as const },
   }), [t.accent, t.line, t.muted, t.surface]);
-  if (isLoading) return <LoadingState />;
+  if (isLoading || (isAuthenticated && profile === undefined)) return <LoadingState />;
   if (!isAuthenticated) return <Redirect href="/(auth)" />;
+  if (profile === null) return <Redirect href="/(onboarding)" />;
+  if (context === undefined) return <LoadingState />;
+  if (context.memberGroups.length === 0) return <Redirect href="/(onboarding)" />;
   return (
     <Tabs screenOptions={screenOptions}>
       <Tabs.Screen name="index" options={homeOptions} />

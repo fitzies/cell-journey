@@ -15,13 +15,23 @@ const singaporeRegion = v.union(
   v.literal("southwest"),
 );
 
-async function requireAuthUserId(ctx: QueryCtx | MutationCtx) {
+type DbCtx = QueryCtx | MutationCtx;
+
+async function requireAuthUserId(ctx: DbCtx) {
   const userId = await getAuthUserId(ctx);
   if (!userId) throw new Error("Not authenticated");
   return userId;
 }
 
-export async function getCurrentProfile(ctx: QueryCtx | MutationCtx) {
+export function isProfileComplete(profile: Doc<"userProfiles">) {
+  return Boolean(
+    profile.fullName?.trim() &&
+      profile.singaporeRegion &&
+      profile.serviceIds.length > 0,
+  );
+}
+
+export async function getCurrentProfile(ctx: DbCtx) {
   const userId = await requireAuthUserId(ctx);
   return await ctx.db
     .query("userProfiles")
@@ -29,23 +39,59 @@ export async function getCurrentProfile(ctx: QueryCtx | MutationCtx) {
     .unique();
 }
 
-export async function requireCurrentProfile(ctx: QueryCtx | MutationCtx) {
+export async function requireCurrentProfile(ctx: DbCtx) {
   const profile = await getCurrentProfile(ctx);
   if (!profile) throw new Error("Profile not found");
   return profile;
 }
 
-export async function requireLeaderProfile(ctx: QueryCtx | MutationCtx) {
-  const profile = await requireCurrentProfile(ctx);
-  if (profile.role !== "leader") throw new Error("Unauthorized");
-  if (!profile.leaderGroupId) throw new Error("Leader has no assigned group");
+export async function getActiveMembershipForGroup(
+  ctx: DbCtx,
+  profileId: Id<"userProfiles">,
+  groupId: Id<"groups">,
+) {
+  return await ctx.db
+    .query("memberships")
+    .withIndex("by_profile_and_group_and_status", (q) =>
+      q.eq("profileId", profileId).eq("groupId", groupId).eq("status", "active"),
+    )
+    .unique();
+}
 
-  const group = await ctx.db.get(profile.leaderGroupId);
+export async function requireActiveMembership(ctx: DbCtx, groupId: Id<"groups">) {
+  const profile = await requireCurrentProfile(ctx);
+  const group = await ctx.db.get(groupId);
+  if (!group || !group.isActive) throw new Error("Group not found");
+
+  const membership = await getActiveMembershipForGroup(ctx, profile._id, groupId);
+  if (!membership) throw new Error("Unauthorized");
+  return { profile, membership, group };
+}
+
+export async function requireLeadershipForGroup(ctx: DbCtx, groupId: Id<"groups">) {
+  const profile = await requireCurrentProfile(ctx);
+  const group = await ctx.db.get(groupId);
   if (!group || !group.isActive || group.leaderProfileId !== profile._id) {
     throw new Error("Unauthorized");
   }
+  return { profile, group };
+}
 
-  return profile;
+/**
+ * Compatibility helper for legacy single-group functions. New functions must
+ * authorize with requireLeadershipForGroup and an explicit target group.
+ */
+export async function requireLeaderProfile(ctx: DbCtx) {
+  const profile = await requireCurrentProfile(ctx);
+  const ledGroups = await ctx.db
+    .query("groups")
+    .withIndex("by_leader", (q) => q.eq("leaderProfileId", profile._id))
+    .take(2);
+  const activeGroups = ledGroups.filter((group) => group.isActive);
+  if (activeGroups.length !== 1) {
+    throw new Error("Select a group in the latest app version");
+  }
+  return { ...profile, leaderGroupId: activeGroups[0]._id };
 }
 
 async function validateProfileInput(
@@ -67,13 +113,12 @@ async function validateProfileInput(
   return { trimmedFullName, uniqueServiceIds };
 }
 
-function getOnboardingStatus(profile: Doc<"userProfiles">) {
-  if (!profile.fullName?.trim() || !profile.singaporeRegion || profile.serviceIds.length === 0) {
-    return "profileIncomplete" as const;
-  }
-  if (profile.role === "leader") return "approved" as const;
+function getCompatibilityOnboardingStatus(profile: Doc<"userProfiles">) {
+  if (!isProfileComplete(profile)) return "profileIncomplete" as const;
   if (profile.currentGroupId && profile.activeMembershipId) return "approved" as const;
-  return profile.onboardingStatus === "pendingApproval" ? "pendingApproval" : "needsGroup";
+  if (profile.onboardingStatus === "pendingApproval") return "pendingApproval" as const;
+  if (profile.role === "leader") return "approved" as const;
+  return "needsGroup" as const;
 }
 
 export const getOrCreateCurrent = mutation({
@@ -102,9 +147,7 @@ export const getOrCreateCurrent = mutation({
 
 export const current = query({
   args: {},
-  handler: async (ctx) => {
-    return await getCurrentProfile(ctx);
-  },
+  handler: async (ctx) => await getCurrentProfile(ctx),
 });
 
 export const currentOrNull = query({
@@ -116,6 +159,53 @@ export const currentOrNull = query({
       .query("userProfiles")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
+  },
+});
+
+export const currentContext = query({
+  args: {},
+  handler: async (ctx) => {
+    const profile = await requireCurrentProfile(ctx);
+    const memberships = await ctx.db
+      .query("memberships")
+      .withIndex("by_profile_status", (q) =>
+        q.eq("profileId", profile._id).eq("status", "active"),
+      )
+      .take(100);
+    const memberGroups = [];
+    for (const membership of memberships) {
+      const group = await ctx.db.get(membership.groupId);
+      if (group?.isActive) memberGroups.push({ membership, group });
+    }
+
+    const ledGroups = (
+      await ctx.db
+        .query("groups")
+        .withIndex("by_leader", (q) => q.eq("leaderProfileId", profile._id))
+        .take(100)
+    ).filter((group) => group.isActive);
+
+    const pending = await ctx.db
+      .query("joinRequests")
+      .withIndex("by_profile_status", (q) =>
+        q.eq("profileId", profile._id).eq("status", "pending"),
+      )
+      .take(100);
+    const pendingRequests = [];
+    for (const request of pending) {
+      const group = await ctx.db.get(request.groupId);
+      if (group) pendingRequests.push({ request, group });
+    }
+
+    return {
+      profile,
+      profileComplete: isProfileComplete(profile),
+      memberGroups,
+      ledGroups,
+      pendingRequests,
+      canUseMemberMode: memberGroups.length > 0,
+      canUseLeaderMode: ledGroups.length > 0,
+    };
   },
 });
 
@@ -144,7 +234,7 @@ export const updateOnboardingProfile = mutation({
 
     await ctx.db.patch(profile._id, {
       ...patch,
-      onboardingStatus: getOnboardingStatus({ ...profile, ...patch }),
+      onboardingStatus: getCompatibilityOnboardingStatus({ ...profile, ...patch }),
     });
     return await ctx.db.get(profile._id);
   },
@@ -174,7 +264,7 @@ export const updateProfile = mutation({
     };
     await ctx.db.patch(profile._id, {
       ...patch,
-      onboardingStatus: getOnboardingStatus({ ...profile, ...patch }),
+      onboardingStatus: getCompatibilityOnboardingStatus({ ...profile, ...patch }),
     });
     return await ctx.db.get(profile._id);
   },

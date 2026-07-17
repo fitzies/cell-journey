@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { GroupSwitcher, useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
 import { api } from '@/lib/api';
@@ -59,13 +60,14 @@ export default function MemberHomeScreen() {
   const t = useAppTheme();
   const [queryFrom] = useState(() => nowMinusWindow());
   const profile = useQuery(api.profiles.current, {});
-  const group = useQuery(api.groups.getMyGroup, {});
-  const events = useQuery(api.events.listMine, { from: queryFrom, limit: 5 });
-  const attendance = useQuery(api.attendance.myHistory, { limit: 3 });
+  const { context, selectedMemberGroup } = useGroups();
+  const group = selectedMemberGroup?.group ?? null;
+  const events = useQuery(api.events.listForGroup, group ? { groupId: group._id, from: queryFrom, limit: 5 } : 'skip');
+  const attendance = useQuery(api.attendance.historyForGroup, group ? { groupId: group._id, limit: 3 } : 'skip');
   const selfSubmit = useMutation(api.attendance.selfSubmit);
   const [busy, setBusy] = useState(false);
 
-  if (profile === undefined || group === undefined || events === undefined || attendance === undefined) return <LoadingState />;
+  if (profile === undefined || context === undefined || !group || events === undefined || attendance === undefined) return <LoadingState />;
 
   const eventRows = events as EventRow[];
   const next = eventRows.find((event) => event.endAt + ONE_HOUR >= Date.now());
@@ -99,6 +101,8 @@ export default function MemberHomeScreen() {
             <Text style={[styles.avatarText, { color: t.accentInk }]}>{initials(displayName)}</Text>
           </View>
         </View>
+
+        <GroupSwitcher mode="member" />
 
         <View style={[styles.nextCard, { backgroundColor: t.accent }]}>
           <View style={styles.heroGlow} />

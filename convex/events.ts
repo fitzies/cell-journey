@@ -1,26 +1,83 @@
 import { v } from "convex/values";
-import { mutation, query, type MutationCtx } from "./_generated/server";
+import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { requireCurrentProfile, requireLeaderProfile } from "./profiles";
+import {
+  getActiveMembershipForGroup,
+  requireCurrentProfile,
+  requireLeaderProfile,
+  requireLeadershipForGroup,
+} from "./profiles";
 
+async function listEventsForGroup(
+  ctx: QueryCtx,
+  groupId: Id<"groups">,
+  from: number,
+  limit: number,
+) {
+  const events = [];
+  for await (const event of ctx.db
+    .query("events")
+    .withIndex("by_group_start", (q) =>
+      q.eq("groupId", groupId).gte("startAt", from),
+    )
+    .order("asc")) {
+    if (!event.cancelledAt) events.push(event);
+    if (events.length >= limit) break;
+  }
+  return events;
+}
+
+export const listForGroup = query({
+  args: {
+    groupId: v.id("groups"),
+    from: v.optional(v.number()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const profile = await requireCurrentProfile(ctx);
+    const group = await ctx.db.get(args.groupId);
+    if (!group || !group.isActive) throw new Error("Group not found");
+
+    const isLeader = group.leaderProfileId === profile._id;
+    const membership = isLeader
+      ? null
+      : await getActiveMembershipForGroup(ctx, profile._id, group._id);
+    if (!isLeader && !membership) throw new Error("Unauthorized");
+
+    return await listEventsForGroup(
+      ctx,
+      group._id,
+      args.from ?? 0,
+      Math.min(args.limit ?? 50, 100),
+    );
+  },
+});
+
+/** Legacy single-group event list. */
 export const listMine = query({
   args: { from: v.optional(v.number()), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const profile = await requireCurrentProfile(ctx);
-    const groupId = profile.role === "leader" ? profile.leaderGroupId : profile.currentGroupId;
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_profile_status", (q) =>
+        q.eq("profileId", profile._id).eq("status", "active"),
+      )
+      .first();
+    const ledGroup = membership
+      ? null
+      : await ctx.db
+          .query("groups")
+          .withIndex("by_leader", (q) => q.eq("leaderProfileId", profile._id))
+          .first();
+    const groupId = membership?.groupId ?? ledGroup?._id;
     if (!groupId) return [];
-
-    const from = args.from ?? 0;
-    const limit = Math.min(args.limit ?? 50, 100);
-    const events = [];
-    for await (const event of ctx.db
-      .query("events")
-      .withIndex("by_group_start", (q) => q.eq("groupId", groupId).gte("startAt", from))
-      .order("asc")) {
-      if (!event.cancelledAt) events.push(event);
-      if (events.length >= limit) break;
-    }
-    return events;
+    return await listEventsForGroup(
+      ctx,
+      groupId,
+      args.from ?? 0,
+      Math.min(args.limit ?? 50, 100),
+    );
   },
 });
 
@@ -124,23 +181,35 @@ async function insertEvent(
   return await ctx.db.get(eventId);
 }
 
+export const createForGroup = mutation({
+  args: {
+    groupId: v.id("groups"),
+    ...eventFields,
+  },
+  handler: async (ctx, args) => {
+    const { profile } = await requireLeadershipForGroup(ctx, args.groupId);
+    return await insertEvent(ctx, args.groupId, profile._id, args);
+  },
+});
+
+/** Legacy single-led-group create. */
 export const create = mutation({
   args: eventFields,
   handler: async (ctx, args) => {
     const leader = await requireLeaderProfile(ctx);
-    return await insertEvent(ctx, leader.leaderGroupId!, leader._id, args);
+    return await insertEvent(ctx, leader.leaderGroupId, leader._id, args);
   },
 });
 
-export const importMine = mutation({
+export const importForGroup = mutation({
   args: {
+    groupId: v.id("groups"),
     sourceType: v.union(v.literal("csv"), v.literal("xlsx")),
     fileName: v.string(),
     events: v.array(importEventValidator),
   },
   handler: async (ctx, args) => {
-    const leader = await requireLeaderProfile(ctx);
-    const groupId = leader.leaderGroupId!;
+    const { profile } = await requireLeadershipForGroup(ctx, args.groupId);
     if (args.events.length === 0) throw new Error("The import has no events");
     if (args.events.length > 100) throw new Error("Import up to 100 events at a time");
 
@@ -161,7 +230,7 @@ export const importMine = mutation({
       const matches = await ctx.db
         .query("events")
         .withIndex("by_group_start", (q) =>
-          q.eq("groupId", groupId).eq("startAt", row.event.startAt),
+          q.eq("groupId", args.groupId).eq("startAt", row.event.startAt),
         )
         .take(200);
       const duplicate = matches.some((event) =>
@@ -173,9 +242,9 @@ export const importMine = mutation({
     const now = Date.now();
     for (const row of normalized) {
       await ctx.db.insert("events", {
-        groupId,
+        groupId: args.groupId,
         ...eventDocumentFields(row.event),
-        createdByProfileId: leader._id,
+        createdByProfileId: profile._id,
         importSource: args.sourceType,
         importFileName: fileName,
         importedAt: now,
@@ -194,9 +263,9 @@ export const update = mutation({
     ...eventFields,
   },
   handler: async (ctx, args) => {
-    const leader = await requireLeaderProfile(ctx);
     const event = await ctx.db.get(args.eventId);
-    if (!event || event.groupId !== leader.leaderGroupId) throw new Error("Event not found");
+    if (!event) throw new Error("Event not found");
+    await requireLeadershipForGroup(ctx, event.groupId);
     if (event.cancelledAt) throw new Error("Cancelled events cannot be edited");
 
     const normalized = normalizeEvent(args);
@@ -217,13 +286,13 @@ export const update = mutation({
 export const cancel = mutation({
   args: { eventId: v.id("events"), reason: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const leader = await requireLeaderProfile(ctx);
     const event = await ctx.db.get(args.eventId);
-    if (!event || event.groupId !== leader.leaderGroupId) throw new Error("Event not found");
+    if (!event) throw new Error("Event not found");
+    const { profile } = await requireLeadershipForGroup(ctx, event.groupId);
     const now = Date.now();
     await ctx.db.patch(event._id, {
       cancelledAt: now,
-      cancelledByProfileId: leader._id,
+      cancelledByProfileId: profile._id,
       cancellationReason: args.reason,
       updatedAt: now,
     });

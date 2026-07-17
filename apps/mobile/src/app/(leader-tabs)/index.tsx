@@ -1,6 +1,7 @@
 import { useQuery } from 'convex/react';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
+import { GroupSwitcher, useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { Card, LeaderScreen, RowCard, SectionHeader, StatPill, Mark, EmptyState } from '@/components/leader/ui';
 import { fonts, useAppTheme } from '@/constants/tokens';
@@ -11,16 +12,16 @@ export default function LeaderHomeScreen() {
   const t = useAppTheme();
   const [from] = useState(() => startOfToday());
   const profile = useQuery(api.profiles.current, {});
-  const hasGroup = Boolean(profile?.leaderGroupId);
-  const group = useQuery(api.groups.getMyGroup, {});
-  const events = useQuery(api.events.listMine, { from, limit: 5 });
-  const pending = useQuery(api.groups.listPendingJoinRequests, hasGroup ? {} : 'skip');
-  const members = useQuery(api.groups.listMyMembers, hasGroup ? {} : 'skip');
+  const { context, selectedLeaderGroup: group } = useGroups();
+  const hasGroup = Boolean(group);
+  const events = useQuery(api.events.listForGroup, group ? { groupId: group._id, from, limit: 5 } : 'skip');
+  const pending = useQuery(api.groups.listPendingJoinRequestsForGroup, group ? { groupId: group._id } : 'skip');
+  const members = useQuery(api.groups.listMembers, group ? { groupId: group._id } : 'skip');
 
-  if (profile === undefined || group === undefined || events === undefined || (hasGroup && (pending === undefined || members === undefined))) return <LoadingState />;
+  if (profile === undefined || context === undefined || (hasGroup && (events === undefined || pending === undefined || members === undefined))) return <LoadingState />;
   const pendingRows = pending ?? [];
   const memberRows = members ?? [];
-  const next = events[0];
+  const next = events?.[0];
   const name = profile?.preferredName?.trim() || profile?.fullName?.trim() || 'Leader';
 
   if (!hasGroup) {
@@ -33,6 +34,7 @@ export default function LeaderHomeScreen() {
 
   return (
     <LeaderScreen eyebrow="Leader home" title={`Hi, ${name.split(/\s+/)[0]}.`} hint={group?.name ?? 'Your cell group'}>
+      <GroupSwitcher mode="leader" />
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <StatPill label="Members" value={memberRows.length} />
         <StatPill label="Pending" value={pendingRows.length} />

@@ -69,10 +69,6 @@ function formatDate(timestamp: number) {
   return new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", year: "numeric" }).format(timestamp);
 }
 
-function roleBadge(role: "member" | "leader") {
-  return role === "leader" ? <Badge>Leader</Badge> : <Badge variant="secondary">Member</Badge>;
-}
-
 export default function AdminPage() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const me = useQuery(api.admin.me, isAuthenticated ? {} : "skip");
@@ -192,7 +188,12 @@ function AdminDashboard() {
     const search = userSearch.trim().toLowerCase();
     if (!search) return users ?? [];
     return (users ?? []).filter((row) =>
-      [row.displayName, row.user.email, row.profile.role, row.currentGroupName, row.leaderGroupName]
+      [
+        row.displayName,
+        row.user.email,
+        ...row.memberGroups.map((group) => group.name),
+        ...row.ledGroups.map((group) => group.name),
+      ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
@@ -537,10 +538,7 @@ function CreateGroupDialog() {
 }
 
 function GroupsPanel({ groups, users }: { groups: GroupRow[] | undefined; users: UserRow[] | undefined }) {
-  const leaders = useMemo(
-    () => users?.filter((row) => row.profile.role === "leader" || !row.profile.currentGroupId) ?? [],
-    [users],
-  );
+  const leaders = useMemo(() => users ?? [], [users]);
   const columns = useMemo<ColumnDef<GroupRow>[]>(() => [
     {
       accessorFn: (row) => row.group.name,
@@ -702,22 +700,32 @@ function UsersPanel({
       ),
     },
     {
-      accessorFn: (row) => row.profile.role,
-      id: "role",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Role" />,
-      cell: ({ row }) => roleBadge(row.original.profile.role),
+      accessorFn: (row) => `${row.memberGroups.length}:${row.ledGroups.length}`,
+      id: "capabilities",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Access" />,
+      cell: ({ row }) => (
+        <div className="flex flex-wrap gap-1.5">
+          {row.original.memberGroups.length ? <Badge variant="secondary">Member</Badge> : null}
+          {row.original.ledGroups.length ? <Badge>Leader</Badge> : null}
+          {!row.original.memberGroups.length && !row.original.ledGroups.length ? <span className="text-muted-foreground">None</span> : null}
+        </div>
+      ),
     },
     {
-      accessorFn: (row) => row.currentGroupName ?? "",
+      accessorFn: (row) => row.memberGroups.map((group) => group.name).join(", "),
       id: "memberGroup",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Member group" />,
-      cell: ({ row }) => row.original.currentGroupName ?? <span className="text-muted-foreground">None</span>,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Member groups" />,
+      cell: ({ row }) => row.original.memberGroups.length ? (
+        <div className="flex max-w-64 flex-wrap gap-1">{row.original.memberGroups.map((group) => <Badge key={group.groupId} variant="outline">{group.name}</Badge>)}</div>
+      ) : <span className="text-muted-foreground">None</span>,
     },
     {
-      accessorFn: (row) => row.leaderGroupName ?? "",
+      accessorFn: (row) => row.ledGroups.map((group) => group.name).join(", "),
       id: "leaderGroup",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Leads" />,
-      cell: ({ row }) => row.original.leaderGroupName ?? <span className="text-muted-foreground">None</span>,
+      cell: ({ row }) => row.original.ledGroups.length ? (
+        <div className="flex max-w-64 flex-wrap gap-1">{row.original.ledGroups.map((group) => <Badge key={group.groupId} variant="outline">{group.name}</Badge>)}</div>
+      ) : <span className="text-muted-foreground">None</span>,
     },
     {
       id: "actions",
@@ -731,7 +739,7 @@ function UsersPanel({
       <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
         <div>
           <CardTitle>People</CardTitle>
-          <CardDescription className="mt-1">Manage roles and current group placement.</CardDescription>
+          <CardDescription className="mt-1">Add or remove memberships and leadership assignments independently.</CardDescription>
         </div>
         <SearchInput value={search} onChange={setSearch} placeholder="Search people" />
       </CardHeader>
@@ -745,81 +753,67 @@ function UsersPanel({
 function UserActions({ row, groups }: { row: UserRow; groups: GroupRow[] }) {
   const activeGroups = groups.filter((item) => item.group.isActive);
   const assignMember = useMutation(api.admin.assignMemberToGroup);
-  const removeMember = useMutation(api.admin.removeMemberFromGroup);
-  const demoteLeader = useMutation(api.admin.demoteLeader);
+  const removeMembership = useMutation(api.admin.removeMembership);
   const setLeader = useMutation(api.admin.setGroupLeader);
-  const [groupValue, setGroupValue] = useState(row.profile.currentGroupId ?? "none");
-  const [leaderGroupValue, setLeaderGroupValue] = useState(row.profile.leaderGroupId ?? "none");
+  const [memberValue, setMemberValue] = useState("choose-member");
+  const [leaderValue, setLeaderValue] = useState("choose-leader");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  useEffect(() => setGroupValue(row.profile.currentGroupId ?? "none"), [row.profile.currentGroupId]);
-  useEffect(() => setLeaderGroupValue(row.profile.leaderGroupId ?? "none"), [row.profile.leaderGroupId]);
-
-  function changeMemberGroup(next: string) {
-    const previous = groupValue;
-    setGroupValue(next);
+  function run(task: () => Promise<unknown>, reset?: () => void) {
     setError(null);
     startTransition(async () => {
       try {
-        if (next === "none") await removeMember({ profileId: row.profile._id });
-        else await assignMember({ profileId: row.profile._id, groupId: next as Id<"groups"> });
+        await task();
+        reset?.();
       } catch (err) {
-        setGroupValue(previous);
-        setError(err instanceof Error ? err.message : "Could not update group");
+        setError(err instanceof Error ? err.message : "Could not update assignments");
       }
     });
   }
 
-  function promoteTo(next: string) {
-    const previous = leaderGroupValue;
-    setLeaderGroupValue(next);
-    setError(null);
-    startTransition(async () => {
-      try {
-        if (next !== "none") await setLeader({ groupId: next as Id<"groups">, profileId: row.profile._id });
-      } catch (err) {
-        setLeaderGroupValue(previous);
-        setError(err instanceof Error ? err.message : "Could not promote member");
-      }
-    });
-  }
-
-  if (row.profile.role === "leader") {
-    return (
-      <div className="text-right">
-        <AlertDialog>
-          <AlertDialogTrigger asChild><Button variant="outline" size="sm" disabled={pending}>Demote</Button></AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Demote leader?</AlertDialogTitle>
-              <AlertDialogDescription>{row.displayName} will lose leader access. Their group will need a new leader.</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => startTransition(async () => { await demoteLeader({ profileId: row.profile._id }); })}>Demote</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
-    );
-  }
+  const availableMemberships = activeGroups.filter((group) => !row.memberGroups.some((item) => item.groupId === group.group._id));
+  const availableLeadership = activeGroups.filter((group) => group.group.leaderProfileId !== row.profile._id);
 
   return (
-    <div className="min-w-[23rem] space-y-1.5">
+    <div className="min-w-[25rem] space-y-2">
+      <div className="flex flex-wrap justify-end gap-1.5">
+        {row.memberGroups.map((group) => (
+          <Button key={`member-${group.groupId}`} variant="outline" size="sm" disabled={pending} onClick={() => run(() => removeMembership({ profileId: row.profile._id, groupId: group.groupId }))}>
+            Remove {group.name}
+          </Button>
+        ))}
+        {row.ledGroups.map((group) => (
+          <Button key={`leader-${group.groupId}`} variant="outline" size="sm" disabled={pending} onClick={() => run(() => setLeader({ groupId: group.groupId, profileId: null }))}>
+            Stop leading {group.name}
+          </Button>
+        ))}
+      </div>
       <div className="flex justify-end gap-2">
-        <Select value={groupValue} onValueChange={changeMemberGroup} disabled={pending}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Member group" /></SelectTrigger>
+        <Select value={memberValue} onValueChange={(next) => {
+          setMemberValue(next);
+          if (next !== "choose-member") run(
+            () => assignMember({ profileId: row.profile._id, groupId: next as Id<"groups"> }),
+            () => setMemberValue("choose-member"),
+          );
+        }} disabled={pending || availableMemberships.length === 0}>
+          <SelectTrigger className="w-44"><SelectValue placeholder="Add membership" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="none">No member group</SelectItem>
-            {activeGroups.map((group) => <SelectItem key={group.group._id} value={group.group._id}>{group.group.name}</SelectItem>)}
+            <SelectItem value="choose-member">Add membership…</SelectItem>
+            {availableMemberships.map((group) => <SelectItem key={group.group._id} value={group.group._id}>{group.group.name}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={leaderGroupValue} onValueChange={promoteTo} disabled={pending}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Promote" /></SelectTrigger>
+        <Select value={leaderValue} onValueChange={(next) => {
+          setLeaderValue(next);
+          if (next !== "choose-leader") run(
+            () => setLeader({ groupId: next as Id<"groups">, profileId: row.profile._id }),
+            () => setLeaderValue("choose-leader"),
+          );
+        }} disabled={pending || availableLeadership.length === 0}>
+          <SelectTrigger className="w-44"><SelectValue placeholder="Add leadership" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="none">Promote to…</SelectItem>
-            {activeGroups.map((group) => <SelectItem key={group.group._id} value={group.group._id}>{group.group.name}</SelectItem>)}
+            <SelectItem value="choose-leader">Add leadership…</SelectItem>
+            {availableLeadership.map((group) => <SelectItem key={group.group._id} value={group.group._id}>{group.group.name}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>

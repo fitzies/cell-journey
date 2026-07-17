@@ -1,6 +1,7 @@
 import { useQuery } from 'convex/react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { GroupSwitcher, useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
 import { api } from '@/lib/api';
@@ -33,9 +34,11 @@ function formatEventMeta(ms: number) {
 
 export default function MemberAttendanceScreen() {
   const t = useAppTheme();
-  const history = useQuery(api.attendance.myHistory, { limit: 30 });
+  const { context, selectedMemberGroup } = useGroups();
+  const group = selectedMemberGroup?.group ?? null;
+  const history = useQuery(api.attendance.historyForGroup, group ? { groupId: group._id, limit: 30 } : 'skip');
 
-  if (history === undefined) return <LoadingState />;
+  if (context === undefined || !group || history === undefined) return <LoadingState />;
 
   const rows = history.rows as HistoryRow[];
   const rate = formatPercent(history.attendanceRate);
@@ -48,9 +51,10 @@ export default function MemberAttendanceScreen() {
         <View style={styles.header}>
           <Text style={[styles.eyebrow, { color: t.accent }]}>ATTENDANCE</Text>
           <Text style={[styles.title, { color: t.ink }]}>Your rhythm so far.</Text>
-          <Text style={[styles.hint, { color: t.muted }]}>A simple record of past gatherings during your active membership.</Text>
+          <Text style={[styles.hint, { color: t.muted }]}>Attendance for {group.name} during your active membership.</Text>
         </View>
 
+        <GroupSwitcher mode="member" />
         <View style={[styles.statCard, { backgroundColor: t.surface, borderColor: t.line }]}>
           <View style={styles.statTopRow}>
             <Text style={[styles.statKicker, { color: t.muted }]}>CURRENT RATE</Text>

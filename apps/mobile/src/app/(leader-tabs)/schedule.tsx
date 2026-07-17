@@ -5,6 +5,7 @@ import { File as ExpoFile } from 'expo-file-system';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GroupSwitcher, useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { ActionButton, EmptyState, LeaderScreen, RowCard, SectionHeader } from '@/components/leader/ui';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
@@ -145,17 +146,17 @@ export default function LeaderScheduleScreen() {
   const [importing, setImporting] = useState(false);
   const [importPreview, setImportPreview] = useState<EventImportPreview | null>(null);
   const [busyEventId, setBusyEventId] = useState<Id<'events'> | null>(null);
-  const profile = useQuery(api.profiles.current, {});
-  const hasGroup = Boolean(profile?.leaderGroupId);
-  const events = useQuery(api.events.listMine, { from, limit: 30 });
-  const create = useMutation(api.events.create);
-  const importEvents = useMutation(api.events.importMine);
+  const { context, selectedLeaderGroup: group } = useGroups();
+  const hasGroup = Boolean(group);
+  const events = useQuery(api.events.listForGroup, group ? { groupId: group._id, from, limit: 30 } : 'skip');
+  const create = useMutation(api.events.createForGroup);
+  const importEvents = useMutation(api.events.importForGroup);
   const update = useMutation(api.events.update);
   const cancel = useMutation(api.events.cancel);
 
   const editingEvent = useMemo(() => events?.find((event) => event._id === editingId) ?? null, [editingId, events]);
 
-  if (profile === undefined || events === undefined) return <LoadingState />;
+  if (context === undefined || (hasGroup && events === undefined)) return <LoadingState />;
 
   if (!hasGroup) {
     return (
@@ -191,7 +192,8 @@ export default function LeaderScheduleScreen() {
       if (editingId) {
         await update({ eventId: editingId, ...parsed.value });
       } else {
-        await create(parsed.value);
+        if (!group) throw new Error('Select a group first');
+        await create({ groupId: group._id, ...parsed.value });
       }
       setForm(defaultForm());
       setEditingId(null);
@@ -230,13 +232,14 @@ export default function LeaderScheduleScreen() {
   };
 
   const confirmImport = async () => {
-    if (!importPreview) return;
+    if (!group || !importPreview) return;
     const validEvents = importPreview.rows.flatMap((row) => row.event ? [row.event] : []);
     if (validEvents.length !== importPreview.rows.length) return;
 
     setImporting(true);
     try {
       const result = await importEvents({
+        groupId: group._id,
         sourceType: importPreview.sourceType,
         fileName: importPreview.fileName,
         events: validEvents,
@@ -279,6 +282,7 @@ export default function LeaderScheduleScreen() {
 
   return (
     <LeaderScreen eyebrow="Schedule" title="Plan gatherings." hint="Keep the schedule clean. Add details only when you need them.">
+      <GroupSwitcher mode="leader" />
       <View style={styles.topActions}>
         <View style={styles.topAction}><ActionButton filled label="Create event" disabled={pickingFile || importing} onPress={openCreateForm} /></View>
         <View style={styles.topAction}><ActionButton label={pickingFile ? 'Opening…' : 'Import CSV / XLSX'} disabled={pickingFile || importing} onPress={pickImportFile} /></View>

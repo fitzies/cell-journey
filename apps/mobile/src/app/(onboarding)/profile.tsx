@@ -25,12 +25,8 @@ export default function ProfileScreen() {
     if (!region) return;
     setSaving(true);
     try {
-      const updated = await update({ fullName, preferredName: preferredName || undefined, singaporeRegion: region, serviceIds: selected });
-      if (updated?.role === 'leader') {
-        router.replace(updated.leaderGroupId ? '/(leader-tabs)' : '/(onboarding)/leader-setup');
-        return;
-      }
-      router.replace('/(onboarding)/group-code');
+      await update({ fullName, preferredName: preferredName || undefined, singaporeRegion: region, serviceIds: selected });
+      router.replace('/(onboarding)');
     } finally {
       setSaving(false);
     }
