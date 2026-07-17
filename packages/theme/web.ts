@@ -3,7 +3,7 @@
  * Do not edit directly. Change the active theme or theme files, then run `pnpm theme:sync`.
  */
 
-export const activeWebTheme = "invincible-theme";
+export const activeWebTheme = "dark-forge";
 
 export const webThemePresets = [
   {

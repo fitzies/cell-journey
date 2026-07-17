@@ -1,36 +1,36 @@
 /**
- * Generated from packages/theme/themes/invincible-theme.css by packages/theme/scripts/generate-mobile-theme.mjs.
+ * Generated from packages/theme/themes/dark-forge.css by packages/theme/scripts/generate-mobile-theme.mjs.
  * Do not edit directly. Change the active theme source, then run `pnpm theme:sync`.
  */
 
 export const mobileTheme = {
   light: {
     name: "Shared Light",
-    background: "#f8f9fa",
+    background: "#faf8f6",
     surface: "#ffffff",
-    ink: "#1a1a1a",
-    muted: "#2f1313",
-    line: "#838181",
-    accent: "#facc15",
-    accentInk: "#1e3a8a",
-    success: "#10b981",
-    danger: "#991b1b",
-    soft: "#a2bbdd",
-    selected: "#ef4444"
+    ink: "#1c1412",
+    muted: "#7a706a",
+    line: "#e3dbd4",
+    accent: "#92400e",
+    accentInk: "#ffffff",
+    success: "#a16207",
+    danger: "#c52525",
+    soft: "#f2eee9",
+    selected: "#f5dcc8"
   },
   dark: {
     name: "Shared Dark",
-    background: "#0f172a",
-    surface: "#1e293b",
-    ink: "#f8fafc",
-    muted: "#94a3b8",
-    line: "#334155",
-    accent: "#facc15",
-    accentInk: "#0f172a",
-    success: "#22c55e",
-    danger: "#dc2626",
-    soft: "#334155",
-    selected: "#ef4444"
+    background: "#0c0908",
+    surface: "#141110",
+    ink: "#e3dad4",
+    muted: "#7a706a",
+    line: "#28211c",
+    accent: "#c2956a",
+    accentInk: "#1a0e04",
+    success: "#dda15e",
+    danger: "#ef4444",
+    soft: "#1e1816",
+    selected: "#2a1e14"
   }
 } as const;
 
@@ -38,7 +38,7 @@ export type MobileThemeName = keyof typeof mobileTheme;
 export type MobileTheme = (typeof mobileTheme)[MobileThemeName];
 
 export const mobileThemeFonts = {
-  sans: "Inter, system-ui, sans-serif",
-  serif: "Georgia, serif",
-  mono: "JetBrains Mono, monospace"
+  sans: "\"IBM Plex Sans\", \"Inter\", ui-sans-serif, system-ui, -apple-system, sans-serif",
+  serif: "\"IBM Plex Serif\", \"Georgia\", ui-serif, serif",
+  mono: "\"IBM Plex Mono\", \"Fira Code\", ui-monospace, monospace"
 } as const;
