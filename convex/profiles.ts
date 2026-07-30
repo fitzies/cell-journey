@@ -23,13 +23,64 @@ async function requireAuthUserId(ctx: DbCtx) {
   return userId;
 }
 
+function cleanName(value: string | undefined) {
+  return value?.trim() ?? "";
+}
+
+export function hasCompleteName(profile: Doc<"userProfiles">) {
+  const firstName = cleanName(profile.firstName);
+  const lastName = cleanName(profile.lastName);
+  if (firstName || lastName) return Boolean(firstName && lastName);
+  return Boolean(cleanName(profile.fullName));
+}
+
+export function getProfileDisplayName(profile: Doc<"userProfiles">) {
+  const preferredName = cleanName(profile.preferredName);
+  if (preferredName) return preferredName;
+  const structuredName = [cleanName(profile.firstName), cleanName(profile.lastName)]
+    .filter(Boolean)
+    .join(" ");
+  return structuredName || cleanName(profile.fullName) || null;
+}
+
 export function isProfileComplete(profile: Doc<"userProfiles">) {
   return Boolean(
-    profile.fullName?.trim() &&
+    hasCompleteName(profile) &&
       profile.singaporeRegion &&
       profile.serviceIds.length > 0,
   );
 }
+
+export const OWNER_CAPABILITIES = {
+  readSchedule: true,
+  createEvents: true,
+  importEvents: true,
+  updateEvents: true,
+  cancelEvents: true,
+  readAttendance: true,
+  markAttendance: true,
+  manageJoinRequests: true,
+  manageMembers: true,
+  reorderMembers: true,
+  changeGroup: true,
+} as const;
+
+export const CO_LEADER_CAPABILITIES = {
+  readSchedule: true,
+  createEvents: true,
+  importEvents: true,
+  updateEvents: false,
+  cancelEvents: false,
+  readAttendance: true,
+  markAttendance: true,
+  manageJoinRequests: false,
+  manageMembers: false,
+  reorderMembers: false,
+  changeGroup: false,
+} as const;
+
+export type GroupCapability = keyof typeof OWNER_CAPABILITIES;
+export type GroupCapabilities = Record<GroupCapability, boolean>;
 
 export async function getCurrentProfile(ctx: DbCtx) {
   const userId = await requireAuthUserId(ctx);
@@ -56,6 +107,58 @@ export async function getActiveMembershipForGroup(
       q.eq("profileId", profileId).eq("groupId", groupId).eq("status", "active"),
     )
     .unique();
+}
+
+export async function getConnectedMembershipForGroup(
+  ctx: DbCtx,
+  profileId: Id<"userProfiles">,
+  groupId: Id<"groups">,
+) {
+  const active = await getActiveMembershipForGroup(ctx, profileId, groupId);
+  const inactive = await ctx.db
+    .query("memberships")
+    .withIndex("by_profile_and_group_and_status", (q) =>
+      q.eq("profileId", profileId).eq("groupId", groupId).eq("status", "inactive"),
+    )
+    .unique();
+  if (active && inactive) throw new Error("Duplicate current membership relationships");
+  return active ?? inactive;
+}
+
+export async function getLeadershipAccessForGroup(
+  ctx: DbCtx,
+  profileId: Id<"userProfiles">,
+  groupId: Id<"groups">,
+) {
+  const group = await ctx.db.get(groupId);
+  if (!group || !group.isActive) return null;
+  if (group.leaderProfileId === profileId) {
+    return { group, accessRole: "owner" as const, capabilities: OWNER_CAPABILITIES };
+  }
+  const assignment = await ctx.db
+    .query("coLeaderAssignments")
+    .withIndex("by_profile_and_group_and_status", (q) =>
+      q.eq("profileId", profileId).eq("groupId", groupId).eq("status", "active"),
+    )
+    .unique();
+  if (!assignment) return null;
+  return {
+    group,
+    assignment,
+    accessRole: "coLeader" as const,
+    capabilities: CO_LEADER_CAPABILITIES,
+  };
+}
+
+export async function requireGroupCapability(
+  ctx: DbCtx,
+  groupId: Id<"groups">,
+  capability: GroupCapability,
+) {
+  const profile = await requireCurrentProfile(ctx);
+  const access = await getLeadershipAccessForGroup(ctx, profile._id, groupId);
+  if (!access || !access.capabilities[capability]) throw new Error("Unauthorized");
+  return { profile, ...access };
 }
 
 export async function requireActiveMembership(ctx: DbCtx, groupId: Id<"groups">) {
@@ -96,11 +199,36 @@ export async function requireLeaderProfile(ctx: DbCtx) {
 
 async function validateProfileInput(
   ctx: MutationCtx,
-  fullName: string,
+  profile: Doc<"userProfiles">,
+  names: { firstName?: string; lastName?: string; fullName?: string },
   serviceIds: Id<"services">[],
+  allowLegacyNameWrite: boolean,
 ) {
-  const trimmedFullName = fullName.trim();
-  if (!trimmedFullName) throw new Error("Full name is required");
+  const firstName = cleanName(names.firstName);
+  const lastName = cleanName(names.lastName);
+  const submittedStructuredName = Boolean(firstName || lastName);
+  if (submittedStructuredName && (!firstName || !lastName)) {
+    throw new Error("First and last name are required");
+  }
+
+  const submittedFullName = cleanName(names.fullName);
+  const preservesStructuredName =
+    !submittedStructuredName &&
+    Boolean(cleanName(profile.firstName) && cleanName(profile.lastName)) &&
+    submittedFullName === cleanName(profile.fullName);
+  if (!submittedStructuredName) {
+    if (!allowLegacyNameWrite && !preservesStructuredName) {
+      throw new Error("First and last name are required");
+    }
+    if (!submittedFullName) throw new Error("Full name is required");
+    if (
+      allowLegacyNameWrite &&
+      (profile.firstName || profile.lastName) &&
+      submittedFullName !== cleanName(profile.fullName)
+    ) {
+      throw new Error("Use first and last name to change this profile name");
+    }
+  }
 
   const uniqueServiceIds = [...new Set(serviceIds)];
   if (uniqueServiceIds.length === 0) throw new Error("Select at least one service");
@@ -110,13 +238,21 @@ async function validateProfileInput(
     if (!service || !service.isActive) throw new Error("Invalid service selected");
   }
 
-  return { trimmedFullName, uniqueServiceIds };
+  return {
+    firstName: submittedStructuredName ? firstName : profile.firstName,
+    lastName: submittedStructuredName ? lastName : profile.lastName,
+    fullName: submittedStructuredName ? `${firstName} ${lastName}` : submittedFullName,
+    uniqueServiceIds,
+  };
 }
 
 function getCompatibilityOnboardingStatus(profile: Doc<"userProfiles">) {
   if (!isProfileComplete(profile)) return "profileIncomplete" as const;
   if (profile.currentGroupId && profile.activeMembershipId) return "approved" as const;
   if (profile.onboardingStatus === "pendingApproval") return "pendingApproval" as const;
+  // Relationship mutations are responsible for moving approved profiles back
+  // to needsGroup; profile-only edits must not drop inactive/co-leader access.
+  if (profile.onboardingStatus === "approved") return "approved" as const;
   if (profile.role === "leader") return "approved" as const;
   return "needsGroup" as const;
 }
@@ -166,24 +302,59 @@ export const currentContext = query({
   args: {},
   handler: async (ctx) => {
     const profile = await requireCurrentProfile(ctx);
-    const memberships = await ctx.db
+    const activeMemberships = await ctx.db
       .query("memberships")
       .withIndex("by_profile_status", (q) =>
         q.eq("profileId", profile._id).eq("status", "active"),
       )
       .take(100);
+    const inactiveMemberships = await ctx.db
+      .query("memberships")
+      .withIndex("by_profile_status", (q) =>
+        q.eq("profileId", profile._id).eq("status", "inactive"),
+      )
+      .take(100);
     const memberGroups = [];
-    for (const membership of memberships) {
+    for (const membership of [...activeMemberships, ...inactiveMemberships]) {
       const group = await ctx.db.get(membership.groupId);
       if (group?.isActive) memberGroups.push({ membership, group });
     }
 
-    const ledGroups = (
+    const ownedGroups = (
       await ctx.db
         .query("groups")
         .withIndex("by_leader", (q) => q.eq("leaderProfileId", profile._id))
         .take(100)
     ).filter((group) => group.isActive);
+    const coLeaderAssignments = await ctx.db
+      .query("coLeaderAssignments")
+      .withIndex("by_profile_and_status", (q) =>
+        q.eq("profileId", profile._id).eq("status", "active"),
+      )
+      .take(100);
+    const ledGroups: Array<
+      Doc<"groups"> & {
+        accessRole: "owner" | "coLeader";
+        capabilities: GroupCapabilities;
+        assignmentId?: Id<"coLeaderAssignments">;
+      }
+    > = ownedGroups.map((group) => ({
+      ...group,
+      accessRole: "owner" as const,
+      capabilities: OWNER_CAPABILITIES,
+    }));
+    for (const assignment of coLeaderAssignments) {
+      if (ownedGroups.some((group) => group._id === assignment.groupId)) continue;
+      const group = await ctx.db.get(assignment.groupId);
+      if (group?.isActive) {
+        ledGroups.push({
+          ...group,
+          accessRole: "coLeader" as const,
+          capabilities: CO_LEADER_CAPABILITIES,
+          assignmentId: assignment._id,
+        });
+      }
+    }
 
     const pending = await ctx.db
       .query("joinRequests")
@@ -209,65 +380,78 @@ export const currentContext = query({
   },
 });
 
-export const updateOnboardingProfile = mutation({
-  args: {
-    fullName: v.string(),
-    preferredName: v.optional(v.string()),
-    singaporeRegion,
-    serviceIds: v.array(v.id("services")),
-  },
-  handler: async (ctx, args) => {
-    const profile = await requireCurrentProfile(ctx);
-    const { trimmedFullName, uniqueServiceIds } = await validateProfileInput(
-      ctx,
-      args.fullName,
-      args.serviceIds,
-    );
-    const now = Date.now();
-    const patch = {
-      fullName: trimmedFullName,
-      preferredName: args.preferredName?.trim() || undefined,
-      singaporeRegion: args.singaporeRegion,
-      serviceIds: uniqueServiceIds,
-      updatedAt: now,
-    };
+const legacyProfileWriteArgs = {
+  fullName: v.string(),
+  preferredName: v.optional(v.string()),
+  singaporeRegion,
+  serviceIds: v.array(v.id("services")),
+};
 
-    await ctx.db.patch(profile._id, {
-      ...patch,
-      onboardingStatus: getCompatibilityOnboardingStatus({ ...profile, ...patch }),
-    });
-    return await ctx.db.get(profile._id);
+const structuredProfileWriteArgs = {
+  firstName: v.string(),
+  lastName: v.string(),
+  preferredName: v.optional(v.string()),
+  singaporeRegion,
+  serviceIds: v.array(v.id("services")),
+};
+
+async function updateProfileFields(
+  ctx: MutationCtx,
+  args: {
+    firstName?: string;
+    lastName?: string;
+    fullName?: string;
+    preferredName?: string;
+    singaporeRegion: Doc<"userProfiles">["singaporeRegion"] & string;
+    serviceIds: Id<"services">[];
   },
+  allowLegacyNameWrite: boolean,
+) {
+  const profile = await requireCurrentProfile(ctx);
+  const names = await validateProfileInput(
+    ctx,
+    profile,
+    args,
+    args.serviceIds,
+    allowLegacyNameWrite,
+  );
+  const now = Date.now();
+  const patch = {
+    firstName: names.firstName,
+    lastName: names.lastName,
+    fullName: names.fullName,
+    preferredName: args.preferredName?.trim() || undefined,
+    singaporeRegion: args.singaporeRegion,
+    serviceIds: names.uniqueServiceIds,
+    updatedAt: now,
+  };
+  await ctx.db.patch(profile._id, {
+    ...patch,
+    onboardingStatus: getCompatibilityOnboardingStatus({ ...profile, ...patch }),
+  });
+  return await ctx.db.get(profile._id);
+}
+
+/** @deprecated Use updateOnboardingProfileV2 for structured-name writes. */
+export const updateOnboardingProfile = mutation({
+  args: legacyProfileWriteArgs,
+  handler: async (ctx, args) => await updateProfileFields(ctx, args, true),
 });
 
+/** @deprecated Use updateProfileV2 for structured-name writes. */
 export const updateProfile = mutation({
-  args: {
-    fullName: v.string(),
-    preferredName: v.optional(v.string()),
-    singaporeRegion,
-    serviceIds: v.array(v.id("services")),
-  },
-  handler: async (ctx, args) => {
-    const profile = await requireCurrentProfile(ctx);
-    const { trimmedFullName, uniqueServiceIds } = await validateProfileInput(
-      ctx,
-      args.fullName,
-      args.serviceIds,
-    );
-    const now = Date.now();
-    const patch = {
-      fullName: trimmedFullName,
-      preferredName: args.preferredName?.trim() || undefined,
-      singaporeRegion: args.singaporeRegion,
-      serviceIds: uniqueServiceIds,
-      updatedAt: now,
-    };
-    await ctx.db.patch(profile._id, {
-      ...patch,
-      onboardingStatus: getCompatibilityOnboardingStatus({ ...profile, ...patch }),
-    });
-    return await ctx.db.get(profile._id);
-  },
+  args: legacyProfileWriteArgs,
+  handler: async (ctx, args) => await updateProfileFields(ctx, args, true),
+});
+
+export const updateOnboardingProfileV2 = mutation({
+  args: structuredProfileWriteArgs,
+  handler: async (ctx, args) => await updateProfileFields(ctx, args, false),
+});
+
+export const updateProfileV2 = mutation({
+  args: structuredProfileWriteArgs,
+  handler: async (ctx, args) => await updateProfileFields(ctx, args, false),
 });
 
 export type ProfileId = Id<"userProfiles">;

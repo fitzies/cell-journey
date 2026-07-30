@@ -15,6 +15,8 @@ import type * as events from "../events.js";
 import type * as groups from "../groups.js";
 import type * as http from "../http.js";
 import type * as joinRequestFlow from "../joinRequestFlow.js";
+import type * as membershipActivity from "../membershipActivity.js";
+import type * as membershipOrdering from "../membershipOrdering.js";
 import type * as migrations from "../migrations.js";
 import type * as profiles from "../profiles.js";
 import type * as seed from "../seed.js";
@@ -33,6 +35,8 @@ declare const fullApi: ApiFromModules<{
   groups: typeof groups;
   http: typeof http;
   joinRequestFlow: typeof joinRequestFlow;
+  membershipActivity: typeof membershipActivity;
+  membershipOrdering: typeof membershipOrdering;
   migrations: typeof migrations;
   profiles: typeof profiles;
   seed: typeof seed;

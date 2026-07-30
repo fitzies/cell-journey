@@ -2,8 +2,10 @@ import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import {
-  getActiveMembershipForGroup,
+  getConnectedMembershipForGroup,
+  getLeadershipAccessForGroup,
   requireCurrentProfile,
+  requireGroupCapability,
   requireLeaderProfile,
   requireLeadershipForGroup,
 } from "./profiles";
@@ -38,11 +40,15 @@ export const listForGroup = query({
     const group = await ctx.db.get(args.groupId);
     if (!group || !group.isActive) throw new Error("Group not found");
 
-    const isLeader = group.leaderProfileId === profile._id;
-    const membership = isLeader
+    const leadership = await getLeadershipAccessForGroup(
+      ctx,
+      profile._id,
+      group._id,
+    );
+    const membership = leadership
       ? null
-      : await getActiveMembershipForGroup(ctx, profile._id, group._id);
-    if (!isLeader && !membership) throw new Error("Unauthorized");
+      : await getConnectedMembershipForGroup(ctx, profile._id, group._id);
+    if (!leadership && !membership) throw new Error("Unauthorized");
 
     return await listEventsForGroup(
       ctx,
@@ -64,13 +70,33 @@ export const listMine = query({
         q.eq("profileId", profile._id).eq("status", "active"),
       )
       .first();
-    const ledGroup = membership
+    const inactiveMembership = membership
+      ? null
+      : await ctx.db
+          .query("memberships")
+          .withIndex("by_profile_status", (q) =>
+            q.eq("profileId", profile._id).eq("status", "inactive"),
+          )
+          .first();
+    const ownedGroup = membership || inactiveMembership
       ? null
       : await ctx.db
           .query("groups")
           .withIndex("by_leader", (q) => q.eq("leaderProfileId", profile._id))
           .first();
-    const groupId = membership?.groupId ?? ledGroup?._id;
+    const assignment = membership || inactiveMembership || ownedGroup
+      ? null
+      : await ctx.db
+          .query("coLeaderAssignments")
+          .withIndex("by_profile_and_status", (q) =>
+            q.eq("profileId", profile._id).eq("status", "active"),
+          )
+          .first();
+    const groupId =
+      membership?.groupId ??
+      inactiveMembership?.groupId ??
+      ownedGroup?._id ??
+      assignment?.groupId;
     if (!groupId) return [];
     return await listEventsForGroup(
       ctx,
@@ -187,7 +213,7 @@ export const createForGroup = mutation({
     ...eventFields,
   },
   handler: async (ctx, args) => {
-    const { profile } = await requireLeadershipForGroup(ctx, args.groupId);
+    const { profile } = await requireGroupCapability(ctx, args.groupId, "createEvents");
     return await insertEvent(ctx, args.groupId, profile._id, args);
   },
 });
@@ -209,7 +235,7 @@ export const importForGroup = mutation({
     events: v.array(importEventValidator),
   },
   handler: async (ctx, args) => {
-    const { profile } = await requireLeadershipForGroup(ctx, args.groupId);
+    const { profile } = await requireGroupCapability(ctx, args.groupId, "importEvents");
     if (args.events.length === 0) throw new Error("The import has no events");
     if (args.events.length > 100) throw new Error("Import up to 100 events at a time");
 

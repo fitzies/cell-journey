@@ -5,6 +5,62 @@ import { approvePendingJoinRequest } from "./joinRequestFlow";
 
 /** Dev-only helpers callable from the Convex dashboard. */
 
+export const assignCoLeader = internalMutation({
+  args: { profileId: v.id("userProfiles"), groupId: v.id("groups") },
+  handler: async (ctx, args) => {
+    const profile = await ctx.db.get(args.profileId);
+    const group = await ctx.db.get(args.groupId);
+    if (!profile) throw new Error("Profile not found");
+    if (!group) throw new Error("Group not found");
+    if (group.leaderProfileId === profile._id) {
+      throw new Error("The group owner cannot also be assigned as a co-leader");
+    }
+    const existing = await ctx.db
+      .query("coLeaderAssignments")
+      .withIndex("by_profile_and_group_and_status", (q) =>
+        q
+          .eq("profileId", profile._id)
+          .eq("groupId", group._id)
+          .eq("status", "active"),
+      )
+      .unique();
+    if (existing) return existing;
+
+    const now = Date.now();
+    const assignmentId = await ctx.db.insert("coLeaderAssignments", {
+      profileId: profile._id,
+      groupId: group._id,
+      status: "active",
+      assignedAt: now,
+      assignedByKind: "developer",
+      createdAt: now,
+      updatedAt: now,
+    });
+    return await ctx.db.get(assignmentId);
+  },
+});
+
+export const revokeCoLeader = internalMutation({
+  args: {
+    assignmentId: v.id("coLeaderAssignments"),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const assignment = await ctx.db.get(args.assignmentId);
+    if (!assignment) throw new Error("Co-leader assignment not found");
+    if (assignment.status === "revoked") return assignment;
+    const now = Date.now();
+    await ctx.db.patch(assignment._id, {
+      status: "revoked",
+      revokedAt: now,
+      revokedByKind: "developer",
+      revocationReason: args.reason?.trim() || undefined,
+      updatedAt: now,
+    });
+    return await ctx.db.get(assignment._id);
+  },
+});
+
 export const approveByUserId = internalMutation({
   args: { userId: v.id("users"), groupId: v.id("groups") },
   handler: async (ctx, { userId, groupId }) => {
@@ -43,6 +99,24 @@ async function promoteProfileToLeaderForGroup(
   if (!group) throw new Error("Group not found");
 
   const now = Date.now();
+  const redundantAssignment = await ctx.db
+    .query("coLeaderAssignments")
+    .withIndex("by_profile_and_group_and_status", (q) =>
+      q
+        .eq("profileId", profile._id)
+        .eq("groupId", groupId)
+        .eq("status", "active"),
+    )
+    .unique();
+  if (redundantAssignment) {
+    await ctx.db.patch(redundantAssignment._id, {
+      status: "revoked",
+      revokedAt: now,
+      revokedByKind: "developer",
+      revocationReason: "Assigned as primary owner",
+      updatedAt: now,
+    });
+  }
   await ctx.db.patch(profile._id, {
     role: "leader",
     ...(!profile.leaderGroupId ? { leaderGroupId: groupId } : {}),

@@ -5,7 +5,7 @@ import { File as ExpoFile } from 'expo-file-system';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GroupSwitcher, useGroups } from '@/components/group-context';
+import { GroupSwitcher, leaderAccessLabel, useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { ActionButton, EmptyState, LeaderScreen, RowCard, SectionHeader } from '@/components/leader/ui';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
@@ -148,6 +148,10 @@ export default function LeaderScheduleScreen() {
   const [busyEventId, setBusyEventId] = useState<Id<'events'> | null>(null);
   const { context, selectedLeaderGroup: group } = useGroups();
   const hasGroup = Boolean(group);
+  const canCreateEvents = group?.capabilities.createEvents === true;
+  const canImportEvents = group?.capabilities.importEvents === true;
+  const canUpdateEvents = group?.capabilities.updateEvents === true;
+  const canCancelEvents = group?.capabilities.cancelEvents === true;
   const events = useQuery(api.events.listForGroup, group ? { groupId: group._id, from, limit: 30 } : 'skip');
   const create = useMutation(api.events.createForGroup);
   const importEvents = useMutation(api.events.importForGroup);
@@ -158,7 +162,7 @@ export default function LeaderScheduleScreen() {
 
   if (context === undefined || (hasGroup && events === undefined)) return <LoadingState />;
 
-  if (!hasGroup) {
+  if (!group) {
     return (
       <LeaderScreen eyebrow="Schedule" title="Plan gatherings." hint="Your leader account is not assigned yet.">
         <EmptyState title="No group assigned." body="Once assigned, you’ll be able to create events for your group." />
@@ -169,6 +173,7 @@ export default function LeaderScheduleScreen() {
   const eventRows = events ?? [];
 
   const openCreateForm = () => {
+    if (!canCreateEvents) return;
     setEditingId(null);
     setForm(defaultForm());
     setFormOpen(true);
@@ -184,6 +189,11 @@ export default function LeaderScheduleScreen() {
     const parsed = parseEventForm(form, from);
     if (!parsed.ok) {
       Alert.alert('Check event details', parsed.message);
+      return;
+    }
+
+    if ((editingId && !canUpdateEvents) || (!editingId && !canCreateEvents)) {
+      Alert.alert('Access changed', 'You no longer have permission to save this event.');
       return;
     }
 
@@ -206,6 +216,7 @@ export default function LeaderScheduleScreen() {
   };
 
   const pickImportFile = async () => {
+    if (!canImportEvents) return;
     setPickingFile(true);
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -232,7 +243,7 @@ export default function LeaderScheduleScreen() {
   };
 
   const confirmImport = async () => {
-    if (!group || !importPreview) return;
+    if (!group || !importPreview || !canImportEvents) return;
     const validEvents = importPreview.rows.flatMap((row) => row.event ? [row.event] : []);
     if (validEvents.length !== importPreview.rows.length) return;
 
@@ -254,12 +265,14 @@ export default function LeaderScheduleScreen() {
   };
 
   const startEdit = (event: Doc<'events'>) => {
+    if (!canUpdateEvents) return;
     setEditingId(event._id);
     setForm(formFromEvent(event));
     setFormOpen(true);
   };
 
   const confirmCancel = (event: Doc<'events'>) => {
+    if (!canCancelEvents) return;
     Alert.alert('Cancel event?', 'Members will no longer see this gathering. Attendance history stays saved.', [
       { text: 'Keep event', style: 'cancel' },
       {
@@ -281,11 +294,11 @@ export default function LeaderScheduleScreen() {
   };
 
   return (
-    <LeaderScreen eyebrow="Schedule" title="Plan gatherings." hint="Keep the schedule clean. Add details only when you need them.">
+    <LeaderScreen eyebrow="Schedule" title="Plan gatherings." hint={`${group.name} · ${leaderAccessLabel(group.accessRole)}`}>
       <GroupSwitcher mode="leader" />
       <View style={styles.topActions}>
-        <View style={styles.topAction}><ActionButton filled label="Create event" disabled={pickingFile || importing} onPress={openCreateForm} /></View>
-        <View style={styles.topAction}><ActionButton label={pickingFile ? 'Opening…' : 'Import CSV / XLSX'} disabled={pickingFile || importing} onPress={pickImportFile} /></View>
+        {canCreateEvents ? <View style={styles.topAction}><ActionButton filled label="Create event" disabled={pickingFile || importing} onPress={openCreateForm} /></View> : null}
+        {canImportEvents ? <View style={styles.topAction}><ActionButton label={pickingFile ? 'Opening…' : 'Import CSV / XLSX'} disabled={pickingFile || importing} onPress={pickImportFile} /></View> : null}
       </View>
 
       <SectionHeader title="Upcoming events" meta={`${eventRows.length} total`} />
@@ -297,6 +310,8 @@ export default function LeaderScheduleScreen() {
               event={event}
               disabled={saving || busyEventId !== null}
               busy={busyEventId === event._id}
+              canEdit={canUpdateEvents}
+              canCancel={canCancelEvents}
               onEdit={() => startEdit(event)}
               onCancel={() => confirmCancel(event)}
             />
@@ -557,7 +572,7 @@ function FormField({ label, containerStyle, ...props }: { label: string; contain
   );
 }
 
-function EventRow({ event, disabled, busy, onEdit, onCancel }: { event: Doc<'events'>; disabled: boolean; busy: boolean; onEdit: () => void; onCancel: () => void }) {
+function EventRow({ event, disabled, busy, canEdit, canCancel, onEdit, onCancel }: { event: Doc<'events'>; disabled: boolean; busy: boolean; canEdit: boolean; canCancel: boolean; onEdit: () => void; onCancel: () => void }) {
   const t = useAppTheme();
   const date = formatDateParts(event.startAt);
   const venue = event.venue ?? event.location;
@@ -577,10 +592,12 @@ function EventRow({ event, disabled, busy, onEdit, onCancel }: { event: Doc<'eve
     >
       {people ? <Text style={[styles.eventExtra, { color: t.muted }]}>{people}</Text> : null}
       {event.remarks ? <Text style={[styles.eventRemarks, { color: t.ink }]}>{event.remarks}</Text> : null}
-      <View style={styles.rowActions}>
-        <View style={styles.rowAction}><ActionButton label="Edit" disabled={disabled} onPress={onEdit} /></View>
-        <View style={styles.rowAction}><ActionButton label={busy ? 'Cancelling…' : 'Cancel'} danger disabled={disabled} onPress={onCancel} /></View>
-      </View>
+      {canEdit || canCancel ? (
+        <View style={styles.rowActions}>
+          {canEdit ? <View style={styles.rowAction}><ActionButton label="Edit" disabled={disabled} onPress={onEdit} /></View> : null}
+          {canCancel ? <View style={styles.rowAction}><ActionButton label={busy ? 'Cancelling…' : 'Cancel'} danger disabled={disabled} onPress={onCancel} /></View> : null}
+        </View>
+      ) : null}
     </RowCard>
   );
 }

@@ -28,8 +28,13 @@ const joinRequestStatus = v.union(
 );
 const membershipStatus = v.union(
   v.literal("active"),
+  v.literal("inactive"),
   v.literal("left"),
   v.literal("removed"),
+);
+const coLeaderAssignmentStatus = v.union(
+  v.literal("active"),
+  v.literal("revoked"),
 );
 const attendanceStatus = v.union(v.literal("present"), v.literal("absent"));
 const pushPlatform = v.union(
@@ -50,7 +55,10 @@ export default defineSchema({
     role,
     onboardingStatus,
 
+    // `fullName` is deprecated but remains dual-written during the structured-name migration.
     fullName: v.optional(v.string()),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
     preferredName: v.optional(v.string()),
     singaporeRegion: v.optional(singaporeRegion),
     serviceIds: v.array(v.id("services")),
@@ -88,6 +96,25 @@ export default defineSchema({
     .index("by_leader", ["leaderProfileId"])
     .index("by_active", ["isActive"]),
 
+  coLeaderAssignments: defineTable({
+    groupId: v.id("groups"),
+    profileId: v.id("userProfiles"),
+    status: coLeaderAssignmentStatus,
+    assignedAt: v.number(),
+    assignedByKind: v.union(v.literal("admin"), v.literal("developer")),
+    assignedByUserId: v.optional(v.id("users")),
+    revokedAt: v.optional(v.number()),
+    revokedByKind: v.optional(v.union(v.literal("admin"), v.literal("developer"))),
+    revokedByUserId: v.optional(v.id("users")),
+    revocationReason: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_group_and_status", ["groupId", "status"])
+    .index("by_profile_and_status", ["profileId", "status"])
+    .index("by_profile_and_group_and_status", ["profileId", "groupId", "status"])
+    .index("by_group_and_profile", ["groupId", "profileId"]),
+
   joinRequests: defineTable({
     profileId: v.id("userProfiles"),
     groupId: v.id("groups"),
@@ -108,6 +135,8 @@ export default defineSchema({
     groupId: v.id("groups"),
     status: membershipStatus,
     joinedAt: v.number(),
+    // Optional during the widen/backfill phase; reads fall back to joinedAt deterministically.
+    sortOrder: v.optional(v.number()),
     endedAt: v.optional(v.number()),
     endedByProfileId: v.optional(v.id("userProfiles")),
     endReason: v.optional(v.string()),
@@ -118,6 +147,20 @@ export default defineSchema({
     .index("by_group_status", ["groupId", "status"])
     .index("by_group", ["groupId"])
     .index("by_profile_group", ["profileId", "groupId"]),
+
+  membershipActivityPeriods: defineTable({
+    membershipId: v.id("memberships"),
+    profileId: v.id("userProfiles"),
+    groupId: v.id("groups"),
+    startedAt: v.number(),
+    endedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_membership_and_startedAt", ["membershipId", "startedAt"])
+    .index("by_membership_and_endedAt", ["membershipId", "endedAt"])
+    .index("by_group_and_startedAt", ["groupId", "startedAt"])
+    .index("by_profile_and_group_and_startedAt", ["profileId", "groupId", "startedAt"]),
 
   events: defineTable({
     groupId: v.id("groups"),

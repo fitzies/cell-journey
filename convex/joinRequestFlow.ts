@@ -1,5 +1,8 @@
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
+import { openActivityPeriod } from "./membershipActivity";
+import { nextSortOrder } from "./membershipOrdering";
+import { getConnectedMembershipForGroup, isProfileComplete } from "./profiles";
 
 export type ReviewOptions = {
   expectedGroupId?: Id<"groups">;
@@ -37,20 +40,19 @@ export async function approvePendingJoinRequest(
   const member = await ctx.db.get(request.profileId);
   if (!member) throw new Error("Member profile not found");
 
-  const existing = await ctx.db
-    .query("memberships")
-    .withIndex("by_profile_and_group_and_status", (q) =>
-      q
-        .eq("profileId", member._id)
-        .eq("groupId", request.groupId)
-        .eq("status", "active"),
-    )
-    .unique();
+  const existing = await getConnectedMembershipForGroup(
+    ctx,
+    member._id,
+    request.groupId,
+  );
 
   const now = Date.now();
   if (request.status === "approved") {
-    if (!existing) throw new Error("Approved request has no active membership");
+    if (!existing) throw new Error("Approved request has no current membership");
     return existing;
+  }
+  if (existing?.status === "inactive") {
+    throw new Error("Member already has a current inactive relationship with this group");
   }
   if (existing) {
     await ctx.db.patch(request._id, {
@@ -84,8 +86,12 @@ export async function approvePendingJoinRequest(
     groupId: request.groupId,
     status: "active",
     joinedAt: now,
+    sortOrder: await nextSortOrder(ctx, request.groupId, "active"),
     joinRequestId: request._id,
   });
+  const membership = await ctx.db.get(membershipId);
+  if (!membership) throw new Error("Membership was not created");
+  await openActivityPeriod(ctx, membership, now);
 
   await ctx.db.patch(request._id, {
     status: "approved",
@@ -141,6 +147,14 @@ export async function rejectPendingJoinRequest(
       q.eq("profileId", member._id).eq("status", "active"),
     )
     .first();
+  const inactiveMembership = activeMembership
+    ? null
+    : await ctx.db
+        .query("memberships")
+        .withIndex("by_profile_status", (q) =>
+          q.eq("profileId", member._id).eq("status", "inactive"),
+        )
+        .first();
   const anotherPending = await ctx.db
     .query("joinRequests")
     .withIndex("by_profile_status", (q) =>
@@ -152,13 +166,17 @@ export async function rejectPendingJoinRequest(
     .withIndex("by_leader", (q) => q.eq("leaderProfileId", member._id))
     .first();
 
-  const profileComplete = Boolean(
-    member.fullName?.trim() && member.singaporeRegion && member.serviceIds.length > 0,
-  );
+  const coLeadership = await ctx.db
+    .query("coLeaderAssignments")
+    .withIndex("by_profile_and_status", (q) =>
+      q.eq("profileId", member._id).eq("status", "active"),
+    )
+    .first();
+  const profileComplete = isProfileComplete(member);
   await ctx.db.patch(member._id, {
     onboardingStatus: !profileComplete
       ? "profileIncomplete"
-      : activeMembership || ledGroup
+      : activeMembership || inactiveMembership || ledGroup || coLeadership
         ? "approved"
         : anotherPending
           ? "pendingApproval"

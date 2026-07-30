@@ -4,6 +4,18 @@ import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { approvePendingJoinRequest, rejectPendingJoinRequest } from "./joinRequestFlow";
 import type { Doc, Id } from "./_generated/dataModel";
+import {
+  CO_LEADER_CAPABILITIES,
+  OWNER_CAPABILITIES,
+  getConnectedMembershipForGroup,
+  getProfileDisplayName,
+  isProfileComplete,
+} from "./profiles";
+import {
+  closeActivityPeriod,
+  isMembershipActiveAtFromRows,
+} from "./membershipActivity";
+import { nextSortOrder } from "./membershipOrdering";
 
 const MAX_ROWS = 250;
 
@@ -71,8 +83,12 @@ function publicProfile(profile: Doc<"userProfiles">) {
     userId: profile.userId,
     role: profile.role,
     onboardingStatus: profile.onboardingStatus,
+    firstName: profile.firstName ?? null,
+    lastName: profile.lastName ?? null,
     fullName: profile.fullName ?? null,
     preferredName: profile.preferredName ?? null,
+    displayName: getProfileDisplayName(profile),
+    profileComplete: isProfileComplete(profile),
     singaporeRegion: profile.singaporeRegion ?? null,
     currentGroupId: profile.currentGroupId ?? null,
     leaderGroupId: profile.leaderGroupId ?? null,
@@ -89,6 +105,7 @@ function effectiveAttendanceStatus(attendance: Doc<"attendance"> | undefined) {
 function attendanceTotals(
   events: Doc<"events">[],
   memberships: Doc<"memberships">[],
+  periodsByMembership: Map<Id<"memberships">, Doc<"membershipActivityPeriods">[]>,
   attendanceByEventAndProfile: Map<string, Doc<"attendance">>,
 ) {
   let present = 0;
@@ -97,10 +114,12 @@ function attendanceTotals(
   for (const event of events) {
     const eligibleProfiles = new Set(
       memberships
-        .filter(
-          (membership) =>
-            membership.joinedAt <= event.startAt &&
-            (membership.endedAt === undefined || membership.endedAt >= event.startAt),
+        .filter((membership) =>
+          isMembershipActiveAtFromRows(
+            membership,
+            periodsByMembership.get(membership._id) ?? [],
+            event.startAt,
+          ),
         )
         .map((membership) => membership.profileId),
     );
@@ -155,23 +174,57 @@ export const listUsers = query({
 
     for (const profile of profiles) {
       const user = await userSummary(ctx, profile.userId);
-      const displayName = profile.preferredName || profile.fullName || user.name || user.email || "Unnamed user";
-      const memberships = await ctx.db
+      const displayName = getProfileDisplayName(profile) || user.name || user.email || "Unnamed user";
+      const activeMemberships = await ctx.db
         .query("memberships")
         .withIndex("by_profile_status", (q) =>
           q.eq("profileId", profile._id).eq("status", "active"),
         )
         .take(100);
+      const inactiveMemberships = await ctx.db
+        .query("memberships")
+        .withIndex("by_profile_status", (q) =>
+          q.eq("profileId", profile._id).eq("status", "inactive"),
+        )
+        .take(100);
       const memberGroups = [];
-      for (const membership of memberships) {
+      for (const membership of [...activeMemberships, ...inactiveMemberships]) {
         const group = await ctx.db.get(membership.groupId);
-        if (group) memberGroups.push({ membershipId: membership._id, groupId: group._id, name: group.name });
+        if (group) memberGroups.push({
+          membershipId: membership._id,
+          groupId: group._id,
+          name: group.name,
+          status: membership.status,
+        });
       }
       const ledGroupDocs = await ctx.db
         .query("groups")
         .withIndex("by_leader", (q) => q.eq("leaderProfileId", profile._id))
         .take(100);
-      const ledGroups = ledGroupDocs.map((group) => ({ groupId: group._id, name: group.name }));
+      const ledGroups: Array<{
+        groupId: Id<"groups">;
+        name: string;
+        accessRole: "owner" | "coLeader";
+      }> = ledGroupDocs.map((group) => ({
+        groupId: group._id,
+        name: group.name,
+        accessRole: "owner" as const,
+      }));
+      const coLeaderAssignments = await ctx.db
+        .query("coLeaderAssignments")
+        .withIndex("by_profile_and_status", (q) =>
+          q.eq("profileId", profile._id).eq("status", "active"),
+        )
+        .take(100);
+      for (const assignment of coLeaderAssignments) {
+        if (ledGroups.some((group) => group.groupId === assignment.groupId)) continue;
+        const group = await ctx.db.get(assignment.groupId);
+        if (group) ledGroups.push({
+          groupId: group._id,
+          name: group.name,
+          accessRole: "coLeader" as const,
+        });
+      }
       const haystack = [
         displayName,
         user.email,
@@ -208,6 +261,24 @@ export const listGroups = query({
 
     for (const group of groups) {
       const leader = group.leaderProfileId ? await ctx.db.get(group.leaderProfileId) : null;
+      const coLeaderAssignments = await ctx.db
+        .query("coLeaderAssignments")
+        .withIndex("by_group_and_status", (q) =>
+          q.eq("groupId", group._id).eq("status", "active"),
+        )
+        .take(100);
+      const coLeaders = [];
+      for (const assignment of coLeaderAssignments) {
+        const profile = await ctx.db.get(assignment.profileId);
+        if (profile) {
+          coLeaders.push({
+            assignment,
+            profile: publicProfile(profile),
+            displayName: getProfileDisplayName(profile),
+            capabilities: CO_LEADER_CAPABILITIES,
+          });
+        }
+      }
       const activeMembers = await ctx.db
         .query("memberships")
         .withIndex("by_group_status", (q) => q.eq("groupId", group._id).eq("status", "active"))
@@ -215,12 +286,112 @@ export const listGroups = query({
       rows.push({
         group,
         leader: leader ? publicProfile(leader) : null,
-        leaderName: leader?.preferredName || leader?.fullName || null,
+        leaderName: leader ? getProfileDisplayName(leader) : null,
+        leaderCapabilities: leader ? OWNER_CAPABILITIES : null,
+        coLeaders,
         activeMemberCount: activeMembers.length,
       });
     }
 
     return rows;
+  },
+});
+
+export const listCoLeaderAssignments = query({
+  args: {
+    groupId: v.optional(v.id("groups")),
+    status: v.optional(v.union(v.literal("active"), v.literal("revoked"))),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const limit = Math.min(args.limit ?? MAX_ROWS, MAX_ROWS);
+    const assignments = args.groupId
+      ? await ctx.db
+          .query("coLeaderAssignments")
+          .withIndex("by_group_and_status", (q) =>
+            args.status
+              ? q.eq("groupId", args.groupId!).eq("status", args.status)
+              : q.eq("groupId", args.groupId!),
+          )
+          .take(limit)
+      : await ctx.db.query("coLeaderAssignments").order("desc").take(limit);
+    const rows = [];
+    for (const assignment of assignments) {
+      if (args.status && assignment.status !== args.status) continue;
+      const profile = await ctx.db.get(assignment.profileId);
+      const group = await ctx.db.get(assignment.groupId);
+      rows.push({
+        assignment,
+        group,
+        profile: profile ? publicProfile(profile) : null,
+        displayName: profile ? getProfileDisplayName(profile) : null,
+        capabilities: CO_LEADER_CAPABILITIES,
+      });
+    }
+    return rows;
+  },
+});
+
+export const assignCoLeader = mutation({
+  args: { groupId: v.id("groups"), profileId: v.id("userProfiles") },
+  handler: async (ctx, args) => {
+    const { userId } = await requireAdmin(ctx);
+    const group = await ctx.db.get(args.groupId);
+    const profile = await ctx.db.get(args.profileId);
+    if (!group) throw new Error("Group not found");
+    if (!profile) throw new Error("Profile not found");
+    if (group.leaderProfileId === profile._id) {
+      throw new Error("The group owner cannot also be assigned as a co-leader");
+    }
+    const existing = await ctx.db
+      .query("coLeaderAssignments")
+      .withIndex("by_profile_and_group_and_status", (q) =>
+        q
+          .eq("profileId", profile._id)
+          .eq("groupId", group._id)
+          .eq("status", "active"),
+      )
+      .unique();
+    if (existing) return existing;
+
+    const now = Date.now();
+    const assignmentId = await ctx.db.insert("coLeaderAssignments", {
+      groupId: group._id,
+      profileId: profile._id,
+      status: "active",
+      assignedAt: now,
+      assignedByKind: "admin",
+      assignedByUserId: userId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await syncCompatibilityRole(ctx, profile._id);
+    return await ctx.db.get(assignmentId);
+  },
+});
+
+export const revokeCoLeader = mutation({
+  args: {
+    assignmentId: v.id("coLeaderAssignments"),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await requireAdmin(ctx);
+    const assignment = await ctx.db.get(args.assignmentId);
+    if (!assignment) throw new Error("Co-leader assignment not found");
+    if (assignment.status === "revoked") return assignment;
+    const now = Date.now();
+    await ctx.db.patch(assignment._id, {
+      status: "revoked",
+      revokedAt: now,
+      revokedByKind: "admin",
+      revokedByUserId: userId,
+      revocationReason: args.reason?.trim() || undefined,
+      updatedAt: now,
+    });
+    await syncCompatibilityRole(ctx, assignment.profileId);
+    return await ctx.db.get(assignment._id);
   },
 });
 
@@ -259,6 +430,21 @@ export const listGroupAttendance = query({
         .query("memberships")
         .withIndex("by_group", (q) => q.eq("groupId", group._id))
         .take(1000);
+      const activityPeriods = await ctx.db
+        .query("membershipActivityPeriods")
+        .withIndex("by_group_and_startedAt", (q) =>
+          q.eq("groupId", group._id).lte("startedAt", to),
+        )
+        .take(3001);
+      const periodsByMembership = new Map<
+        Id<"memberships">,
+        Doc<"membershipActivityPeriods">[]
+      >();
+      for (const period of activityPeriods) {
+        const rows = periodsByMembership.get(period.membershipId) ?? [];
+        rows.push(period);
+        periodsByMembership.set(period.membershipId, rows);
+      }
       const attendanceRows = completedEvents.length === 0
         ? []
         : await ctx.db
@@ -278,8 +464,18 @@ export const listGroupAttendance = query({
         }
       }
 
-      const current = attendanceTotals(currentEvents, memberships, attendanceByEventAndProfile);
-      const previous = attendanceTotals(previousEvents, memberships, attendanceByEventAndProfile);
+      const current = attendanceTotals(
+        currentEvents,
+        memberships,
+        periodsByMembership,
+        attendanceByEventAndProfile,
+      );
+      const previous = attendanceTotals(
+        previousEvents,
+        memberships,
+        periodsByMembership,
+        attendanceByEventAndProfile,
+      );
       const leader = group.leaderProfileId ? await ctx.db.get(group.leaderProfileId) : null;
       const lastEvent = currentEvents[0] ?? null;
 
@@ -290,7 +486,7 @@ export const listGroupAttendance = query({
           code: group.code,
           isActive: group.isActive,
         },
-        leaderName: leader?.preferredName || leader?.fullName || null,
+        leaderName: leader ? getProfileDisplayName(leader) : null,
         activeMemberCount: memberships.filter((membership) => membership.status === "active").length,
         eventCount: currentEvents.length,
         presentCount: current.present,
@@ -303,7 +499,11 @@ export const listGroupAttendance = query({
         lastEvent: lastEvent
           ? { _id: lastEvent._id, title: lastEvent.title, startAt: lastEvent.startAt }
           : null,
-        isComplete: events.length < 160 && memberships.length < 1000 && attendanceRows.length < 1500,
+        isComplete:
+          events.length < 160 &&
+          memberships.length < 1000 &&
+          activityPeriods.length < 3001 &&
+          attendanceRows.length < 1500,
       });
     }
 
@@ -426,6 +626,20 @@ async function syncCompatibilityRole(ctx: MutationCtx, profileId: Id<"userProfil
       q.eq("profileId", profileId).eq("status", "active"),
     )
     .first();
+  const inactiveMembership = membership
+    ? null
+    : await ctx.db
+        .query("memberships")
+        .withIndex("by_profile_status", (q) =>
+          q.eq("profileId", profileId).eq("status", "inactive"),
+        )
+        .first();
+  const coLeadership = await ctx.db
+    .query("coLeaderAssignments")
+    .withIndex("by_profile_and_status", (q) =>
+      q.eq("profileId", profileId).eq("status", "active"),
+    )
+    .first();
   const pending = await ctx.db
     .query("joinRequests")
     .withIndex("by_profile_status", (q) =>
@@ -440,18 +654,16 @@ async function syncCompatibilityRole(ctx: MutationCtx, profileId: Id<"userProfil
     compatibilityMembership.profileId !== profile._id ||
     compatibilityMembership.status !== "active" ||
     compatibilityMembership.groupId !== profile.currentGroupId;
-  const profileComplete = Boolean(
-    profile.fullName?.trim() && profile.singaporeRegion && profile.serviceIds.length > 0,
-  );
+  const profileComplete = isProfileComplete(profile);
   await ctx.db.patch(profileId, {
-    role: ledGroup ? "leader" : "member",
+    role: ledGroup || coLeadership ? "leader" : "member",
     leaderGroupId: ledGroup?._id,
     ...(shouldReplaceCompatibilityMembership
       ? { activeMembershipId: membership?._id, currentGroupId: membership?.groupId }
       : {}),
     onboardingStatus: !profileComplete
       ? "profileIncomplete"
-      : ledGroup || membership
+      : ledGroup || coLeadership || membership || inactiveMembership
         ? "approved"
         : pending
           ? "pendingApproval"
@@ -466,7 +678,7 @@ export const setGroupLeader = mutation({
     profileId: v.union(v.id("userProfiles"), v.null()),
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
+    const { userId } = await requireAdmin(ctx);
     const group = await ctx.db.get(args.groupId);
     if (!group) throw new Error("Group not found");
     const previousLeaderId = group.leaderProfileId;
@@ -475,10 +687,32 @@ export const setGroupLeader = mutation({
       if (!profile) throw new Error("Profile not found");
     }
 
+    const now = Date.now();
     await ctx.db.patch(group._id, {
       leaderProfileId: args.profileId ?? undefined,
-      updatedAt: Date.now(),
+      updatedAt: now,
     });
+    if (args.profileId) {
+      const redundantAssignment = await ctx.db
+        .query("coLeaderAssignments")
+        .withIndex("by_profile_and_group_and_status", (q) =>
+          q
+            .eq("profileId", args.profileId!)
+            .eq("groupId", group._id)
+            .eq("status", "active"),
+        )
+        .unique();
+      if (redundantAssignment) {
+        await ctx.db.patch(redundantAssignment._id, {
+          status: "revoked",
+          revokedAt: now,
+          revokedByKind: "admin",
+          revokedByUserId: userId,
+          revocationReason: "Assigned as primary owner",
+          updatedAt: now,
+        });
+      }
+    }
     if (previousLeaderId && previousLeaderId !== args.profileId) {
       await syncCompatibilityRole(ctx, previousLeaderId);
     }
@@ -530,12 +764,11 @@ export const assignMemberToGroup = mutation({
     if (!profile) throw new Error("Profile not found");
     if (!group || !group.isActive) throw new Error("Active group not found");
 
-    const existing = await ctx.db
-      .query("memberships")
-      .withIndex("by_profile_and_group_and_status", (q) =>
-        q.eq("profileId", profile._id).eq("groupId", group._id).eq("status", "active"),
-      )
-      .unique();
+    const existing = await getConnectedMembershipForGroup(
+      ctx,
+      profile._id,
+      group._id,
+    );
     const pending = await ctx.db
       .query("joinRequests")
       .withIndex("by_profile_and_group_and_status", (q) =>
@@ -545,12 +778,23 @@ export const assignMemberToGroup = mutation({
 
     const now = Date.now();
     if (!existing) {
-      await ctx.db.insert("memberships", {
+      const membershipId = await ctx.db.insert("memberships", {
         profileId: profile._id,
         groupId: group._id,
         status: "active",
         joinedAt: now,
+        sortOrder: await nextSortOrder(ctx, group._id, "active"),
         ...(pending ? { joinRequestId: pending._id } : {}),
+      });
+      const membership = await ctx.db.get(membershipId);
+      if (!membership) throw new Error("Membership was not created");
+      await ctx.db.insert("membershipActivityPeriods", {
+        membershipId: membership._id,
+        profileId: membership.profileId,
+        groupId: membership.groupId,
+        startedAt: now,
+        createdAt: now,
+        updatedAt: now,
       });
     }
     if (pending) {
@@ -565,16 +809,17 @@ export const removeMembership = mutation({
   args: { profileId: v.id("userProfiles"), groupId: v.id("groups") },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    const membership = await ctx.db
-      .query("memberships")
-      .withIndex("by_profile_and_group_and_status", (q) =>
-        q.eq("profileId", args.profileId).eq("groupId", args.groupId).eq("status", "active"),
-      )
-      .unique();
+    const membership = await getConnectedMembershipForGroup(
+      ctx,
+      args.profileId,
+      args.groupId,
+    );
     if (!membership) return null;
+    const now = Date.now();
+    if (membership.status === "active") await closeActivityPeriod(ctx, membership, now);
     await ctx.db.patch(membership._id, {
       status: "removed",
-      endedAt: Date.now(),
+      endedAt: now,
       endReason: "removedByAdmin",
     });
     await syncCompatibilityRole(ctx, args.profileId);
@@ -587,17 +832,28 @@ export const removeMemberFromGroup = mutation({
   args: { profileId: v.id("userProfiles") },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    const memberships = await ctx.db
+    const activeMemberships = await ctx.db
       .query("memberships")
       .withIndex("by_profile_status", (q) =>
         q.eq("profileId", args.profileId).eq("status", "active"),
       )
       .take(2);
+    const inactiveMemberships = await ctx.db
+      .query("memberships")
+      .withIndex("by_profile_status", (q) =>
+        q.eq("profileId", args.profileId).eq("status", "inactive"),
+      )
+      .take(2);
+    const memberships = [...activeMemberships, ...inactiveMemberships];
     if (memberships.length > 1) throw new Error("Select a specific group membership to remove");
     if (!memberships[0]) return null;
+    const now = Date.now();
+    if (memberships[0].status === "active") {
+      await closeActivityPeriod(ctx, memberships[0], now);
+    }
     await ctx.db.patch(memberships[0]._id, {
       status: "removed",
-      endedAt: Date.now(),
+      endedAt: now,
       endReason: "removedByAdmin",
     });
     await syncCompatibilityRole(ctx, args.profileId);

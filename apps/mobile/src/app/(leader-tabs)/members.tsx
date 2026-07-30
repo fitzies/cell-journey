@@ -1,113 +1,258 @@
 import { useMutation, useQuery } from 'convex/react';
+import type { FunctionReturnType } from 'convex/server';
 import { useMemo, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GroupSwitcher, useGroups } from '@/components/group-context';
+import { OrderedRosterScreen, type OrderedRosterEntry } from '@/components/leader/ordered-roster';
+import { EmptyState, Mark, RowCard, StatPill } from '@/components/leader/ui';
 import { LoadingState } from '@/components/onboarding/ui';
-import { ActionButton, EmptyState, LeaderScreen, Mark, RowCard, SectionHeader, StatPill } from '@/components/leader/ui';
+import { fonts, radius, useAppTheme } from '@/constants/tokens';
 import { api, type Doc, type Id } from '@/lib/api';
+import { getProfileDisplayName } from '@/lib/name';
 
 const regionLabels: Record<string, string> = {
-  north: 'North', south: 'South', east: 'East', west: 'West', central: 'Central', northeast: 'Northeast', northwest: 'Northwest', southeast: 'Southeast', southwest: 'Southwest',
+  north: 'North',
+  south: 'South',
+  east: 'East',
+  west: 'West',
+  central: 'Central',
+  northeast: 'Northeast',
+  northwest: 'Northwest',
+  southeast: 'Southeast',
+  southwest: 'Southwest',
 };
+
+type MemberRow = FunctionReturnType<typeof api.groups.listMembers>[number];
 
 export default function LeaderMembersScreen() {
   const { context, selectedLeaderGroup: group } = useGroups();
-  const hasGroup = Boolean(group);
-  const pending = useQuery(api.groups.listPendingJoinRequestsForGroup, group ? { groupId: group._id } : 'skip');
-  const members = useQuery(api.groups.listMembers, group ? { groupId: group._id } : 'skip');
-  const services = useQuery(api.groups.listServices, {});
-  const approve = useMutation(api.groups.approveJoinRequest);
-  const reject = useMutation(api.groups.rejectJoinRequest);
+  const isOwner = group?.accessRole === 'owner';
+  const members = useQuery(api.groups.listMembers, group && isOwner ? { groupId: group._id } : 'skip');
+  const services = useQuery(api.groups.listServices, group && isOwner ? {} : 'skip');
+  const markInactive = useMutation(api.groups.markMemberInactive);
+  const reactivate = useMutation(api.groups.reactivateMember);
   const remove = useMutation(api.groups.removeMemberFromGroupById);
+  const reorder = useMutation(api.groups.reorderMembers);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const serviceMap = useMemo(() => new Map((services ?? []).map((service) => [service._id, service.name])), [services]);
 
-  if (context === undefined || services === undefined || (hasGroup && (pending === undefined || members === undefined))) return <LoadingState />;
+  if (context === undefined || (group && isOwner && (members === undefined || services === undefined))) return <LoadingState />;
 
-  if (!hasGroup) {
+  if (!group) {
     return (
-      <LeaderScreen eyebrow="Members" title="Care for your group." hint="Your leader account is not assigned yet.">
-        <EmptyState title="No group assigned." body="Once this leader is assigned to a group, join requests and members will appear here." />
-      </LeaderScreen>
+      <OrderedRosterScreen
+        eyebrow="Members"
+        title="Care for your group."
+        hint="Your leader account is not assigned yet."
+        headerContent={<EmptyState title="No group assigned." body="Once this leader is assigned to a group, members will appear here." />}
+        activeRows={[]}
+        inactiveRows={[]}
+        showSections={false}
+        renderRow={() => null}
+      />
     );
   }
 
-  const pendingRows = pending ?? [];
+  if (!isOwner) {
+    return (
+      <OrderedRosterScreen
+        eyebrow="Members"
+        title="Roster overview."
+        hint="The primary owner manages roster status and ordering."
+        headerContent={(
+          <>
+            <GroupSwitcher mode="leader" />
+            <EmptyState
+              title="Owner-managed roster."
+              body="You can use the ordered roster while taking attendance. Only the primary owner can activate, inactivate, remove, or reorder members."
+            />
+          </>
+        )}
+        activeRows={[]}
+        inactiveRows={[]}
+        showSections={false}
+        renderRow={() => null}
+      />
+    );
+  }
+
   const memberRows = members ?? [];
+  const activeEntries: OrderedRosterEntry<MemberRow>[] = memberRows
+    .filter((row) => row.membership.status === 'active')
+    .map((row) => ({ id: row.membership._id, value: row }));
+  const inactiveEntries: OrderedRosterEntry<MemberRow>[] = memberRows
+    .filter((row) => row.membership.status === 'inactive')
+    .map((row) => ({ id: row.membership._id, value: row }));
 
-  const approveRequest = async (id: Id<'joinRequests'>) => {
-    setBusyId(id);
-    try { await approve({ joinRequestId: id }); }
-    catch (err) { Alert.alert('Could not approve', err instanceof Error ? err.message : 'Please try again.'); }
-    finally { setBusyId(null); }
-  };
-
-  const rejectRequest = (id: Id<'joinRequests'>) => {
-    Alert.alert('Reject request?', 'This member can enter another code and try again.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Reject', style: 'destructive', onPress: async () => {
-        setBusyId(id);
-        try { await reject({ joinRequestId: id }); }
-        catch (err) { Alert.alert('Could not reject', err instanceof Error ? err.message : 'Please try again.'); }
-        finally { setBusyId(null); }
-      } },
-    ]);
-  };
-
-  const removeMember = (profileRow: Doc<'userProfiles'>) => {
-    Alert.alert('Remove member?', `${profileRow.fullName ?? 'This member'} will leave ${group?.name ?? 'this group'}. Other memberships and history stay saved.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: async () => {
-        setBusyId(profileRow._id);
-        try { if (group) await remove({ groupId: group._id, profileId: profileRow._id }); }
-        catch (err) { Alert.alert('Could not remove', err instanceof Error ? err.message : 'Please try again.'); }
-        finally { setBusyId(null); }
-      } },
-    ]);
-  };
-
-  const profileDetail = (profileRow: Doc<'userProfiles'> | null) => {
-    if (!profileRow) return 'Profile unavailable';
-    const region = profileRow.singaporeRegion ? regionLabels[profileRow.singaporeRegion] : 'No region';
-    const names = profileRow.serviceIds.map((id) => serviceMap.get(id)).filter(Boolean).join(', ');
+  const profileDetail = (profile: Doc<'userProfiles'> | null) => {
+    if (!profile) return 'Profile unavailable';
+    const region = profile.singaporeRegion ? regionLabels[profile.singaporeRegion] : 'No region';
+    const names = profile.serviceIds.map((id) => serviceMap.get(id)).filter(Boolean).join(', ');
     return `${region}${names ? ` · ${names}` : ''}`;
   };
 
-  return (
-    <LeaderScreen eyebrow="Members" title="Care for your group." hint="Approve requests and keep your active member list tidy.">
+  const runMembershipMutation = async (membershipId: Id<'memberships'>, operation: () => Promise<unknown>, errorTitle: string) => {
+    setBusyId(membershipId);
+    try {
+      await operation();
+    } catch (error) {
+      Alert.alert(errorTitle, error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const inactivateMember = (row: MemberRow) => {
+    const name = getProfileDisplayName(row.profile, 'This member');
+    Alert.alert(
+      'Make member inactive?',
+      `${name} will move to the optional attendance section and will no longer be required for future events.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Make inactive',
+          onPress: () => void runMembershipMutation(
+            row.membership._id,
+            () => markInactive({ groupId: group._id, membershipId: row.membership._id }),
+            'Could not update member',
+          ),
+        },
+      ],
+    );
+  };
+
+  const activateMember = (row: MemberRow) => {
+    void runMembershipMutation(
+      row.membership._id,
+      () => reactivate({ groupId: group._id, membershipId: row.membership._id }),
+      'Could not activate member',
+    );
+  };
+
+  const removeMember = (row: MemberRow) => {
+    const name = getProfileDisplayName(row.profile, 'This member');
+    Alert.alert(
+      'Remove member?',
+      `${name} will leave ${group.name}. Their attendance history will stay saved.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => void runMembershipMutation(
+            row.membership._id,
+            () => remove({ groupId: group._id, profileId: row.membership.profileId }),
+            'Could not remove member',
+          ),
+        },
+      ],
+    );
+  };
+
+  const persistOrder = async (section: 'active' | 'inactive', rows: OrderedRosterEntry<MemberRow>[]) => {
+    await reorder({
+      groupId: group._id,
+      status: section,
+      membershipIds: rows.map((row) => row.value.membership._id),
+    });
+  };
+
+  const headerContent = (
+    <>
       <GroupSwitcher mode="leader" />
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        <StatPill label="Active" value={memberRows.length} />
-        <StatPill label="Pending" value={pendingRows.length} />
+      <View style={styles.stats}>
+        <StatPill label="Active" value={activeEntries.length} />
+        <StatPill label="Inactive" value={inactiveEntries.length} />
       </View>
+    </>
+  );
 
-      <SectionHeader title="Join requests" meta={`${pendingRows.length} pending`} />
-      {pendingRows.length ? (
-        <View style={{ gap: 10 }}>
-          {pendingRows.map(({ request, profile: requestProfile }) => (
-            <RowCard key={request._id} mark={<Mark>?</Mark>} title={requestProfile?.fullName ?? 'Unnamed member'} detail={profileDetail(requestProfile)}>
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-                <ActionButton filled label={busyId === request._id ? 'Approving…' : 'Approve'} disabled={busyId !== null} onPress={() => approveRequest(request._id)} />
-                <ActionButton danger label="Reject" disabled={busyId !== null} onPress={() => rejectRequest(request._id)} />
-              </View>
-            </RowCard>
-          ))}
-        </View>
-      ) : (
-        <EmptyState title="No pending requests." body="When members enter your group code, their requests will appear here." />
-      )}
-
-      <SectionHeader title="Active members" meta={`${memberRows.length} total`} />
-      {memberRows.length ? (
-        <View style={{ gap: 10 }}>
-          {memberRows.map(({ profile: memberProfile }) => memberProfile ? (
-            <RowCard key={memberProfile._id} mark={<Mark success>✓</Mark>} title={memberProfile.preferredName || memberProfile.fullName || 'Unnamed member'} detail={profileDetail(memberProfile)} right={<ActionButton danger label="Remove" disabled={busyId !== null} onPress={() => removeMember(memberProfile)} />} />
-          ) : null)}
-        </View>
-      ) : (
-        <EmptyState title="No active members." body="Approved members will show up here." />
-      )}
-    </LeaderScreen>
+  return (
+    <OrderedRosterScreen
+      eyebrow="Members"
+      title="Care for your group."
+      hint="Keep required members first, and retain inactive members as optional without losing their history."
+      headerContent={headerContent}
+      activeRows={activeEntries}
+      inactiveRows={inactiveEntries}
+      activeTitle="Active · required"
+      activeDescription="Required for attendance at future events."
+      activeEmptyText="No active members. Activate someone below when they return."
+      inactiveTitle="Inactive · optional"
+      inactiveDescription="Not required for attendance, but they can still be marked present."
+      inactiveEmptyText="No inactive members."
+      canReorder
+      onReorder={persistOrder}
+      onReorderError={(error) => Alert.alert('Could not save member order', error instanceof Error ? error.message : 'Please try again.')}
+      renderRow={({ value: row }) => {
+        const profile = row.profile;
+        const inactive = row.membership.status === 'inactive';
+        const isBusy = busyId === row.membership._id;
+        return (
+          <RowCard
+            mark={<Mark success={!inactive}>{inactive ? '○' : '✓'}</Mark>}
+            title={getProfileDisplayName(profile, 'Unnamed member')}
+            detail={inactive ? `Inactive · Not required\n${profileDetail(profile)}` : profileDetail(profile)}
+          >
+            <View style={styles.actions}>
+              <MemberAction
+                label={isBusy ? 'Updating…' : inactive ? 'Activate' : 'Make inactive'}
+                filled={inactive}
+                disabled={busyId !== null}
+                onPress={() => inactive ? activateMember(row) : inactivateMember(row)}
+              />
+              <MemberAction
+                label="Remove"
+                danger
+                disabled={busyId !== null}
+                onPress={() => removeMember(row)}
+              />
+            </View>
+          </RowCard>
+        );
+      }}
+    />
   );
 }
+
+function MemberAction({
+  label,
+  onPress,
+  filled,
+  danger,
+  disabled,
+}: {
+  label: string;
+  onPress: () => void;
+  filled?: boolean;
+  danger?: boolean;
+  disabled?: boolean;
+}) {
+  const t = useAppTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.actionButton,
+        {
+          backgroundColor: filled ? t.accent : t.surface,
+          borderColor: filled ? t.accent : t.line,
+          opacity: disabled ? 0.45 : 1,
+          transform: [{ scale: pressed && !disabled ? 0.98 : 1 }],
+        },
+      ]}
+    >
+      <Text style={[styles.actionText, { color: filled ? t.accentInk : danger ? t.danger : t.ink }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  stats: { flexDirection: 'row', gap: 10 },
+  actions: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  actionButton: { minHeight: 44, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
+  actionText: { fontFamily: fonts.bodySemiBold, fontSize: 13.5, letterSpacing: -0.1 },
+});

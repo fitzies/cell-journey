@@ -14,6 +14,10 @@ type AppContext = FunctionReturnType<typeof api.profiles.currentContext>;
 type MemberGroup = AppContext['memberGroups'][number];
 type LedGroup = AppContext['ledGroups'][number];
 
+export function leaderAccessLabel(accessRole: LedGroup['accessRole']) {
+  return accessRole === 'owner' ? 'Owner' : 'Co-leader';
+}
+
 type GroupContextValue = {
   context: AppContext | undefined;
   memberGroups: MemberGroup[];
@@ -111,8 +115,8 @@ export function GroupSwitcher({ mode }: { mode: 'member' | 'leader' }) {
   const t = useAppTheme();
   const groups = useGroups();
   const rows = mode === 'member'
-    ? groups.memberGroups.map((row) => row.group)
-    : groups.ledGroups;
+    ? groups.memberGroups.map((row) => ({ group: row.group, role: null }))
+    : groups.ledGroups.map((group) => ({ group, role: leaderAccessLabel(group.accessRole) }));
   const selectedId = mode === 'member' ? groups.selectedMemberGroupId : groups.selectedLeaderGroupId;
   const select = mode === 'member' ? groups.selectMemberGroup : groups.selectLeaderGroup;
 
@@ -121,11 +125,14 @@ export function GroupSwitcher({ mode }: { mode: 'member' | 'leader' }) {
     <View style={styles.switcherWrap}>
       <Text style={[styles.switcherLabel, { color: t.muted }]}>CURRENT GROUP</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.switcherRow}>
-        {rows.map((group) => {
+        {rows.map(({ group, role }) => {
           const selected = group._id === selectedId;
           return (
             <Pressable
               key={group._id}
+              accessibilityRole="button"
+              accessibilityLabel={role ? `${group.name}, ${role}` : group.name}
+              accessibilityState={{ selected }}
               onPress={() => select(group._id)}
               style={({ pressed }) => [
                 styles.groupChip,
@@ -137,6 +144,7 @@ export function GroupSwitcher({ mode }: { mode: 'member' | 'leader' }) {
               ]}
             >
               <Text style={[styles.groupChipText, { color: selected ? t.accentInk : t.ink }]}>{group.name}</Text>
+              {role ? <Text style={[styles.groupChipRole, { color: selected ? t.accentInk : t.muted }]}>{role}</Text> : null}
             </Pressable>
           );
         })}
@@ -168,8 +176,9 @@ const styles = StyleSheet.create({
   switcherWrap: { marginBottom: 18 },
   switcherLabel: { marginBottom: 8, fontFamily: fonts.bodyBold, fontSize: 10, letterSpacing: 1.5 },
   switcherRow: { gap: 8, paddingRight: 12 },
-  groupChip: { borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 9 },
+  groupChip: { borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
   groupChipText: { fontFamily: fonts.bodySemiBold, fontSize: 13.5 },
+  groupChipRole: { marginTop: 1, fontFamily: fonts.bodyBold, fontSize: 9.5, letterSpacing: 0.8, textTransform: 'uppercase' },
   modeButton: { minHeight: 52, borderWidth: 1, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
   modeButtonText: { fontFamily: fonts.bodySemiBold, fontSize: 15 },
 });

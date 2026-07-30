@@ -7,6 +7,7 @@ import { GroupSwitcher, useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
 import { api } from '@/lib/api';
+import { getProfileDisplayName, getProfileGreetingName } from '@/lib/name';
 
 type EventRow = {
   _id: string;
@@ -21,10 +22,6 @@ const ONE_HOUR = 60 * 60 * 1000;
 
 function nowMinusWindow() {
   return Date.now() - ONE_HOUR;
-}
-
-function firstName(name?: string) {
-  return name?.trim().split(/\s+/)[0] || 'there';
 }
 
 function initials(name?: string) {
@@ -72,7 +69,8 @@ export default function MemberHomeScreen() {
   const eventRows = events as EventRow[];
   const next = eventRows.find((event) => event.endAt + ONE_HOUR >= Date.now());
   const checkInOpen = isAttendanceOpen(next);
-  const displayName = profile?.preferredName?.trim() || profile?.fullName?.trim() || 'Member';
+  const displayName = getProfileDisplayName(profile, 'Member');
+  const greetingName = getProfileGreetingName(profile, 'there');
   const rate = attendance.attendanceRate === null ? '—' : `${Math.round(attendance.attendanceRate * 100)}%`;
 
   const checkIn = async () => {
@@ -94,7 +92,7 @@ export default function MemberHomeScreen() {
         <View style={styles.topRow}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.eyebrow, { color: t.accent }]}>HOME</Text>
-            <Text style={[styles.title, { color: t.ink }]}>Hi, {firstName(displayName)}.</Text>
+            <Text style={[styles.title, { color: t.ink }]}>Hi, {greetingName}.</Text>
             <Text style={[styles.hint, { color: t.muted }]}>{group?.name ?? 'Your cell group'}</Text>
           </View>
           <View style={[styles.avatar, { backgroundColor: t.accent }]}>

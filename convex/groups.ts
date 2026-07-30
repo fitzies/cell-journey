@@ -1,12 +1,23 @@
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
+import type { GroupCapabilities } from "./profiles";
 import { approvePendingJoinRequest, rejectPendingJoinRequest } from "./joinRequestFlow";
 import {
+  CO_LEADER_CAPABILITIES,
+  OWNER_CAPABILITIES,
   getActiveMembershipForGroup,
+  getConnectedMembershipForGroup,
+  getProfileDisplayName,
+  isProfileComplete,
   requireCurrentProfile,
   requireLeadershipForGroup,
 } from "./profiles";
+import { closeActivityPeriod, openActivityPeriod } from "./membershipActivity";
+import {
+  connectedMembershipsForGroup,
+  nextSortOrder,
+} from "./membershipOrdering";
 
 async function relationshipPatch(
   ctx: MutationCtx,
@@ -22,6 +33,14 @@ async function relationshipPatch(
       q.eq("profileId", profileId).eq("status", "active"),
     )
     .first();
+  const inactiveMembership = nextMembership
+    ? null
+    : await ctx.db
+        .query("memberships")
+        .withIndex("by_profile_status", (q) =>
+          q.eq("profileId", profileId).eq("status", "inactive"),
+        )
+        .first();
   const pending = await ctx.db
     .query("joinRequests")
     .withIndex("by_profile_status", (q) =>
@@ -36,6 +55,13 @@ async function relationshipPatch(
   const compatibilityMembership = profile.activeMembershipId
     ? await ctx.db.get(profile.activeMembershipId)
     : null;
+  const coLeadership = await ctx.db
+    .query("coLeaderAssignments")
+    .withIndex("by_profile_and_status", (q) =>
+      q.eq("profileId", profileId).eq("status", "active"),
+    )
+    .first();
+
   const shouldReplaceCompatibilityMembership =
     !compatibilityMembership ||
     compatibilityMembership._id === endedMembershipId ||
@@ -50,9 +76,9 @@ async function relationshipPatch(
           currentGroupId: nextMembership?.groupId,
         }
       : {}),
-    onboardingStatus: !profile.fullName?.trim() || !profile.singaporeRegion || profile.serviceIds.length === 0
+    onboardingStatus: !isProfileComplete(profile)
       ? ("profileIncomplete" as const)
-      : nextMembership || ledGroup
+      : nextMembership || inactiveMembership || ledGroup || coLeadership
         ? ("approved" as const)
         : pending
           ? ("pendingApproval" as const)
@@ -75,23 +101,56 @@ export const listMine = query({
   args: {},
   handler: async (ctx) => {
     const profile = await requireCurrentProfile(ctx);
-    const memberships = await ctx.db
+    const activeMemberships = await ctx.db
       .query("memberships")
       .withIndex("by_profile_status", (q) =>
         q.eq("profileId", profile._id).eq("status", "active"),
       )
       .take(100);
+    const inactiveMemberships = await ctx.db
+      .query("memberships")
+      .withIndex("by_profile_status", (q) =>
+        q.eq("profileId", profile._id).eq("status", "inactive"),
+      )
+      .take(100);
     const memberGroups = [];
-    for (const membership of memberships) {
+    for (const membership of [...activeMemberships, ...inactiveMemberships]) {
       const group = await ctx.db.get(membership.groupId);
       if (group?.isActive) memberGroups.push({ membership, group });
     }
-    const ledGroups = (
+    const ownedGroups = (
       await ctx.db
         .query("groups")
         .withIndex("by_leader", (q) => q.eq("leaderProfileId", profile._id))
         .take(100)
     ).filter((group) => group.isActive);
+    const ledGroups: Array<
+      Doc<"groups"> & {
+        accessRole: "owner" | "coLeader";
+        capabilities: GroupCapabilities;
+        assignmentId?: Id<"coLeaderAssignments">;
+      }
+    > = ownedGroups.map((group) => ({
+      ...group,
+      accessRole: "owner" as const,
+      capabilities: OWNER_CAPABILITIES,
+    }));
+    const assignments = await ctx.db
+      .query("coLeaderAssignments")
+      .withIndex("by_profile_and_status", (q) =>
+        q.eq("profileId", profile._id).eq("status", "active"),
+      )
+      .take(100);
+    for (const assignment of assignments) {
+      if (ownedGroups.some((group) => group._id === assignment.groupId)) continue;
+      const group = await ctx.db.get(assignment.groupId);
+      if (group?.isActive) ledGroups.push({
+        ...group,
+        accessRole: "coLeader" as const,
+        capabilities: CO_LEADER_CAPABILITIES,
+        assignmentId: assignment._id,
+      });
+    }
     return { memberGroups, ledGroups };
   },
 });
@@ -108,10 +167,25 @@ export const getMyGroup = query({
       )
       .first();
     if (membership) return await ctx.db.get(membership.groupId);
-    return await ctx.db
+    const inactiveMembership = await ctx.db
+      .query("memberships")
+      .withIndex("by_profile_status", (q) =>
+        q.eq("profileId", profile._id).eq("status", "inactive"),
+      )
+      .first();
+    if (inactiveMembership) return await ctx.db.get(inactiveMembership.groupId);
+    const ownedGroup = await ctx.db
       .query("groups")
       .withIndex("by_leader", (q) => q.eq("leaderProfileId", profile._id))
       .first();
+    if (ownedGroup) return ownedGroup;
+    const assignment = await ctx.db
+      .query("coLeaderAssignments")
+      .withIndex("by_profile_and_status", (q) =>
+        q.eq("profileId", profile._id).eq("status", "active"),
+      )
+      .first();
+    return assignment ? await ctx.db.get(assignment.groupId) : null;
   },
 });
 
@@ -129,7 +203,7 @@ export const previewGroupByCode = query({
     return {
       _id: group._id,
       name: group.name,
-      leaderName: leader?.preferredName || leader?.fullName || null,
+      leaderName: leader ? getProfileDisplayName(leader) : null,
     };
   },
 });
@@ -138,7 +212,7 @@ export const requestToJoinByCode = mutation({
   args: { code: v.string() },
   handler: async (ctx, args) => {
     const profile = await requireCurrentProfile(ctx);
-    if (!profile.fullName || !profile.singaporeRegion || profile.serviceIds.length === 0) {
+    if (!isProfileComplete(profile)) {
       throw new Error("Complete your profile before joining a group");
     }
 
@@ -148,8 +222,8 @@ export const requestToJoinByCode = mutation({
       .unique();
     if (!group || !group.isActive) throw new Error("Invalid group code");
 
-    const membership = await getActiveMembershipForGroup(ctx, profile._id, group._id);
-    if (membership) throw new Error("Already a member of this group");
+    const membership = await getConnectedMembershipForGroup(ctx, profile._id, group._id);
+    if (membership) throw new Error("Already connected to this group");
 
     const pending = await ctx.db
       .query("joinRequests")
@@ -169,14 +243,23 @@ export const requestToJoinByCode = mutation({
       status: "pending",
       requestedAt: now,
     });
-    const anyMembership = await ctx.db
+    const anyActiveMembership = await ctx.db
       .query("memberships")
       .withIndex("by_profile_status", (q) =>
         q.eq("profileId", profile._id).eq("status", "active"),
       )
       .first();
+    const anyInactiveMembership = anyActiveMembership
+      ? null
+      : await ctx.db
+          .query("memberships")
+          .withIndex("by_profile_status", (q) =>
+            q.eq("profileId", profile._id).eq("status", "inactive"),
+          )
+          .first();
     await ctx.db.patch(profile._id, {
-      onboardingStatus: anyMembership ? "approved" : "pendingApproval",
+      onboardingStatus:
+        anyActiveMembership || anyInactiveMembership ? "approved" : "pendingApproval",
       updatedAt: now,
     });
     return await ctx.db.get(requestId);
@@ -301,9 +384,10 @@ export const leaveGroup = mutation({
   args: { groupId: v.id("groups") },
   handler: async (ctx, args) => {
     const profile = await requireCurrentProfile(ctx);
-    const membership = await getActiveMembershipForGroup(ctx, profile._id, args.groupId);
+    const membership = await getConnectedMembershipForGroup(ctx, profile._id, args.groupId);
     if (!membership) return null;
     const now = Date.now();
+    if (membership.status === "active") await closeActivityPeriod(ctx, membership, now);
     await ctx.db.patch(membership._id, {
       status: "left",
       endedAt: now,
@@ -323,16 +407,24 @@ export const leaveCurrentGroup = mutation({
   args: {},
   handler: async (ctx) => {
     const profile = await requireCurrentProfile(ctx);
-    const memberships = await ctx.db
+    const activeMemberships = await ctx.db
       .query("memberships")
       .withIndex("by_profile_status", (q) =>
         q.eq("profileId", profile._id).eq("status", "active"),
       )
       .take(2);
+    const inactiveMemberships = await ctx.db
+      .query("memberships")
+      .withIndex("by_profile_status", (q) =>
+        q.eq("profileId", profile._id).eq("status", "inactive"),
+      )
+      .take(2);
+    const memberships = [...activeMemberships, ...inactiveMemberships];
     if (memberships.length === 0) return null;
     if (memberships.length > 1) throw new Error("Select which group to leave in the latest app version");
     const membership = memberships[0];
     const now = Date.now();
+    if (membership.status === "active") await closeActivityPeriod(ctx, membership, now);
     await ctx.db.patch(membership._id, {
       status: "left",
       endedAt: now,
@@ -353,10 +445,11 @@ async function removeMemberFromGroup(
   profileId: Id<"userProfiles">,
 ) {
   const { profile: leader } = await requireLeadershipForGroup(ctx, groupId);
-  const membership = await getActiveMembershipForGroup(ctx, profileId, groupId);
+  const membership = await getConnectedMembershipForGroup(ctx, profileId, groupId);
   if (!membership) throw new Error("Member not found in this group");
 
   const now = Date.now();
+  if (membership.status === "active") await closeActivityPeriod(ctx, membership, now);
   await ctx.db.patch(membership._id, {
     status: "removed",
     endedAt: now,
@@ -390,16 +483,105 @@ export const removeMember = mutation({
   },
 });
 
+export const markMemberInactive = mutation({
+  args: { groupId: v.id("groups"), membershipId: v.id("memberships") },
+  handler: async (ctx, args) => {
+    const { profile: owner } = await requireLeadershipForGroup(ctx, args.groupId);
+    const membership = await ctx.db.get(args.membershipId);
+    if (!membership || membership.groupId !== args.groupId || membership.status !== "active") {
+      throw new Error("Active member not found in this group");
+    }
+
+    const now = Date.now();
+    await closeActivityPeriod(ctx, membership, now);
+    await ctx.db.patch(membership._id, {
+      status: "inactive",
+      endedAt: undefined,
+      endedByProfileId: undefined,
+      endReason: undefined,
+      sortOrder: await nextSortOrder(ctx, args.groupId, "inactive"),
+    });
+    await ctx.db.patch(
+      membership.profileId,
+      await relationshipPatch(ctx, membership.profileId, membership._id),
+    );
+    return { membershipId: membership._id, changedByProfileId: owner._id };
+  },
+});
+
+export const reactivateMember = mutation({
+  args: { groupId: v.id("groups"), membershipId: v.id("memberships") },
+  handler: async (ctx, args) => {
+    const { profile: owner } = await requireLeadershipForGroup(ctx, args.groupId);
+    const membership = await ctx.db.get(args.membershipId);
+    if (!membership || membership.groupId !== args.groupId || membership.status !== "inactive") {
+      throw new Error("Inactive member not found in this group");
+    }
+    const current = await getConnectedMembershipForGroup(
+      ctx,
+      membership.profileId,
+      membership.groupId,
+    );
+    if (!current || current._id !== membership._id) {
+      throw new Error("Another current membership relationship already exists");
+    }
+
+    const now = Date.now();
+    await openActivityPeriod(ctx, membership, now);
+    await ctx.db.patch(membership._id, {
+      status: "active",
+      sortOrder: await nextSortOrder(ctx, args.groupId, "active"),
+    });
+    await ctx.db.patch(membership.profileId, {
+      onboardingStatus: "approved",
+      updatedAt: now,
+    });
+    return { membershipId: membership._id, changedByProfileId: owner._id };
+  },
+});
+
+export const reorderMembers = mutation({
+  args: {
+    groupId: v.id("groups"),
+    status: v.union(v.literal("active"), v.literal("inactive")),
+    membershipIds: v.array(v.id("memberships")),
+  },
+  handler: async (ctx, args) => {
+    await requireLeadershipForGroup(ctx, args.groupId);
+    if (new Set(args.membershipIds).size !== args.membershipIds.length) {
+      throw new Error("Membership IDs must be unique");
+    }
+
+    const section = await ctx.db
+      .query("memberships")
+      .withIndex("by_group_status", (q) =>
+        q.eq("groupId", args.groupId).eq("status", args.status),
+      )
+      .take(501);
+    if (section.length > 500) throw new Error("Member section is too large to reorder");
+    if (
+      section.length !== args.membershipIds.length ||
+      section.some((membership) => !args.membershipIds.includes(membership._id))
+    ) {
+      throw new Error("Reorder must include every member in the selected status section");
+    }
+
+    for (let rank = 0; rank < args.membershipIds.length; rank += 1) {
+      const membership = section.find((row) => row._id === args.membershipIds[rank]);
+      if (!membership) throw new Error("Membership not found in selected section");
+      if (membership.sortOrder !== rank) {
+        await ctx.db.patch(membership._id, { sortOrder: rank });
+      }
+    }
+    return null;
+  },
+});
+
 export const listMembers = query({
   args: { groupId: v.id("groups") },
   handler: async (ctx, args) => {
     await requireLeadershipForGroup(ctx, args.groupId);
-    const memberships = await ctx.db
-      .query("memberships")
-      .withIndex("by_group_status", (q) =>
-        q.eq("groupId", args.groupId).eq("status", "active"),
-      )
-      .take(200);
+    const memberships = await connectedMembershipsForGroup(ctx, args.groupId);
     const rows = [];
     for (const membership of memberships) {
       rows.push({ membership, profile: await ctx.db.get(membership.profileId) });
@@ -418,12 +600,7 @@ export const listMyMembers = query({
       .withIndex("by_leader", (q) => q.eq("leaderProfileId", profile._id))
       .take(2);
     if (groups.length !== 1) throw new Error("Select a group in the latest app version");
-    const memberships = await ctx.db
-      .query("memberships")
-      .withIndex("by_group_status", (q) =>
-        q.eq("groupId", groups[0]._id).eq("status", "active"),
-      )
-      .take(200);
+    const memberships = await connectedMembershipsForGroup(ctx, groups[0]._id);
     const rows = [];
     for (const membership of memberships) {
       rows.push({ membership, profile: await ctx.db.get(membership.profileId) });

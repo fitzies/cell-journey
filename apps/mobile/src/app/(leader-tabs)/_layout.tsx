@@ -30,7 +30,7 @@ const profileOptions = { title: 'Profile', tabBarIcon: profileIcon };
 export default function LeaderTabs() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const profile = useQuery(api.profiles.currentOrNull, isAuthenticated ? {} : 'skip');
-  const { context } = useGroups();
+  const { context, selectedLeaderGroup } = useGroups();
   const t = useAppTheme();
   const screenOptions = useMemo(() => ({
     headerShown: false,
@@ -58,7 +58,9 @@ export default function LeaderTabs() {
       <Tabs.Screen name="index" options={homeOptions} />
       <Tabs.Screen name="attendance" options={attendanceOptions} />
       <Tabs.Screen name="schedule" options={scheduleOptions} />
-      <Tabs.Screen name="members" options={membersOptions} />
+      <Tabs.Protected guard={selectedLeaderGroup?.capabilities.manageMembers === true}>
+        <Tabs.Screen name="members" options={membersOptions} />
+      </Tabs.Protected>
       <Tabs.Screen name="profile" options={profileOptions} />
     </Tabs>
   );

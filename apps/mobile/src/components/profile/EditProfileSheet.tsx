@@ -1,5 +1,5 @@
 import { useMutation } from 'convex/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
@@ -36,16 +36,23 @@ export function EditProfileSheet({
 }) {
   const t = useAppTheme();
   const insets = useSafeAreaInsets();
-  const updateProfile = useMutation(api.profiles.updateProfile);
-  const [fullName, setFullName] = useState('');
+  const updateProfile = useMutation(api.profiles.updateProfileV2);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [legacyFullName, setLegacyFullName] = useState<string | null>(null);
   const [region, setRegion] = useState<Region | null>(null);
   const [selected, setSelected] = useState<Id<'services'>[]>([]);
   const [saving, setSaving] = useState(false);
+  const lastNameInput = useRef<TextInput>(null);
 
   useEffect(() => {
     if (!visible || !profile) return;
     const activeServiceIds = new Set(services.map((service) => service._id));
-    setFullName(profile.fullName ?? '');
+    const savedFirstName = profile.firstName?.trim() ?? '';
+    const savedLastName = profile.lastName?.trim() ?? '';
+    setFirstName(savedFirstName);
+    setLastName(savedLastName);
+    setLegacyFullName(!savedFirstName || !savedLastName ? profile.fullName?.trim() || null : null);
     setRegion(profile.singaporeRegion ?? null);
     setSelected(profile.serviceIds.filter((serviceId) => activeServiceIds.has(serviceId)));
   }, [profile, services, visible]);
@@ -57,9 +64,14 @@ export function EditProfileSheet({
 
   const submit = async () => {
     if (!profile || saving) return;
-    const trimmedFullName = fullName.trim();
-    if (!trimmedFullName) {
-      Alert.alert('Add your full name', 'Use the name your leader or members would recognise.');
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
+    if (!trimmedFirstName) {
+      Alert.alert('Add your first name', 'Enter your first name as your leader or members would recognise it.');
+      return;
+    }
+    if (!trimmedLastName) {
+      Alert.alert('Add your last name', 'Enter your last name rather than relying on the old full-name field.');
       return;
     }
     if (selected.length === 0) {
@@ -74,7 +86,8 @@ export function EditProfileSheet({
     setSaving(true);
     try {
       await updateProfile({
-        fullName: trimmedFullName,
+        firstName: trimmedFirstName,
+        lastName: trimmedLastName,
         preferredName: profile.preferredName?.trim() || undefined,
         singaporeRegion: region,
         serviceIds: selected,
@@ -88,7 +101,7 @@ export function EditProfileSheet({
     }
   };
 
-  const canSave = Boolean(fullName.trim() && region && selected.length > 0 && !saving && profile);
+  const canSave = Boolean(firstName.trim() && lastName.trim() && region && selected.length > 0 && !saving && profile);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -107,18 +120,47 @@ export function EditProfileSheet({
           </View>
 
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetBody}>
-            <View style={styles.fieldWrap}>
-              <Text style={[styles.label, { color: t.muted }]}>Full name</Text>
-              <TextInput
-                value={fullName}
-                onChangeText={setFullName}
-                editable={!saving}
-                autoCapitalize="words"
-                returnKeyType="done"
-                placeholder="Your full name"
-                placeholderTextColor={t.muted}
-                style={[styles.input, { backgroundColor: t.background, borderColor: t.line, color: t.ink }]}
-              />
+            {legacyFullName ? (
+              <View style={[styles.nameNotice, { backgroundColor: t.soft, borderColor: t.line }]}>
+                <Text style={[styles.nameNoticeTitle, { color: t.ink }]}>Confirm your name</Text>
+                <Text style={[styles.nameNoticeBody, { color: t.muted }]}>We currently show “{legacyFullName}”. Add your first and last names below—we won’t guess how your name should be split.</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.nameRow}>
+              <View style={[styles.fieldWrap, styles.nameField]}>
+                <Text style={[styles.label, { color: t.muted }]}>First name</Text>
+                <TextInput
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  editable={!saving}
+                  autoCapitalize="words"
+                  autoComplete="given-name"
+                  textContentType="givenName"
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => lastNameInput.current?.focus()}
+                  placeholder="First name"
+                  placeholderTextColor={t.muted}
+                  style={[styles.input, { backgroundColor: t.background, borderColor: t.line, color: t.ink }]}
+                />
+              </View>
+              <View style={[styles.fieldWrap, styles.nameField]}>
+                <Text style={[styles.label, { color: t.muted }]}>Last name</Text>
+                <TextInput
+                  ref={lastNameInput}
+                  value={lastName}
+                  onChangeText={setLastName}
+                  editable={!saving}
+                  autoCapitalize="words"
+                  autoComplete="family-name"
+                  textContentType="familyName"
+                  returnKeyType="done"
+                  placeholder="Last name"
+                  placeholderTextColor={t.muted}
+                  style={[styles.input, { backgroundColor: t.background, borderColor: t.line, color: t.ink }]}
+                />
+              </View>
             </View>
 
             <View style={styles.fieldWrap}>
@@ -229,6 +271,11 @@ const styles = StyleSheet.create({
   closeText: { marginTop: -2, fontFamily: fonts.bodySemiBold, fontSize: 26, lineHeight: 28 },
   eyebrow: { fontFamily: fonts.bodyBold, fontSize: 10.5, letterSpacing: 1.7, textTransform: 'uppercase' },
   title: { marginTop: 6, fontFamily: fonts.bodyBold, fontSize: 20, letterSpacing: -0.4 },
+  nameNotice: { borderWidth: 1, borderRadius: radius.lg, padding: 14 },
+  nameNoticeTitle: { fontFamily: fonts.bodyBold, fontSize: 15, letterSpacing: -0.2 },
+  nameNoticeBody: { marginTop: 5, fontFamily: fonts.body, fontSize: 13.5, lineHeight: 19 },
+  nameRow: { gap: 14 },
+  nameField: { width: '100%' },
   fieldWrap: { gap: 8 },
   label: { fontFamily: fonts.bodyBold, fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase' },
   input: { minHeight: 52, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 14, fontFamily: fonts.bodySemiBold, fontSize: 16 },

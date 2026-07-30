@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
 import { api } from '@/lib/api';
+import { getProfileDisplayName } from '@/lib/name';
 
 export default function ProfileTab() {
   const t = useAppTheme();
@@ -25,7 +26,7 @@ export default function ProfileTab() {
   };
 
   if (profile === undefined) return <LoadingState />;
-  const displayName = profile?.preferredName?.trim() || profile?.fullName?.trim() || 'Signed in';
+  const displayName = getProfileDisplayName(profile, 'Signed in');
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.background }}>
