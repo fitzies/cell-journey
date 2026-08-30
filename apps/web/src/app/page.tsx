@@ -495,9 +495,9 @@ function CreateGroupDialog() {
             <Input
               id="group-name"
               value={name}
-              onChange={(event) => {
-                setName(event.target.value);
-                if (!code) setCode(initialCode(event.target.value));
+              onChange={(event) => setName(event.target.value)}
+              onBlur={() => {
+                if (!code) setCode(initialCode(name));
               }}
               placeholder="Bukit Timah Cell"
             />
