@@ -18,6 +18,7 @@ import { GroupLeadershipControls } from "@/components/admin/group-leadership-con
 import { PanelLoading, SearchInput } from "@/components/admin/panel-ui";
 import { PeoplePanel } from "@/components/admin/people-panel";
 import { profileDisplayName } from "@/components/admin/profile-display-name";
+import { CreateServiceDialog, ServicesPanel } from "@/components/admin/services-panel";
 import type {
   AttendanceRow,
   GroupRow,
@@ -175,6 +176,7 @@ function AdminDashboard() {
   const users = useQuery(api.admin.listUsers, needsManagementData ? { limit: 250 } : "skip");
   const groups = useQuery(api.admin.listGroups, needsManagementData ? { limit: 200 } : "skip");
   const requests = useQuery(api.admin.listPendingJoinRequests, { limit: 100 });
+  const services = useQuery(api.admin.listServices, tab === "services" ? { limit: 250 } : "skip");
 
   const attendanceRows = useMemo(() => {
     const search = attendanceSearch.trim().toLowerCase();
@@ -260,8 +262,9 @@ function AdminDashboard() {
               <TabsTrigger value="groups">Groups</TabsTrigger>
               <TabsTrigger value="people">People</TabsTrigger>
               <TabsTrigger value="requests">Requests{requests?.length ? ` (${requests.length})` : ""}</TabsTrigger>
+              <TabsTrigger value="services">Services</TabsTrigger>
             </TabsList>
-            <CreateGroupDialog />
+            {tab === "services" ? <CreateServiceDialog services={services} /> : <CreateGroupDialog />}
           </div>
 
           <TabsContent value="attendance">
@@ -289,6 +292,9 @@ function AdminDashboard() {
           </TabsContent>
           <TabsContent value="requests">
             <RequestsPanel requests={requests} />
+          </TabsContent>
+          <TabsContent value="services">
+            <ServicesPanel services={services} />
           </TabsContent>
         </Tabs>
       </main>

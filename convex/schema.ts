@@ -82,7 +82,9 @@ export default defineSchema({
     isActive: v.boolean(),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_active_sort", ["isActive", "sortOrder"]),
+  })
+    .index("by_active_sort", ["isActive", "sortOrder"])
+    .index("by_sort_order", ["sortOrder"]),
 
   groups: defineTable({
     name: v.string(),

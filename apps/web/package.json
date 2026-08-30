@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "predev": "node ../../packages/theme/scripts/generate-mobile-theme.mjs",
-    "dev": "next dev",
+    "dev": "node scripts/dev.mjs",
     "prebuild": "node ../../packages/theme/scripts/generate-mobile-theme.mjs",
     "build": "next build",
     "start": "next start"

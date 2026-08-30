@@ -297,6 +297,17 @@ export const listGroups = query({
   },
 });
 
+export const listServices = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    return await ctx.db
+      .query("services")
+      .withIndex("by_sort_order")
+      .take(Math.min(args.limit ?? MAX_ROWS, MAX_ROWS));
+  },
+});
+
 export const listCoLeaderAssignments = query({
   args: {
     groupId: v.optional(v.id("groups")),
@@ -610,6 +621,85 @@ export const updateGroup = mutation({
 
     await ctx.db.patch(group._id, { name, code, isActive: args.isActive, updatedAt: Date.now() });
     return await ctx.db.get(group._id);
+  },
+});
+
+function cleanServiceName(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function validateServiceSortOrder(value: number) {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error("Display order must be a whole number of 0 or more");
+  }
+}
+
+async function serviceWithName(
+  ctx: QueryCtx | MutationCtx,
+  name: string,
+  excludeId?: Id<"services">,
+) {
+  const normalizedName = name.toLocaleLowerCase("en-SG");
+  const services = await ctx.db.query("services").take(MAX_ROWS);
+  return services.find(
+    (service) =>
+      service._id !== excludeId &&
+      service.name.toLocaleLowerCase("en-SG") === normalizedName,
+  );
+}
+
+export const createService = mutation({
+  args: {
+    name: v.string(),
+    sortOrder: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const name = cleanServiceName(args.name);
+    if (!name) throw new Error("Service name is required");
+    validateServiceSortOrder(args.sortOrder);
+    if (await serviceWithName(ctx, name)) {
+      throw new Error("A service with this name already exists");
+    }
+
+    const now = Date.now();
+    const serviceId = await ctx.db.insert("services", {
+      name,
+      sortOrder: args.sortOrder,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return await ctx.db.get(serviceId);
+  },
+});
+
+export const updateService = mutation({
+  args: {
+    serviceId: v.id("services"),
+    name: v.string(),
+    sortOrder: v.number(),
+    isActive: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const service = await ctx.db.get(args.serviceId);
+    if (!service) throw new Error("Service not found");
+
+    const name = cleanServiceName(args.name);
+    if (!name) throw new Error("Service name is required");
+    validateServiceSortOrder(args.sortOrder);
+    if (await serviceWithName(ctx, name, service._id)) {
+      throw new Error("A service with this name already exists");
+    }
+
+    await ctx.db.patch(service._id, {
+      name,
+      sortOrder: args.sortOrder,
+      isActive: args.isActive,
+      updatedAt: Date.now(),
+    });
+    return await ctx.db.get(service._id);
   },
 });
 
