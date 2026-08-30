@@ -61,10 +61,6 @@ const DAY = 24 * 60 * 60 * 1000;
 
 type Period = "30" | "90" | "180";
 
-function initialCode(name: string) {
-  return name.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, 6);
-}
-
 function formatPercent(value: number | null) {
   return value === null ? "—" : `${Math.round(value * 100)}%`;
 }
@@ -496,9 +492,6 @@ function CreateGroupDialog() {
               id="group-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              onBlur={() => {
-                if (!code) setCode(initialCode(name));
-              }}
               placeholder="Bukit Timah Cell"
             />
           </div>
