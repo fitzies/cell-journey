@@ -85,7 +85,7 @@ export default function LeaderProfileScreen() {
         <ActionButton label={busy ? 'Signing out…' : 'Sign out'} disabled={busy} onPress={handleSignOut} />
       </View>
 
-      <EditProfileSheet visible={editOpen} profile={profile} services={services} onClose={() => setEditOpen(false)} />
+      {editOpen ? <EditProfileSheet profile={profile} services={services} onClose={() => setEditOpen(false)} /> : null}
     </LeaderScreen>
   );
 }

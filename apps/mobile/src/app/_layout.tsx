@@ -1,6 +1,5 @@
-import { ThemeProvider, DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { ConvexAuthProvider } from '@convex-dev/auth/react';
-import { Stack } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { Platform, Text, useColorScheme, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SecureStore from 'expo-secure-store';

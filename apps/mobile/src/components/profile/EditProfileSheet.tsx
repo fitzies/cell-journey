@@ -1,5 +1,5 @@
 import { useMutation } from 'convex/react';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
@@ -22,13 +22,11 @@ const regionLabels: Record<Region, string> = {
 };
 
 export function EditProfileSheet({
-  visible,
   profile,
   services,
   onClose,
   onSaved,
 }: {
-  visible: boolean;
   profile: Doc<'userProfiles'> | null;
   services: Doc<'services'>[];
   onClose: () => void;
@@ -37,25 +35,20 @@ export function EditProfileSheet({
   const t = useAppTheme();
   const insets = useSafeAreaInsets();
   const updateProfile = useMutation(api.profiles.updateProfileV2);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [legacyFullName, setLegacyFullName] = useState<string | null>(null);
-  const [region, setRegion] = useState<Region | null>(null);
-  const [selected, setSelected] = useState<Id<'services'>[]>([]);
+  const savedFirstName = profile?.firstName?.trim() ?? '';
+  const savedLastName = profile?.lastName?.trim() ?? '';
+  const activeServiceIds = new Set(services.map((service) => service._id));
+  const [firstName, setFirstName] = useState(savedFirstName);
+  const [lastName, setLastName] = useState(savedLastName);
+  const [legacyFullName] = useState<string | null>(
+    !savedFirstName || !savedLastName ? profile?.fullName?.trim() || null : null,
+  );
+  const [region, setRegion] = useState<Region | null>(profile?.singaporeRegion ?? null);
+  const [selected, setSelected] = useState<Id<'services'>[]>(
+    () => profile?.serviceIds.filter((serviceId) => activeServiceIds.has(serviceId)) ?? [],
+  );
   const [saving, setSaving] = useState(false);
   const lastNameInput = useRef<TextInput>(null);
-
-  useEffect(() => {
-    if (!visible || !profile) return;
-    const activeServiceIds = new Set(services.map((service) => service._id));
-    const savedFirstName = profile.firstName?.trim() ?? '';
-    const savedLastName = profile.lastName?.trim() ?? '';
-    setFirstName(savedFirstName);
-    setLastName(savedLastName);
-    setLegacyFullName(!savedFirstName || !savedLastName ? profile.fullName?.trim() || null : null);
-    setRegion(profile.singaporeRegion ?? null);
-    setSelected(profile.serviceIds.filter((serviceId) => activeServiceIds.has(serviceId)));
-  }, [profile, services, visible]);
 
   const toggleService = (serviceId: Id<'services'>) => {
     if (saving) return;
@@ -104,7 +97,7 @@ export function EditProfileSheet({
   const canSave = Boolean(firstName.trim() && lastName.trim() && region && selected.length > 0 && !saving && profile);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalRoot}>
         <Pressable style={styles.modalBackdrop} onPress={saving ? undefined : onClose} />
         <View style={[styles.sheet, { backgroundColor: t.surface, borderColor: t.line, paddingBottom: Math.max(18, insets.bottom + 10) }]}>
@@ -262,7 +255,7 @@ function SheetButton({ label, onPress, disabled, filled }: { label: string; onPr
 
 const styles = StyleSheet.create({
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
-  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.34)' },
+  modalBackdrop: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.34)' },
   sheet: { maxHeight: '90%', borderTopLeftRadius: 30, borderTopRightRadius: 30, borderWidth: 1, paddingTop: 10, paddingHorizontal: 20 },
   sheetHandle: { alignSelf: 'center', width: 42, height: 4, borderRadius: 999, marginBottom: 16 },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },

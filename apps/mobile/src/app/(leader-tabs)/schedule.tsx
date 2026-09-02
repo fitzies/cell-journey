@@ -2,7 +2,7 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import { useMutation, useQuery } from 'convex/react';
 import * as DocumentPicker from 'expo-document-picker';
 import { File as ExpoFile } from 'expo-file-system';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GroupSwitcher, leaderAccessLabel, useGroups } from '@/components/group-context';
@@ -321,15 +321,16 @@ export default function LeaderScheduleScreen() {
         <EmptyState title="No events yet." body="Create your first event so members can see the schedule and check in during the attendance window." />
       )}
 
-      <EventFormModal
-        visible={formOpen}
-        form={form}
-        editingTitle={editingEvent?.title ?? null}
-        saving={saving}
-        onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
-        onSubmit={submitForm}
-        onClose={closeForm}
-      />
+      {formOpen ? (
+        <EventFormModal
+          form={form}
+          editingTitle={editingEvent?.title ?? null}
+          saving={saving}
+          onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+          onSubmit={submitForm}
+          onClose={closeForm}
+        />
+      ) : null}
       <ImportPreviewModal
         preview={importPreview}
         importing={importing}
@@ -342,7 +343,7 @@ export default function LeaderScheduleScreen() {
   );
 }
 
-function EventFormModal({ visible, form, editingTitle, saving, onChange, onSubmit, onClose }: { visible: boolean; form: EventForm; editingTitle: string | null; saving: boolean; onChange: (patch: Partial<EventForm>) => void; onSubmit: () => void; onClose: () => void }) {
+function EventFormModal({ form, editingTitle, saving, onChange, onSubmit, onClose }: { form: EventForm; editingTitle: string | null; saving: boolean; onChange: (patch: Partial<EventForm>) => void; onSubmit: () => void; onClose: () => void }) {
   const t = useAppTheme();
   const insets = useSafeAreaInsets();
   const [pickerField, setPickerField] = useState<PickerField | null>(null);
@@ -350,10 +351,6 @@ function EventFormModal({ visible, form, editingTitle, saving, onChange, onSubmi
 
   const pickerValue = pickerField === 'date' ? dateFromInput(form.date) : pickerField === 'startTime' ? dateFromTimeInput(form, form.startTime) : dateFromTimeInput(form, form.endTime);
   const pickerMode = pickerField === 'date' ? 'date' : 'time';
-
-  useEffect(() => {
-    if (!visible) setPickerField(null);
-  }, [visible]);
 
   const updateFromPicker = (field: PickerField, selected: Date) => {
     if (field === 'date') onChange({ date: formatDateInput(selected.getTime()) });
@@ -373,7 +370,7 @@ function EventFormModal({ visible, form, editingTitle, saving, onChange, onSubmi
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalRoot}>
         <Pressable style={styles.modalBackdrop} onPress={onClose} />
         <View style={[styles.sheet, { backgroundColor: t.surface, borderColor: t.line, paddingBottom: Math.max(18, insets.bottom + 10) }]}>
@@ -606,7 +603,7 @@ const styles = StyleSheet.create({
   topActions: { flexDirection: 'row', gap: 8 },
   topAction: { flex: 1, minWidth: 0 },
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
-  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.34)' },
+  modalBackdrop: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.34)' },
   sheet: { maxHeight: '88%', borderTopLeftRadius: 30, borderTopRightRadius: 30, borderWidth: 1, paddingTop: 10, paddingHorizontal: 20, paddingBottom: 18 },
   importSheet: { maxHeight: '92%' },
   sheetHandle: { alignSelf: 'center', width: 42, height: 4, borderRadius: 999, marginBottom: 16 },

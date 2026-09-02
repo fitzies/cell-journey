@@ -66,20 +66,22 @@ export function GroupContextProvider({ children }: { children: ReactNode }) {
 
   const memberGroups = useMemo(() => context?.memberGroups ?? [], [context]);
   const ledGroups = useMemo(() => context?.ledGroups ?? [], [context]);
+  const selectedMemberGroupId = memberGroups.some((row) => row.group._id === memberId)
+    ? memberId
+    : memberGroups[0]?.group._id ?? null;
+  const selectedLeaderGroupId = ledGroups.some((group) => group._id === leaderId)
+    ? leaderId
+    : ledGroups[0]?._id ?? null;
 
   useEffect(() => {
     if (!hydrated || !context) return;
-    if (!memberGroups.some((row) => row.group._id === memberId)) {
-      const next = memberGroups[0]?.group._id ?? null;
-      setMemberId(next);
-      if (next) void writeSelection(MEMBER_KEY, next);
+    if (selectedMemberGroupId && selectedMemberGroupId !== memberId) {
+      void writeSelection(MEMBER_KEY, selectedMemberGroupId);
     }
-    if (!ledGroups.some((group) => group._id === leaderId)) {
-      const next = ledGroups[0]?._id ?? null;
-      setLeaderId(next);
-      if (next) void writeSelection(LEADER_KEY, next);
+    if (selectedLeaderGroupId && selectedLeaderGroupId !== leaderId) {
+      void writeSelection(LEADER_KEY, selectedLeaderGroupId);
     }
-  }, [context, hydrated, leaderId, ledGroups, memberGroups, memberId]);
+  }, [context, hydrated, leaderId, memberId, selectedLeaderGroupId, selectedMemberGroupId]);
 
   const selectMemberGroup = useCallback((groupId: Id<'groups'>) => {
     setMemberId(groupId);
@@ -94,13 +96,13 @@ export function GroupContextProvider({ children }: { children: ReactNode }) {
     context,
     memberGroups,
     ledGroups,
-    selectedMemberGroupId: memberId,
-    selectedLeaderGroupId: leaderId,
-    selectedMemberGroup: memberGroups.find((row) => row.group._id === memberId) ?? memberGroups[0] ?? null,
-    selectedLeaderGroup: ledGroups.find((group) => group._id === leaderId) ?? ledGroups[0] ?? null,
+    selectedMemberGroupId,
+    selectedLeaderGroupId,
+    selectedMemberGroup: memberGroups.find((row) => row.group._id === selectedMemberGroupId) ?? null,
+    selectedLeaderGroup: ledGroups.find((group) => group._id === selectedLeaderGroupId) ?? null,
     selectMemberGroup,
     selectLeaderGroup,
-  }), [context, leaderId, ledGroups, memberGroups, memberId, selectLeaderGroup, selectMemberGroup]);
+  }), [context, ledGroups, memberGroups, selectLeaderGroup, selectMemberGroup, selectedLeaderGroupId, selectedMemberGroupId]);
 
   return <GroupContext.Provider value={value}>{children}</GroupContext.Provider>;
 }

@@ -112,12 +112,6 @@ export default function LeaderAttendanceScreen() {
   const clearOptional = useMutation(api.attendance.clearOptionalForMember);
   const reorder = useMutation(api.groups.reorderMembers);
 
-  useEffect(() => {
-    if (!group || rememberedId || !eventRows[0]) return;
-    const eventId = eventRows[0].event._id;
-    setSelectedEvents((current) => ({ ...current, [group._id]: eventId }));
-  }, [eventRows, group, rememberedId]);
-
   if (
     context === undefined ||
     (hasGroup && (firstWorklistPage === undefined || recentCompleted === undefined || (selectedEventId && detail === undefined) || (canReorder && canonicalMembers === undefined)))

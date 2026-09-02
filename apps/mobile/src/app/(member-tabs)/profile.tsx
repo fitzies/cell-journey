@@ -130,7 +130,7 @@ export default function MemberProfileScreen() {
           <ActionButton label={busy === 'signOut' ? 'Signing out…' : 'Sign out'} disabled={busy !== null} onPress={handleSignOut} />
         </View>
       </ScrollView>
-      <EditProfileSheet visible={editOpen} profile={profile} services={services} onClose={() => setEditOpen(false)} />
+      {editOpen ? <EditProfileSheet profile={profile} services={services} onClose={() => setEditOpen(false)} /> : null}
     </SafeAreaView>
   );
 }

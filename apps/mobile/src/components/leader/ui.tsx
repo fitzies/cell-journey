@@ -34,11 +34,11 @@ export function Card({ children, accent }: PropsWithChildren<{ accent?: boolean 
   return <View style={[styles.card, { backgroundColor: accent ? t.accent : t.surface, borderColor: accent ? t.accent : t.line }]}>{children}</View>;
 }
 
-export function Mark({ children, success, danger }: PropsWithChildren<{ success?: boolean; danger?: boolean }>) {
+export function Mark({ children, success, danger, compact }: PropsWithChildren<{ success?: boolean; danger?: boolean; compact?: boolean }>) {
   const t = useAppTheme();
   return (
-    <View style={[styles.mark, { backgroundColor: success ? t.success : danger ? t.danger : t.soft }]}>
-      <Text style={{ color: success || danger ? t.accentInk : t.accent, fontFamily: fonts.bodyBold }}>{children}</Text>
+    <View style={[styles.mark, compact && styles.compactMark, { backgroundColor: success ? t.success : danger ? t.danger : t.soft }]}>
+      <Text style={[styles.markText, compact && styles.compactMarkText, { color: success || danger ? t.accentInk : t.accent }]}>{children}</Text>
     </View>
   );
 }
@@ -85,10 +85,10 @@ export function StatPill({ label, value }: { label: string; value: string | numb
   );
 }
 
-export function RowCard({ mark, title, detail, right, children }: PropsWithChildren<{ mark: ReactNode; title: string; detail?: string; right?: ReactNode }>) {
+export function RowCard({ mark, title, detail, right, compact, children }: PropsWithChildren<{ mark: ReactNode; title: string; detail?: string; right?: ReactNode; compact?: boolean }>) {
   const t = useAppTheme();
   return (
-    <View style={[styles.rowCard, { backgroundColor: t.surface, borderColor: t.line }]}>
+    <View style={[styles.rowCard, compact && styles.compactRowCard, { backgroundColor: t.surface, borderColor: t.line }]}>
       {mark}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={[styles.rowTitle, { color: t.ink }]}>{title}</Text>
@@ -112,6 +112,9 @@ const styles = StyleSheet.create({
   sectionMeta: { fontFamily: fonts.bodyMedium, fontSize: 13 },
   card: { borderWidth: 1, borderRadius: 28, padding: 20, overflow: 'hidden' },
   mark: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  markText: { fontFamily: fonts.bodyBold },
+  compactMark: { width: 30, height: 30, borderRadius: 10 },
+  compactMarkText: { fontSize: 13 },
   emptyTitle: { marginTop: 18, fontFamily: fonts.bodyBold, fontSize: 18, letterSpacing: -0.3 },
   emptyBody: { marginTop: 7, fontFamily: fonts.body, fontSize: 14, lineHeight: 20 },
   button: { minHeight: 46, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
@@ -120,6 +123,7 @@ const styles = StyleSheet.create({
   statValue: { fontFamily: fonts.display, fontSize: 34, lineHeight: 38, letterSpacing: -1 },
   statLabel: { marginTop: 4, fontFamily: fonts.bodyBold, fontSize: 10.5, letterSpacing: 1.4, textTransform: 'uppercase' },
   rowCard: { borderWidth: 1, borderRadius: 20, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 13 },
+  compactRowCard: { minHeight: 56, borderRadius: 16, paddingVertical: 5, paddingLeft: 10, paddingRight: 4, gap: 10 },
   rowTitle: { fontFamily: fonts.bodySemiBold, fontSize: 16, letterSpacing: -0.25 },
   rowDetail: { marginTop: 4, fontFamily: fonts.body, fontSize: 13.5, lineHeight: 19 },
 });

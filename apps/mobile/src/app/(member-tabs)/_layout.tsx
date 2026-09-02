@@ -1,6 +1,7 @@
 import { useConvexAuth, useQuery } from 'convex/react';
 import { Redirect, Tabs } from 'expo-router';
 import { useMemo } from 'react';
+import type { ColorValue } from 'react-native';
 import { useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { SolarTabIcon, type SolarTabIconName } from '@/components/solar-tab-icon';
@@ -8,7 +9,7 @@ import { useAppTheme } from '@/constants/tokens';
 import { api } from '@/lib/api';
 
 function tabIcon(name: SolarTabIconName) {
-  function TabIcon({ color, focused }: { color: string; focused: boolean }) {
+  function TabIcon({ color, focused }: { color: ColorValue; focused: boolean }) {
     return <SolarTabIcon name={name} color={color} focused={focused} />;
   }
 

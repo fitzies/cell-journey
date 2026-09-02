@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Alert, FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable-flatlist';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
@@ -33,7 +33,10 @@ type OrderedRosterScreenProps<T> = {
   inactiveEmptyText?: string;
   showSections?: boolean;
   canReorder?: boolean;
-  renderRow: (entry: OrderedRosterEntry<T>) => ReactNode;
+  reorderControls?: 'rail' | 'inline-handle';
+  showReorderHint?: boolean;
+  reorderAccessibilityLabel?: (entry: OrderedRosterEntry<T>) => string;
+  renderRow: (entry: OrderedRosterEntry<T>, reorderHandle?: ReactNode) => ReactNode;
   onReorder?: (section: RosterSection, rows: OrderedRosterEntry<T>[]) => Promise<void>;
   onReorderError?: (error: unknown) => void;
 };
@@ -44,7 +47,9 @@ function idsFor<T>(rows: OrderedRosterEntry<T>[]) {
 
 function rowsFromOrder<T>(order: string[], source: OrderedRosterEntry<T>[]) {
   const byId = new Map(source.map((row) => [row.id, row]));
-  return order.map((id) => byId.get(id)).filter((row): row is OrderedRosterEntry<T> => Boolean(row));
+  const ordered = order.map((id) => byId.get(id)).filter((row): row is OrderedRosterEntry<T> => Boolean(row));
+  const orderedIds = new Set(order);
+  return [...ordered, ...source.filter((row) => !orderedIds.has(row.id))];
 }
 
 export function OrderedRosterScreen<T>({
@@ -62,19 +67,17 @@ export function OrderedRosterScreen<T>({
   inactiveEmptyText = 'No inactive members.',
   showSections = true,
   canReorder = false,
+  reorderControls = 'rail',
+  showReorderHint = true,
+  reorderAccessibilityLabel,
   renderRow,
   onReorder,
   onReorderError,
 }: OrderedRosterScreenProps<T>) {
   const t = useAppTheme();
-  const activeKey = idsFor(activeRows).join('|');
-  const inactiveKey = idsFor(inactiveRows).join('|');
   const [activeOrder, setActiveOrder] = useState(() => idsFor(activeRows));
   const [inactiveOrder, setInactiveOrder] = useState(() => idsFor(inactiveRows));
   const [savingOrder, setSavingOrder] = useState(false);
-
-  useEffect(() => setActiveOrder(idsFor(activeRows)), [activeKey]);
-  useEffect(() => setInactiveOrder(idsFor(inactiveRows)), [inactiveKey]);
 
   const orderedActive = useMemo(() => rowsFromOrder(activeOrder, activeRows), [activeOrder, activeRows]);
   const orderedInactive = useMemo(() => rowsFromOrder(inactiveOrder, inactiveRows), [inactiveOrder, inactiveRows]);
@@ -159,9 +162,13 @@ export function OrderedRosterScreen<T>({
             <Text style={[styles.sectionMeta, { color: t.muted }]}>{rows.length}</Text>
           </View>
           {description ? <Text style={[styles.sectionDescription, { color: t.muted }]}>{description}</Text> : null}
-          {canReorder && rows.filter((row) => row.reorderable !== false).length > 1 ? (
+          {showReorderHint && canReorder && rows.filter((row) => row.reorderable !== false).length > 1 ? (
             <Text style={[styles.reorderHint, { color: t.muted }]}>
-              {Platform.OS === 'web' ? 'Use the arrow controls to set the order.' : 'Hold the grip to drag, or use the arrow controls.'}
+              {reorderControls === 'inline-handle'
+                ? 'Hold the handle to reorder.'
+                : Platform.OS === 'web'
+                  ? 'Use the arrow controls to set the order.'
+                  : 'Hold the grip to drag, or use the arrow controls.'}
             </Text>
           ) : null}
         </View>
@@ -179,13 +186,78 @@ export function OrderedRosterScreen<T>({
     const sectionRows = item.section === 'active' ? orderedActive : orderedInactive;
     const reorderableRows = sectionRows.filter((row) => row.reorderable !== false);
     const reorderIndex = reorderableRows.findIndex((row) => row.id === item.entry.id);
-    const rowCanReorder = canReorder && item.entry.reorderable !== false && reorderableRows.length > 1;
+    const showReorderControl = canReorder && item.entry.reorderable !== false;
+    const rowCanReorder = showReorderControl && reorderableRows.length > 1;
     const dragEnabled = rowCanReorder && Platform.OS !== 'web' && !savingOrder;
+    const positionLabel = `Position ${reorderIndex + 1} of ${reorderableRows.length}`;
+    const handleLabel = reorderAccessibilityLabel?.(item.entry) ?? 'Reorder member';
+    const moveWithMenu = () => {
+      Alert.alert(handleLabel, positionLabel, [
+        ...(reorderIndex > 0
+          ? [{ text: 'Move up', onPress: () => moveRow(item.section, item.entry.id, -1) }]
+          : []),
+        ...(reorderIndex < reorderableRows.length - 1
+          ? [{ text: 'Move down', onPress: () => moveRow(item.section, item.entry.id, 1) }]
+          : []),
+        { text: 'Cancel', style: 'cancel' as const },
+      ]);
+    };
+    const inlineHandle = showReorderControl && reorderControls === 'inline-handle'
+      ? Platform.OS === 'web'
+        ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={handleLabel}
+              accessibilityHint={rowCanReorder ? 'Moves this member one position each time it is pressed.' : undefined}
+              disabled={!rowCanReorder || savingOrder}
+              onPress={() => moveRow(item.section, item.entry.id, reorderIndex < reorderableRows.length - 1 ? 1 : -1)}
+              style={({ pressed }) => [
+                styles.inlineHandle,
+                { opacity: !rowCanReorder || savingOrder ? 0.35 : pressed ? 0.55 : 1 },
+              ]}
+            >
+              <Text style={[styles.inlineHandleText, { color: t.muted }]}>⠿</Text>
+            </Pressable>
+          )
+        : (
+            <Pressable
+              accessibilityRole="adjustable"
+              accessibilityLabel={handleLabel}
+              accessibilityValue={{
+                min: 1,
+                max: reorderableRows.length,
+                now: reorderIndex + 1,
+                text: positionLabel,
+              }}
+              accessibilityActions={[
+                ...(reorderIndex > 0 ? [{ name: 'decrement' as const, label: 'Move up' }] : []),
+                ...(reorderIndex < reorderableRows.length - 1 ? [{ name: 'increment' as const, label: 'Move down' }] : []),
+              ]}
+              disabled={!dragEnabled}
+              delayLongPress={180}
+              onPress={moveWithMenu}
+              onAccessibilityAction={(event) => {
+                if (event.nativeEvent.actionName === 'decrement') moveRow(item.section, item.entry.id, -1);
+                if (event.nativeEvent.actionName === 'increment') moveRow(item.section, item.entry.id, 1);
+              }}
+              onLongPress={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                drag();
+              }}
+              style={({ pressed }) => [
+                styles.inlineHandle,
+                { opacity: !rowCanReorder || savingOrder ? 0.35 : pressed || isActive ? 0.55 : 1 },
+              ]}
+            >
+              <Text style={[styles.inlineHandleText, { color: t.muted }]}>⠿</Text>
+            </Pressable>
+          )
+      : undefined;
 
     return (
       <View style={[styles.rosterRow, { opacity: isActive ? 0.92 : 1 }]}>
-        <View style={styles.rowContent}>{renderRow(item.entry)}</View>
-        {rowCanReorder ? (
+        <View style={styles.rowContent}>{renderRow(item.entry, inlineHandle)}</View>
+        {rowCanReorder && reorderControls === 'rail' ? (
           <View style={[styles.orderRail, { backgroundColor: t.soft, borderColor: t.line }]}>
             <Pressable
               accessibilityRole="button"
@@ -275,6 +347,8 @@ const styles = StyleSheet.create({
   arrow: { fontFamily: fonts.bodyBold, fontSize: 18 },
   grip: { width: 28, height: 30, borderTopWidth: 1, borderBottomWidth: 1, alignItems: 'center', justifyContent: 'center' },
   gripText: { fontFamily: fonts.bodyBold, fontSize: 20, lineHeight: 22, transform: [{ rotate: '90deg' }] },
+  inlineHandle: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  inlineHandleText: { fontFamily: fonts.bodyBold, fontSize: 20, lineHeight: 22 },
   emptyRow: { borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 16, paddingVertical: 18, marginBottom: 10 },
   emptyText: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20 },
 });

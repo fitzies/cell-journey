@@ -1,4 +1,4 @@
-import { useEffect, useRef, type PropsWithChildren, type ReactNode } from 'react';
+import { useEffect, useState, type PropsWithChildren, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Easing, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -7,8 +7,8 @@ import { fonts, radius, typography, useAppTheme } from '@/constants/tokens';
 let lastProgress = 0;
 
 function usePageEntrance(animationKey?: string | number) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const shift = useRef(new Animated.Value(8)).current;
+  const [opacity] = useState(() => new Animated.Value(0));
+  const [shift] = useState(() => new Animated.Value(8));
   useEffect(() => {
     opacity.setValue(0);
     shift.setValue(8);
@@ -22,9 +22,7 @@ function usePageEntrance(animationKey?: string | number) {
 
 export function useStaggerReveal(count: number, opts: { delay?: number; initialDelay?: number; duration?: number; animationKey?: string | number } = {}) {
   const { delay = 120, initialDelay = 80, duration = 440, animationKey } = opts;
-  const valuesRef = useRef<Animated.Value[] | null>(null);
-  if (!valuesRef.current) valuesRef.current = Array.from({ length: count }, () => new Animated.Value(0));
-  const values = valuesRef.current;
+  const [values] = useState(() => Array.from({ length: count }, () => new Animated.Value(0)));
   useEffect(() => {
     values.forEach((v) => v.setValue(0));
     Animated.parallel(values.map((v, i) => Animated.timing(v, { toValue: 1, duration, delay: initialDelay + i * delay, easing: Easing.out(Easing.cubic), useNativeDriver: true }))).start();
@@ -37,7 +35,7 @@ export function OnboardingShell({ children, eyebrow, title, hint, cta, onCta, ct
   const t = useAppTheme();
   const bodyAnim = usePageEntrance(animationKey);
   const reveal = useStaggerReveal(4, { initialDelay: 70, animationKey });
-  const progressAnim = useRef(new Animated.Value(lastProgress)).current;
+  const [progressAnim] = useState(() => new Animated.Value(lastProgress));
   const pct = Math.max(0.06, Math.min(1, progress));
   useEffect(() => {
     Animated.timing(progressAnim, { toValue: pct, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();

@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { View, type ColorValue } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { radius, useAppTheme } from '@/constants/tokens';
 
@@ -14,7 +14,7 @@ export type SolarTabIconName = keyof typeof icons;
 
 type SolarTabIconProps = {
   name: SolarTabIconName;
-  color: string;
+  color: ColorValue;
   focused: boolean;
 };
 
@@ -31,7 +31,7 @@ export function SolarTabIcon({ name, color, focused }: SolarTabIconProps) {
         backgroundColor: focused ? t.selected : 'transparent',
       }}
     >
-      <SvgXml xml={icons[name].replaceAll('currentColor', color)} width={24} height={24} />
+      <SvgXml xml={icons[name].replaceAll('currentColor', String(color))} width={24} height={24} />
     </View>
   );
 }

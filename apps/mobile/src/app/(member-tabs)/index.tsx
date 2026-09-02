@@ -47,15 +47,15 @@ function formatTimeRange(startAt: number, endAt: number) {
   return `${new Intl.DateTimeFormat('en-SG', opts).format(startAt)}–${new Intl.DateTimeFormat('en-SG', opts).format(endAt)}`;
 }
 
-function isAttendanceOpen(event?: EventRow) {
+function isAttendanceOpen(event: EventRow | undefined, now: number) {
   if (!event) return false;
-  const now = Date.now();
   return now >= event.startAt - ONE_HOUR && now <= event.endAt + ONE_HOUR;
 }
 
 export default function MemberHomeScreen() {
   const t = useAppTheme();
   const [queryFrom] = useState(() => nowMinusWindow());
+  const [renderNow] = useState(Date.now);
   const profile = useQuery(api.profiles.current, {});
   const { context, selectedMemberGroup } = useGroups();
   const group = selectedMemberGroup?.group ?? null;
@@ -67,8 +67,8 @@ export default function MemberHomeScreen() {
   if (profile === undefined || context === undefined || !group || events === undefined || attendance === undefined) return <LoadingState />;
 
   const eventRows = events as EventRow[];
-  const next = eventRows.find((event) => event.endAt + ONE_HOUR >= Date.now());
-  const checkInOpen = isAttendanceOpen(next);
+  const next = eventRows.find((event) => event.endAt + ONE_HOUR >= renderNow);
+  const checkInOpen = isAttendanceOpen(next, renderNow);
   const displayName = getProfileDisplayName(profile, 'Member');
   const greetingName = getProfileGreetingName(profile, 'there');
   const rate = attendance.attendanceRate === null ? '—' : `${Math.round(attendance.attendanceRate * 100)}%`;
