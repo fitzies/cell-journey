@@ -16,7 +16,7 @@ Before starting or changing a server:
 1. Run `hostname`, `tailscale ip -4`, `tailscale status`, `tailscale serve status`, and `ss -ltnp` for the intended port.
 2. Confirm that Forge and the client device are connected to the same tailnet. A physical phone must run Tailscale too when it is not otherwise on a network that can reach Forge.
 3. Reuse a working listener or Tailscale Serve mapping. Do not stop a process, replace a mapping, change firewall rules, start Funnel, or create a public Expo tunnel without the user's permission.
-4. Prefer an exact Tailscale-IP bind. If a tool cannot bind to one address, bind it to loopback and use an existing tailnet-only Tailscale Serve TCP forward.
+4. Prefer an exact Tailscale-IP bind. If a tool cannot bind to one address, bind it to loopback and use an existing tailnet-only Tailscale Serve TCP forward. The tailnet-facing port and loopback port may differ.
 5. Never give the user `localhost`, `127.0.0.1`, or `0.0.0.0` as the URL to open.
 
 Treat Tailscale IPs and Serve mappings as runtime state. Discover them each time instead of copying an old address from this file.
@@ -25,25 +25,27 @@ Treat Tailscale IPs and Serve mappings as runtime state. Discover them each time
 
 Read `apps/mobile/AGENTS.md`, check the installed Expo version, and use that version's Expo documentation before changing Expo configuration. Preserve the repo's pnpm scripts and pass flags through them.
 
-Expo's LAN mode chooses a network interface and may advertise Forge's ordinary LAN address instead of its Tailscale address. Expo's localhost mode is safer on this host when a tailnet-only TCP forward already maps the chosen Tailscale port to the same loopback port.
+Expo's LAN mode chooses a network interface and may advertise Forge's ordinary LAN address instead of its Tailscale address. Expo's localhost mode is safer on this host when a tailnet-only TCP forward maps a tailnet-facing port to Metro's loopback port.
 
-For the usual Metro port, first confirm that Tailscale Serve forwards the Forge tailnet port to `127.0.0.1:8081`. Then start Metro with an explicitly advertised Tailscale URL:
+Forge currently uses tailnet port `8082` for loopback port `8083`. Confirm that mapping at runtime, then start Metro with an explicitly advertised Tailscale URL:
 
 ```bash
 CJ_TAILSCALE_IPV4="$(tailscale ip -4 | sed -n '1p')"
-EXPO_PACKAGER_PROXY_URL="http://${CJ_TAILSCALE_IPV4}:8081" \
-  pnpm --filter mobile start -- --localhost --port 8081
+CJ_EXPO_TAILSCALE_PORT="8082"
+CJ_EXPO_LOOPBACK_PORT="8083"
+EXPO_PACKAGER_PROXY_URL="http://${CJ_TAILSCALE_IPV4}:${CJ_EXPO_TAILSCALE_PORT}" \
+  pnpm --filter mobile start -- --localhost --port "${CJ_EXPO_LOOPBACK_PORT}"
 ```
 
 `EXPO_PACKAGER_PROXY_URL` changes the URL embedded in Expo's QR code and manifests. The loopback bind keeps Metro off Forge's non-Tailscale interfaces, while Tailscale Serve carries HTTP and WebSocket traffic from the tailnet to Metro.
 
-If port 8081 is occupied, inspect the owner. Reuse it if it is the intended server. Otherwise choose a free port only after confirming a matching Tailscale Serve TCP forward. Do not silently configure or overwrite a Serve mapping.
+Tailscale Serve owns its tailnet-facing port, so Expo may report that port as occupied even when the loopback target is free. Pass Expo the loopback target port, not the tailnet-facing port. If either port is unavailable, inspect the owner and reuse the intended server. Otherwise choose a free pair only after confirming a matching Tailscale Serve TCP forward. Do not silently configure or overwrite a Serve mapping.
 
 After startup, verify all of the following:
 
 - `ss -ltnp` shows Metro on the expected loopback port.
-- `tailscale serve status` shows the matching tailnet TCP forward.
-- An HTTP request to `http://<tailscale-ip>:<port>` succeeds. A loopback-only request is not enough.
+- `tailscale serve status` shows the tailnet port forwarding to that loopback port.
+- An HTTP request to `http://<tailscale-ip>:<tailnet-port>` succeeds. A loopback-only request is not enough.
 - Expo reports or embeds the Tailscale address, not Forge's LAN address or localhost.
 
 Report the Expo QR/deep link produced by the running CLI when the user needs to open the native app. For Expo web, report the verified `http://forge:<port>` URL, or the verified Tailscale-IP URL if MagicDNS fails.
@@ -54,6 +56,7 @@ Do not use `--tunnel` as an automatic workaround. Expo tunnel URLs are public, d
 
 - Forge cannot run an iOS Simulator or build iOS locally because it is Linux. Do not pass `--ios` or press `i`. Use a physical iPhone with Expo Go or an installed development build. Use EAS Build or the user's Mac only when the task calls for a new iOS binary.
 - Do not assume an Android emulator or USB device exists. Check `adb devices` and the Android toolchain first. Otherwise use a physical Android device over Tailscale.
+- Do not depend on Forge opening a desktop browser or React Native DevTools window. Expo may report a missing GTK library on this headless host and still start Metro successfully. If the QR code and Metro URL appear, report the GUI-tool failure separately. Do not install a Linux desktop stack unless the user asks.
 - Starting Metro does not prove the native UI works. State whether verification covered only the bundler route or a real device session.
 - Expo web is useful for browser checks, but it does not verify native layout, permissions, secure storage, haptics, push notifications, or platform-specific authentication.
 

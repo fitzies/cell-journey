@@ -79,7 +79,6 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
-    .index("by_user", ["userId"])
     .index("by_userId", ["userId"])
     .index("by_invitedEmail", ["invitedEmail"])
     .index("by_identityEmailNormalized", ["identityEmailNormalized"])

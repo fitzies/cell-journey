@@ -132,7 +132,9 @@ function NoAccess({ reason, email }: { reason: string; email: string | null }) {
   const { signOut } = useAuthActions();
   const message = reason === "notConfigured"
     ? "Set ADMIN_EMAILS in your Convex environment variables."
-    : "This account is not on the admin allowlist.";
+    : reason === "emailNotVerified"
+      ? "Verify this account's email before using the admin dashboard."
+      : "This account is not on the admin allowlist.";
 
   return (
     <main className="grid min-h-screen place-items-center px-6 py-10">

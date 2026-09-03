@@ -136,6 +136,39 @@ describe("pre-provisioned profiles", () => {
     expect(claimed).toMatchObject({ _id: invited?._id, userId: authUserId });
   });
 
+  test("invite creation rejects a legacy linked profile with a mixed-case email", async () => {
+    const t = makeTest();
+    const admin = await seedAdmin(t);
+    const adminClient = asUser(t, admin.userId);
+
+    await t.run(async (ctx) => {
+      const now = Date.now();
+      const userId = await ctx.db.insert("users", {
+        name: "Existing Person",
+        email: "Existing.Person@Example.COM",
+        emailVerificationTime: now,
+      });
+      await ctx.db.insert("userProfiles", {
+        userId,
+        role: "member",
+        onboardingStatus: "approved",
+        fullName: "Existing Person",
+        singaporeRegion: "central",
+        serviceIds: [],
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+
+    await expect(
+      adminClient.mutation(api.admin.createInvitedProfile, {
+        firstName: "Duplicate",
+        lastName: "Person",
+        email: "existing.person@example.com",
+      }),
+    ).rejects.toThrow("already uses this email");
+  });
+
   test("claiming fails closed when invitation data is duplicated", async () => {
     const t = makeTest();
     const now = Date.now();

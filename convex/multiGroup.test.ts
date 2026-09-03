@@ -311,7 +311,11 @@ describe("multi-group relationships", () => {
       const target = await seedProfile(t, "Incomplete");
       const seeded = await t.run(async (ctx) => {
         const now = Date.now();
-        const adminUserId = await ctx.db.insert("users", { name: "Admin", email: "admin@example.com" });
+        const adminUserId = await ctx.db.insert("users", {
+          name: "Admin",
+          email: "admin@example.com",
+          emailVerificationTime: now,
+        });
         const groupId = await ctx.db.insert("groups", { name: "Assigned", code: "ASSIGN", isActive: true, createdAt: now, updatedAt: now });
         return { adminUserId, groupId };
       });

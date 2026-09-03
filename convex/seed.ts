@@ -66,7 +66,7 @@ export const approveByUserId = internalMutation({
   handler: async (ctx, { userId, groupId }) => {
     const profile = await ctx.db
       .query("userProfiles")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
       .unique();
     if (!profile) throw new Error("No userProfile found for that userId");
 
@@ -135,7 +135,7 @@ export const promoteToLeader = internalMutation({
   handler: async (ctx, { userId, groupId }) => {
     const profile = await ctx.db
       .query("userProfiles")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
       .unique();
     if (!profile) throw new Error("No userProfile found for that userId");
     return await promoteProfileToLeaderForGroup(ctx, profile, groupId);

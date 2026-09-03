@@ -56,11 +56,11 @@ async function requireAdmin(ctx: QueryCtx | MutationCtx) {
   if (allowed.length === 0) {
     throw new Error("Admin access is not configured. Set ADMIN_EMAILS in Convex env vars.");
   }
-  if (typeof user?.emailVerificationTime !== "number") {
-    throw new Error("Verify your email before accessing admin tools.");
-  }
   if (!email || !allowed.includes(email)) {
     throw new Error("This account is not allowed to access admin tools.");
+  }
+  if (typeof user?.emailVerificationTime !== "number") {
+    throw new Error("Verify your email before accessing admin tools.");
   }
 
   return { userId, user, email };
@@ -163,11 +163,11 @@ export const me = query({
     if (allowed.length === 0) {
       return { isAdmin: false, email, name: user?.name ?? null, reason: "notConfigured" as const };
     }
-    if (typeof user?.emailVerificationTime !== "number") {
-      return { isAdmin: false, email, name: user?.name ?? null, reason: "emailNotVerified" as const };
-    }
     if (!email || !allowed.includes(email)) {
       return { isAdmin: false, email, name: user?.name ?? null, reason: "notAllowed" as const };
+    }
+    if (typeof user?.emailVerificationTime !== "number") {
+      return { isAdmin: false, email, name: user?.name ?? null, reason: "emailNotVerified" as const };
     }
 
     return { isAdmin: true, email, name: user?.name ?? null, reason: null };
@@ -308,6 +308,24 @@ export const createInvitedProfile = mutation({
     const matchingProfiles = new Map(
       [...invitedMatches, ...identityMatches].map((profile) => [profile._id, profile]),
     );
+
+    // Transitional safeguard for profiles created before normalized identity
+    // emails were stored. Convex Auth preserves provider casing, so the users
+    // email index alone cannot detect every case-insensitive match.
+    const legacyLinkedProfiles = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_identityEmailNormalized", (q) =>
+        q.eq("identityEmailNormalized", undefined),
+      )
+      .collect();
+    for (const profile of legacyLinkedProfiles) {
+      if (!profile.userId) continue;
+      const linkedUser = (await ctx.db.get(profile.userId)) as AuthUser | null;
+      if (linkedUser?.email && normalizeEmail(linkedUser.email) === email) {
+        matchingProfiles.set(profile._id, profile);
+      }
+    }
+
     for (const authUser of authUsers) {
       const linkedProfiles = await ctx.db
         .query("userProfiles")
@@ -631,7 +649,7 @@ export const approveJoinRequest = mutation({
     const { userId } = await requireAdmin(ctx);
     const reviewer = await ctx.db
       .query("userProfiles")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
       .unique();
 
     return await approvePendingJoinRequest(ctx, args.joinRequestId, {
@@ -646,7 +664,7 @@ export const rejectJoinRequest = mutation({
     const { userId } = await requireAdmin(ctx);
     const reviewer = await ctx.db
       .query("userProfiles")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
       .unique();
 
     return await rejectPendingJoinRequest(ctx, args.joinRequestId, {
