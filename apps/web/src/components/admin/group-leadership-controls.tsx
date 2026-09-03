@@ -26,6 +26,7 @@ export function GroupLeadershipControls({ group, people }: { group: GroupRow; pe
   const revokeCoLeader = useMutation(api.admin.revokeCoLeader);
   const [primaryValue, setPrimaryValue] = useState(group.group.leaderProfileId ?? "none");
   const [coLeaderValue, setCoLeaderValue] = useState("choose-co-leader");
+  const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -82,7 +83,7 @@ export function GroupLeadershipControls({ group, people }: { group: GroupRow; pe
           {!group.leaderName && !group.coLeaders.length ? <span className="text-xs text-muted-foreground">Needs leadership</span> : null}
         </div>
       </div>
-      <Dialog>
+      <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
           <Button variant="outline" size="sm" className="shrink-0 gap-1.5" aria-label={`Manage leadership for ${group.group.name}`}>
             <Settings2 className="h-3.5 w-3.5" />

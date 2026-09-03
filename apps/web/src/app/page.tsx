@@ -57,6 +57,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
 
@@ -88,7 +89,7 @@ function LoadingScreen() {
     <main className="grid min-h-screen place-items-center px-6">
       <Card className="w-full max-w-sm">
         <CardContent className="flex items-center gap-3 p-6 text-sm text-muted-foreground">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
+          <Spinner className="text-primary" />
           Loading admin
         </CardContent>
       </Card>
@@ -452,7 +453,7 @@ function AttendancePanel({
         {canLoadMore || loadingMore ? (
           <div className="flex justify-center">
             <Button variant="outline" size="sm" onClick={loadMore} disabled={loadingMore}>
-              {loadingMore ? "Loading…" : "Load more groups"}
+              {loadingMore ? <><Spinner />Loading…</> : "Load more groups"}
             </Button>
           </div>
         ) : null}
@@ -619,6 +620,7 @@ function GroupIdentity({ group }: { group: GroupRow }) {
 
 function EditGroupDialog({ group }: { group: GroupRow }) {
   const updateGroup = useMutation(api.admin.updateGroup);
+  const deleteGroup = useMutation(api.admin.deleteGroup);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(group.group.name);
   const [code, setCode] = useState(group.group.code);
@@ -634,6 +636,18 @@ function EditGroupDialog({ group }: { group: GroupRow }) {
         setOpen(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not update group");
+      }
+    });
+  }
+
+  function removeArchivedGroup() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await deleteGroup({ groupId: group.group._id });
+        setOpen(false);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not delete group");
       }
     });
   }
@@ -659,6 +673,27 @@ function EditGroupDialog({ group }: { group: GroupRow }) {
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
         </div>
         <DialogFooter>
+          {!group.group.isActive ? (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="sm:mr-auto" disabled={pending}>Delete group</Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete {group.group.name}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently removes the archived group. Groups with members, events, attendance, or history cannot be deleted.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={removeArchivedGroup} disabled={pending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    {pending ? "Deleting…" : "Delete group"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : null}
           <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
           <Button onClick={submit} disabled={pending}>{pending ? "Saving…" : "Save"}</Button>
         </DialogFooter>

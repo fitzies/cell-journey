@@ -624,6 +624,40 @@ export const updateGroup = mutation({
   },
 });
 
+export const deleteGroup = mutation({
+  args: { groupId: v.id("groups") },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const group = await ctx.db.get(args.groupId);
+    if (!group) throw new Error("Group not found");
+    if (group.isActive) throw new Error("Only archived groups can be deleted");
+    if (group.leaderProfileId) throw new Error("Remove the group leader before deleting this group");
+
+    const [activeCoLeaders, revokedCoLeaders] = await Promise.all([
+      ctx.db.query("coLeaderAssignments").withIndex("by_group_and_status", (q) => q.eq("groupId", args.groupId).eq("status", "active")).take(1),
+      ctx.db.query("coLeaderAssignments").withIndex("by_group_and_status", (q) => q.eq("groupId", args.groupId).eq("status", "revoked")).take(1),
+    ]);
+    if (activeCoLeaders.length || revokedCoLeaders.length) throw new Error("This group has leadership history and cannot be deleted");
+
+    const [memberships, joinRequests, activityPeriods, events, attendance] = await Promise.all([
+      ctx.db.query("memberships").withIndex("by_group", (q) => q.eq("groupId", args.groupId)).take(1),
+      ctx.db.query("joinRequests").withIndex("by_group_status", (q) => q.eq("groupId", args.groupId).eq("status", "pending")).take(1),
+      ctx.db.query("membershipActivityPeriods").withIndex("by_group_and_startedAt", (q) => q.eq("groupId", args.groupId)).take(1),
+      ctx.db.query("events").withIndex("by_group_start", (q) => q.eq("groupId", args.groupId)).take(1),
+      ctx.db.query("attendance").withIndex("by_group", (q) => q.eq("groupId", args.groupId)).take(1),
+    ]);
+    if (memberships.length || joinRequests.length || activityPeriods.length || events.length || attendance.length) {
+      throw new Error("This group has history or pending data and cannot be deleted. Keep it archived instead.");
+    }
+
+    const profilesUsingGroup = await ctx.db.query("userProfiles").withIndex("by_current_group", (q) => q.eq("currentGroupId", args.groupId)).take(1);
+    if (profilesUsingGroup.length) throw new Error("A user profile still references this group");
+
+    await ctx.db.delete(args.groupId);
+    return { deleted: true };
+  },
+});
+
 function cleanServiceName(value: string) {
   return value.trim().replace(/\s+/g, " ");
 }

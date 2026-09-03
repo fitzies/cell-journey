@@ -3,6 +3,7 @@
 import { Search } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 
 export function SearchInput({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) {
   return (
@@ -15,8 +16,11 @@ export function SearchInput({ value, onChange, placeholder }: { value: string; o
 
 export function PanelLoading() {
   return (
-    <div className="grid h-40 place-items-center rounded-lg border text-sm text-muted-foreground">
-      Loading data
+    <div className="grid h-40 place-items-center rounded-lg border text-sm text-muted-foreground" role="status" aria-label="Loading data">
+      <div className="flex items-center gap-2">
+        <Spinner className="text-primary" />
+        Loading data
+      </div>
     </div>
   );
 }
