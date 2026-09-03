@@ -312,13 +312,12 @@ export const createInvitedProfile = mutation({
     // Transitional safeguard for profiles created before normalized identity
     // emails were stored. Convex Auth preserves provider casing, so the users
     // email index alone cannot detect every case-insensitive match.
-    const legacyLinkedProfiles = await ctx.db
+    const legacyLinkedProfiles = ctx.db
       .query("userProfiles")
       .withIndex("by_identityEmailNormalized", (q) =>
         q.eq("identityEmailNormalized", undefined),
-      )
-      .collect();
-    for (const profile of legacyLinkedProfiles) {
+      );
+    for await (const profile of legacyLinkedProfiles) {
       if (!profile.userId) continue;
       const linkedUser = (await ctx.db.get(profile.userId)) as AuthUser | null;
       if (linkedUser?.email && normalizeEmail(linkedUser.email) === email) {
