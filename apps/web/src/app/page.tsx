@@ -7,7 +7,6 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   CircleAlert,
-  Crown,
   LogOut,
   Minus,
   Pencil,
@@ -541,13 +540,12 @@ function CreateGroupDialog() {
 
 function GroupsPanel({ groups, users }: { groups: GroupRow[] | undefined; users: UserRow[] | undefined }) {
   const leaders = useMemo(() => users ?? [], [users]);
-  const [rowStyle, setRowStyle] = useState<"overview" | "compact" | "focus">("overview");
   const columns = useMemo<ColumnDef<GroupRow>[]>(() => [
     {
       accessorFn: (row) => row.group.name,
       id: "name",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Group" />,
-      cell: ({ row }) => <GroupIdentity group={row.original} style={rowStyle} />,
+      cell: ({ row }) => <GroupIdentity group={row.original} />,
     },
     {
       accessorFn: (row) => [
@@ -574,38 +572,14 @@ function GroupsPanel({ groups, users }: { groups: GroupRow[] | undefined; users:
       header: () => <span className="sr-only">Actions</span>,
       cell: ({ row }) => <div className="text-right"><EditGroupDialog group={row.original} /></div>,
     },
-  ], [leaders, rowStyle]);
+  ], [leaders]);
 
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <CardTitle>Groups</CardTitle>
-            <CardDescription className="mt-1">A clearer row for every cell, with leadership and status visible at a glance.</CardDescription>
-          </div>
-          <div className="flex flex-wrap items-center gap-2" aria-label="Group row style options">
-            <span className="text-xs text-muted-foreground">Row style</span>
-            <div className="flex rounded-md border bg-muted/30 p-0.5">
-              {([
-                ["overview", "Overview"],
-                ["compact", "Compact"],
-                ["focus", "Leader focus"],
-              ] as const).map(([value, label]) => (
-                <Button
-                  key={value}
-                  type="button"
-                  variant={rowStyle === value ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-8 px-2.5 text-xs"
-                  onClick={() => setRowStyle(value)}
-                  aria-pressed={rowStyle === value}
-                >
-                  {label}
-                </Button>
-              ))}
-            </div>
-          </div>
+        <div>
+          <CardTitle>Groups</CardTitle>
+          <CardDescription className="mt-1">A clearer row for every cell, with leadership and status visible at a glance.</CardDescription>
         </div>
       </CardHeader>
       <CardContent>
@@ -615,7 +589,7 @@ function GroupsPanel({ groups, users }: { groups: GroupRow[] | undefined; users:
   );
 }
 
-function GroupIdentity({ group, style }: { group: GroupRow; style: "overview" | "compact" | "focus" }) {
+function GroupIdentity({ group }: { group: GroupRow }) {
   const initials = group.group.name
     .split(/\s+/)
     .map((word) => word[0])
@@ -632,12 +606,11 @@ function GroupIdentity({ group, style }: { group: GroupRow; style: "overview" | 
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <p className="truncate font-medium">{group.group.name}</p>
-          {style === "focus" ? <Crown className="h-3.5 w-3.5 shrink-0 text-amber-500" aria-label="Leadership focus" /> : null}
         </div>
         <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
           <span className="font-mono tracking-wide">{group.group.code}</span>
-          {style !== "compact" ? <span aria-hidden="true">·</span> : null}
-          {style !== "compact" ? <span className="truncate">{leader}</span> : null}
+          <span aria-hidden="true">·</span>
+          <span className="truncate">{leader}</span>
         </div>
       </div>
     </div>
