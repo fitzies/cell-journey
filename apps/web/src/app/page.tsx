@@ -7,10 +7,13 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   CircleAlert,
+  Crown,
   LogOut,
   Minus,
+  Pencil,
   Plus,
   ShieldCheck,
+  Users,
 } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
@@ -425,6 +428,7 @@ function AttendancePanel({
           <DataTable
             columns={columns}
             data={rows}
+            getRowId={(row) => row.group._id}
             emptyMessage="No attendance data yet. It will appear after the first completed event."
           />
         )}
@@ -525,18 +529,13 @@ function CreateGroupDialog() {
 
 function GroupsPanel({ groups, users }: { groups: GroupRow[] | undefined; users: UserRow[] | undefined }) {
   const leaders = useMemo(() => users ?? [], [users]);
+  const [rowStyle, setRowStyle] = useState<"overview" | "compact" | "focus">("overview");
   const columns = useMemo<ColumnDef<GroupRow>[]>(() => [
     {
       accessorFn: (row) => row.group.name,
       id: "name",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Group" />,
-      cell: ({ row }) => <span className="font-medium">{row.original.group.name}</span>,
-    },
-    {
-      accessorFn: (row) => row.group.code,
-      id: "code",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Code" />,
-      cell: ({ row }) => <Badge variant="outline" className="font-mono font-normal">{row.original.group.code}</Badge>,
+      cell: ({ row }) => <GroupIdentity group={row.original} style={rowStyle} />,
     },
     {
       accessorFn: (row) => [
@@ -544,12 +543,13 @@ function GroupsPanel({ groups, users }: { groups: GroupRow[] | undefined; users:
         ...row.coLeaders.map((coLeader) => coLeader.displayName),
       ].filter(Boolean).join(", "),
       id: "leadership",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Leadership" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Leaders & permissions" />,
       cell: ({ row }) => <GroupLeadershipControls group={row.original} people={leaders} />,
     },
     {
       accessorKey: "activeMemberCount",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Members" />,
+      cell: ({ row }) => <span className="inline-flex items-center gap-1.5 tabular-nums"><Users className="h-3.5 w-3.5 text-muted-foreground" />{row.original.activeMemberCount}</span>,
     },
     {
       accessorFn: (row) => row.group.isActive,
@@ -562,18 +562,73 @@ function GroupsPanel({ groups, users }: { groups: GroupRow[] | undefined; users:
       header: () => <span className="sr-only">Actions</span>,
       cell: ({ row }) => <div className="text-right"><EditGroupDialog group={row.original} /></div>,
     },
-  ], [leaders]);
+  ], [leaders, rowStyle]);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Groups</CardTitle>
-        <CardDescription>Assign a primary leader and co-leaders, then manage group status.</CardDescription>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle>Groups</CardTitle>
+            <CardDescription className="mt-1">A clearer row for every cell, with leadership and status visible at a glance.</CardDescription>
+          </div>
+          <div className="flex flex-wrap items-center gap-2" aria-label="Group row style options">
+            <span className="text-xs text-muted-foreground">Row style</span>
+            <div className="flex rounded-md border bg-muted/30 p-0.5">
+              {([
+                ["overview", "Overview"],
+                ["compact", "Compact"],
+                ["focus", "Leader focus"],
+              ] as const).map(([value, label]) => (
+                <Button
+                  key={value}
+                  type="button"
+                  variant={rowStyle === value ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-8 px-2.5 text-xs"
+                  onClick={() => setRowStyle(value)}
+                  aria-pressed={rowStyle === value}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
-        {!groups ? <PanelLoading /> : <DataTable columns={columns} data={groups} emptyMessage="No groups yet." />}
+        {!groups ? <PanelLoading /> : <DataTable columns={columns} data={groups} getRowId={(row) => row.group._id} emptyMessage="No groups yet." />}
       </CardContent>
     </Card>
+  );
+}
+
+function GroupIdentity({ group, style }: { group: GroupRow; style: "overview" | "compact" | "focus" }) {
+  const initials = group.group.name
+    .split(/\s+/)
+    .map((word) => word[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  const leader = group.leaderName ?? "No primary leader";
+
+  return (
+    <div className="flex min-w-56 items-center gap-3">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary ring-1 ring-inset ring-primary/15">
+        {initials || "CJ"}
+      </div>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="truncate font-medium">{group.group.name}</p>
+          {style === "focus" ? <Crown className="h-3.5 w-3.5 shrink-0 text-amber-500" aria-label="Leadership focus" /> : null}
+        </div>
+        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-mono tracking-wide">{group.group.code}</span>
+          {style !== "compact" ? <span aria-hidden="true">·</span> : null}
+          {style !== "compact" ? <span className="truncate">{leader}</span> : null}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -600,7 +655,7 @@ function EditGroupDialog({ group }: { group: GroupRow }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button variant="ghost" size="sm">Edit</Button></DialogTrigger>
+      <DialogTrigger asChild><Button variant="ghost" size="sm" className="gap-1.5"><Pencil className="h-3.5 w-3.5" />Edit</Button></DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit group</DialogTitle>
@@ -665,7 +720,7 @@ function RequestsPanel({ requests }: { requests: RequestRows | undefined }) {
         <CardDescription>Approve or reject pending group requests.</CardDescription>
       </CardHeader>
       <CardContent>
-        {!requests ? <PanelLoading /> : <DataTable columns={columns} data={requests} emptyMessage="No pending requests." />}
+        {!requests ? <PanelLoading /> : <DataTable columns={columns} data={requests} getRowId={(row) => row.request._id} emptyMessage="No pending requests." />}
       </CardContent>
     </Card>
   );

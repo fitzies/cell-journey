@@ -97,7 +97,7 @@ export function PeoplePanel({
         <SearchInput value={search} onChange={setSearch} placeholder="Search people" />
       </CardHeader>
       <CardContent>
-        {loading ? <PanelLoading /> : <DataTable columns={columns} data={users} emptyMessage="No people found." />}
+        {loading ? <PanelLoading /> : <DataTable columns={columns} data={users} getRowId={(row) => row.profile._id} emptyMessage="No people found." />}
       </CardContent>
     </Card>
   );

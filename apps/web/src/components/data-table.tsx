@@ -29,6 +29,7 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   emptyMessage?: string;
   pageSize?: number;
+  getRowId?: (row: TData) => string;
 }
 
 export function DataTable<TData, TValue>({
@@ -36,6 +37,7 @@ export function DataTable<TData, TValue>({
   data,
   emptyMessage = "No results.",
   pageSize = 10,
+  getRowId,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const table = useReactTable({
@@ -46,6 +48,7 @@ export function DataTable<TData, TValue>({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    getRowId,
     initialState: { pagination: { pageIndex: 0, pageSize } },
   });
   const firstRow = data.length === 0 ? 0 : table.getState().pagination.pageIndex * pageSize + 1;

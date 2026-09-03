@@ -2,8 +2,18 @@
 
 import { useMutation } from "convex/react";
 import { useEffect, useState, useTransition } from "react";
+import { Settings2 } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api, type Id } from "@/lib/api";
 
@@ -63,59 +73,66 @@ export function GroupLeadershipControls({ group, people }: { group: GroupRow; pe
   }
 
   return (
-    <div className="min-w-64 space-y-3 py-1">
-      <div className="space-y-1.5">
-        <p className="text-xs font-medium text-muted-foreground">Primary leader</p>
-        <Select value={primaryValue} onValueChange={changePrimary} disabled={pending}>
-          <SelectTrigger className="w-56" aria-label={`Primary leader for ${group.group.name}`}><SelectValue placeholder="Assign primary leader" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">No primary leader</SelectItem>
-            {people.map((person) => {
-              const isCoLeader = coLeaderProfileIds.has(person.profile._id);
-              return (
-                <SelectItem key={person.profile._id} value={person.profile._id}>
-                  {profileDisplayName(person.profile, person.displayName)}{isCoLeader ? " (make primary)" : ""}
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
+    <div className="flex min-w-64 items-center justify-between gap-3 py-1">
+      <div className="min-w-0 space-y-1">
+        <p className="truncate text-sm">{group.leaderName ?? "No primary leader"}</p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {group.leaderName ? <Badge variant="secondary" className="text-[11px]">Primary</Badge> : null}
+          {group.coLeaders.length ? <Badge variant="outline" className="text-[11px]">{group.coLeaders.length} co-leader{group.coLeaders.length === 1 ? "" : "s"}</Badge> : null}
+          {!group.leaderName && !group.coLeaders.length ? <span className="text-xs text-muted-foreground">Needs leadership</span> : null}
+        </div>
       </div>
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm" className="shrink-0 gap-1.5" aria-label={`Manage leadership for ${group.group.name}`}>
+            <Settings2 className="h-3.5 w-3.5" />
+            Manage
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Manage leadership</DialogTitle>
+            <DialogDescription>{group.group.name} · {group.group.code}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5 py-2">
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">Primary leader</p>
+              <Select value={primaryValue} onValueChange={changePrimary} disabled={pending}>
+                <SelectTrigger aria-label={`Primary leader for ${group.group.name}`}><SelectValue placeholder="Assign primary leader" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No primary leader</SelectItem>
+                  {people.map((person) => {
+                    const isCoLeader = coLeaderProfileIds.has(person.profile._id);
+                    return <SelectItem key={person.profile._id} value={person.profile._id}>{profileDisplayName(person.profile, person.displayName)}{isCoLeader ? " (make primary)" : ""}</SelectItem>;
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
 
-      <div className="space-y-1.5">
-        <p className="text-xs font-medium text-muted-foreground">Co-leaders</p>
-        {group.coLeaders.length ? (
-          <div className="space-y-1">
-            {group.coLeaders.map((coLeader) => (
-              <div key={coLeader.assignment._id} className="flex items-center justify-between gap-2 text-sm">
-                <span className="truncate">{profileDisplayName(coLeader.profile, "Unnamed person")}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                  disabled={pending}
-                  onClick={() => run(() => revokeCoLeader({ assignmentId: coLeader.assignment._id }))}
-                  aria-label={`Revoke ${profileDisplayName(coLeader.profile, "co-leader")} as co-leader`}
-                >
-                  Revoke
-                </Button>
-              </div>
-            ))}
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">Co-leaders</p>
+              {group.coLeaders.length ? (
+                <div className="divide-y rounded-md border">
+                  {group.coLeaders.map((coLeader) => (
+                    <div key={coLeader.assignment._id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                      <span className="truncate">{profileDisplayName(coLeader.profile, "Unnamed person")}</span>
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive" disabled={pending} onClick={() => run(() => revokeCoLeader({ assignmentId: coLeader.assignment._id }))} aria-label={`Revoke ${profileDisplayName(coLeader.profile, "co-leader")} as co-leader`}>Revoke</Button>
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="text-sm text-muted-foreground">None assigned</p>}
+              <Select value={coLeaderValue} onValueChange={selectCoLeader} disabled={pending || availableCoLeaders.length === 0}>
+                <SelectTrigger aria-label={`Add co-leader to ${group.group.name}`}><SelectValue placeholder="Assign co-leader" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="choose-co-leader">Assign co-leader…</SelectItem>
+                  {availableCoLeaders.map((person) => <SelectItem key={person.profile._id} value={person.profile._id}>{profileDisplayName(person.profile, person.displayName)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            {error ? <p className="text-sm text-destructive">{error}</p> : null}
           </div>
-        ) : <p className="text-sm text-muted-foreground">None assigned</p>}
-        <Select value={coLeaderValue} onValueChange={selectCoLeader} disabled={pending || availableCoLeaders.length === 0}>
-          <SelectTrigger className="h-9 w-56" aria-label={`Add co-leader to ${group.group.name}`}><SelectValue placeholder="Assign co-leader" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="choose-co-leader">Assign co-leader…</SelectItem>
-            {availableCoLeaders.map((person) => (
-              <SelectItem key={person.profile._id} value={person.profile._id}>
-                {profileDisplayName(person.profile, person.displayName)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      {error ? <p className="max-w-56 text-xs text-destructive">{error}</p> : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
