@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
+import { CreateUserDialog } from "@/components/admin/create-user-dialog";
 import { GroupLeadershipControls } from "@/components/admin/group-leadership-controls";
 import { PanelLoading, SearchInput } from "@/components/admin/panel-ui";
 import { PeoplePanel } from "@/components/admin/people-panel";
@@ -86,13 +87,8 @@ export default function AdminPage() {
 
 function LoadingScreen() {
   return (
-    <main className="grid min-h-screen place-items-center px-6">
-      <Card className="w-full max-w-sm">
-        <CardContent className="flex items-center gap-3 p-6 text-sm text-muted-foreground">
-          <Spinner className="text-primary" />
-          Loading admin
-        </CardContent>
-      </Card>
+    <main className="grid min-h-screen place-items-center" role="status" aria-label="Loading">
+      <Spinner className="size-6 text-primary" />
     </main>
   );
 }
@@ -279,7 +275,14 @@ function AdminDashboard() {
                 <SelectItem value="services">Services</SelectItem>
               </SelectContent>
             </Select>
-            {tab === "services" ? <CreateServiceDialog services={services} /> : <CreateGroupDialog />}
+            {tab === "services" ? (
+              <CreateServiceDialog services={services} />
+            ) : (
+              <div className="flex w-full gap-2 sm:w-auto">
+                <CreateUserDialog />
+                <CreateGroupDialog />
+              </div>
+            )}
           </div>
 
           <TabsContent value="attendance">
@@ -500,7 +503,7 @@ function CreateGroupDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button><Plus />Create group</Button>
+        <Button className="flex-1 sm:flex-none"><Plus />Create group</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

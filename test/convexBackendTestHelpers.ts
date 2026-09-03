@@ -125,5 +125,9 @@ export async function seedEvent(
 
 export async function seedAdmin(t: TestClient) {
   process.env.ADMIN_EMAILS = "admin@example.com";
-  return await seedProfile(t, "Admin", { email: "admin@example.com" });
+  const admin = await seedProfile(t, "Admin", { email: "admin@example.com" });
+  await t.run((ctx) =>
+    ctx.db.patch(admin.userId, { emailVerificationTime: Date.now() }),
+  );
+  return admin;
 }

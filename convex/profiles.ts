@@ -27,6 +27,113 @@ function cleanName(value: string | undefined) {
   return value?.trim() ?? "";
 }
 
+export function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+async function uniqueProfileByUserId(ctx: DbCtx, userId: Id<"users">) {
+  const profiles = await ctx.db
+    .query("userProfiles")
+    .withIndex("by_userId", (q) => q.eq("userId", userId))
+    .take(2);
+  if (profiles.length > 1) {
+    throw new Error("Multiple profiles are linked to this account");
+  }
+  return profiles[0] ?? null;
+}
+
+async function uniqueProfileByNormalizedEmail(
+  ctx: DbCtx,
+  index: "by_invitedEmail" | "by_identityEmailNormalized",
+  field: "invitedEmail" | "identityEmailNormalized",
+  email: string,
+) {
+  const profiles = await ctx.db
+    .query("userProfiles")
+    .withIndex(index, (q) => q.eq(field, email))
+    .take(2);
+  if (profiles.length > 1) {
+    throw new Error("Multiple profiles use this email address");
+  }
+  return profiles[0] ?? null;
+}
+
+/**
+ * Claims a pre-provisioned profile for a verified Convex Auth user.
+ * The caller supplies only the server-derived auth user ID; this helper reads
+ * verification and email state from the managed users table.
+ */
+export async function claimInvitedProfileForAuthUser(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+) {
+  const linkedProfile = await uniqueProfileByUserId(ctx, userId);
+  const user = await ctx.db.get(userId);
+  if (!user) throw new Error("Authenticated user not found");
+
+  if (typeof user.emailVerificationTime !== "number" || !user.email) {
+    return linkedProfile;
+  }
+
+  const email = normalizeEmail(user.email);
+  if (!email) return linkedProfile;
+
+  const invitedProfile = await uniqueProfileByNormalizedEmail(
+    ctx,
+    "by_invitedEmail",
+    "invitedEmail",
+    email,
+  );
+  const identityProfile = await uniqueProfileByNormalizedEmail(
+    ctx,
+    "by_identityEmailNormalized",
+    "identityEmailNormalized",
+    email,
+  );
+
+  if (linkedProfile) {
+    if (invitedProfile && invitedProfile._id !== linkedProfile._id) {
+      throw new Error("This verified email belongs to a different invited profile");
+    }
+    if (identityProfile && identityProfile._id !== linkedProfile._id) {
+      throw new Error("This verified email belongs to a different account");
+    }
+
+    const shouldMarkClaimed =
+      linkedProfile.invitedEmail === email && linkedProfile.claimedAt === undefined;
+    if (
+      linkedProfile.identityEmailNormalized !== email ||
+      shouldMarkClaimed
+    ) {
+      const now = Date.now();
+      await ctx.db.patch(linkedProfile._id, {
+        identityEmailNormalized: email,
+        ...(shouldMarkClaimed ? { claimedAt: now } : {}),
+        updatedAt: now,
+      });
+      return await ctx.db.get(linkedProfile._id);
+    }
+    return linkedProfile;
+  }
+
+  if (identityProfile) {
+    throw new Error("This verified email belongs to a different account");
+  }
+  if (!invitedProfile) return null;
+  if (invitedProfile.userId && invitedProfile.userId !== userId) {
+    throw new Error("This invited profile is already linked to another account");
+  }
+
+  const now = Date.now();
+  await ctx.db.patch(invitedProfile._id, {
+    userId,
+    identityEmailNormalized: email,
+    claimedAt: now,
+    updatedAt: now,
+  });
+  return await ctx.db.get(invitedProfile._id);
+}
+
 export function hasCompleteName(profile: Doc<"userProfiles">) {
   const firstName = cleanName(profile.firstName);
   const lastName = cleanName(profile.lastName);
@@ -84,10 +191,7 @@ export type GroupCapabilities = Record<GroupCapability, boolean>;
 
 export async function getCurrentProfile(ctx: DbCtx) {
   const userId = await requireAuthUserId(ctx);
-  return await ctx.db
-    .query("userProfiles")
-    .withIndex("by_user", (q) => q.eq("userId", userId))
-    .unique();
+  return await uniqueProfileByUserId(ctx, userId);
 }
 
 export async function requireCurrentProfile(ctx: DbCtx) {
@@ -261,16 +365,19 @@ export const getOrCreateCurrent = mutation({
   args: {},
   handler: async (ctx) => {
     const userId = await requireAuthUserId(ctx);
-    const existing = await ctx.db
-      .query("userProfiles")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .unique();
+    const existing = await claimInvitedProfileForAuthUser(ctx, userId);
 
     if (existing) return existing;
 
     const now = Date.now();
+    const user = await ctx.db.get(userId);
+    const identityEmailNormalized =
+      user && typeof user.emailVerificationTime === "number" && user.email
+        ? normalizeEmail(user.email)
+        : undefined;
     const profileId = await ctx.db.insert("userProfiles", {
       userId,
+      ...(identityEmailNormalized ? { identityEmailNormalized } : {}),
       role: "member",
       onboardingStatus: "profileIncomplete",
       serviceIds: [],
@@ -291,10 +398,7 @@ export const currentOrNull = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-    return await ctx.db
-      .query("userProfiles")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .unique();
+    return await uniqueProfileByUserId(ctx, userId);
   },
 });
 

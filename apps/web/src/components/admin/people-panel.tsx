@@ -35,6 +35,16 @@ export function PeoplePanel({
       cell: ({ row }) => <PersonIdentity row={row.original} />,
     },
     {
+      accessorKey: "accountStatus",
+      id: "accountStatus",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
+      cell: ({ row }) => row.original.accountStatus === "awaitingSignIn" ? (
+        <Badge variant="outline" className="text-muted-foreground">Awaiting sign-in</Badge>
+      ) : (
+        <Badge variant="secondary">Active</Badge>
+      ),
+    },
+    {
       accessorFn: (row) => `${row.memberGroups.length}:${row.ledGroups.map((group) => group.accessRole).join(":")}`,
       id: "capabilities",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Access" />,

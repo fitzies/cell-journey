@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cell Journey remote development"
+  short_description: "Run Expo and web previews over Tailscale"
+  default_prompt: "Use $cell-journey-remote-dev to start and verify the appropriate Cell Journey development server over Tailscale."

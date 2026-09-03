@@ -10,6 +10,7 @@ import {
   getConnectedMembershipForGroup,
   getProfileDisplayName,
   isProfileComplete,
+  normalizeEmail,
 } from "./profiles";
 import {
   closeActivityPeriod,
@@ -55,6 +56,9 @@ async function requireAdmin(ctx: QueryCtx | MutationCtx) {
   if (allowed.length === 0) {
     throw new Error("Admin access is not configured. Set ADMIN_EMAILS in Convex env vars.");
   }
+  if (typeof user?.emailVerificationTime !== "number") {
+    throw new Error("Verify your email before accessing admin tools.");
+  }
   if (!email || !allowed.includes(email)) {
     throw new Error("This account is not allowed to access admin tools.");
   }
@@ -80,7 +84,7 @@ async function userSummary(ctx: QueryCtx, userId: Id<"users">) {
 function publicProfile(profile: Doc<"userProfiles">) {
   return {
     _id: profile._id,
-    userId: profile.userId,
+    userId: profile.userId ?? null,
     role: profile.role,
     onboardingStatus: profile.onboardingStatus,
     firstName: profile.firstName ?? null,
@@ -96,6 +100,14 @@ function publicProfile(profile: Doc<"userProfiles">) {
     createdAt: profile.createdAt,
     updatedAt: profile.updatedAt,
   };
+}
+
+function validateInviteEmail(value: string) {
+  const email = normalizeEmail(value);
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("Enter a valid email address");
+  }
+  return email;
 }
 
 function effectiveAttendanceStatus(attendance: Doc<"attendance"> | undefined) {
@@ -151,6 +163,9 @@ export const me = query({
     if (allowed.length === 0) {
       return { isAdmin: false, email, name: user?.name ?? null, reason: "notConfigured" as const };
     }
+    if (typeof user?.emailVerificationTime !== "number") {
+      return { isAdmin: false, email, name: user?.name ?? null, reason: "emailNotVerified" as const };
+    }
     if (!email || !allowed.includes(email)) {
       return { isAdmin: false, email, name: user?.name ?? null, reason: "notAllowed" as const };
     }
@@ -173,7 +188,15 @@ export const listUsers = query({
     const rows = [];
 
     for (const profile of profiles) {
-      const user = await userSummary(ctx, profile.userId);
+      const user = profile.userId
+        ? await userSummary(ctx, profile.userId)
+        : {
+            _id: null,
+            name: getProfileDisplayName(profile),
+            email: profile.invitedEmail ?? null,
+            image: null,
+          };
+      const accountStatus = profile.userId ? "active" as const : "awaitingSignIn" as const;
       const displayName = getProfileDisplayName(profile) || user.name || user.email || "Unnamed user";
       const activeMemberships = await ctx.db
         .query("memberships")
@@ -240,6 +263,7 @@ export const listUsers = query({
       rows.push({
         profile: publicProfile(profile),
         user,
+        accountStatus,
         displayName,
         memberGroups,
         ledGroups,
@@ -249,6 +273,67 @@ export const listUsers = query({
     }
 
     return rows;
+  },
+});
+
+export const createInvitedProfile = mutation({
+  args: {
+    firstName: v.string(),
+    lastName: v.string(),
+    email: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { userId: invitedByUserId } = await requireAdmin(ctx);
+    const firstName = args.firstName.trim();
+    const lastName = args.lastName.trim();
+    if (!firstName || !lastName) {
+      throw new Error("First and last name are required");
+    }
+    const email = validateInviteEmail(args.email);
+
+    const [invitedMatches, identityMatches, authUsers] = await Promise.all([
+      ctx.db
+        .query("userProfiles")
+        .withIndex("by_invitedEmail", (q) => q.eq("invitedEmail", email))
+        .take(2),
+      ctx.db
+        .query("userProfiles")
+        .withIndex("by_identityEmailNormalized", (q) =>
+          q.eq("identityEmailNormalized", email),
+        )
+        .take(2),
+      ctx.db.query("users").withIndex("email", (q) => q.eq("email", email)).take(2),
+    ]);
+
+    const matchingProfiles = new Map(
+      [...invitedMatches, ...identityMatches].map((profile) => [profile._id, profile]),
+    );
+    for (const authUser of authUsers) {
+      const linkedProfiles = await ctx.db
+        .query("userProfiles")
+        .withIndex("by_userId", (q) => q.eq("userId", authUser._id))
+        .take(2);
+      for (const profile of linkedProfiles) matchingProfiles.set(profile._id, profile);
+    }
+    if (matchingProfiles.size > 0) {
+      throw new Error("A profile already uses this email address");
+    }
+
+    const now = Date.now();
+    const profileId = await ctx.db.insert("userProfiles", {
+      invitedEmail: email,
+      invitedAt: now,
+      invitedByUserId,
+      role: "member",
+      onboardingStatus: "profileIncomplete",
+      firstName,
+      lastName,
+      fullName: `${firstName} ${lastName}`,
+      serviceIds: [],
+      createdAt: now,
+      updatedAt: now,
+    });
+    return await ctx.db.get(profileId);
   },
 });
 

@@ -48,7 +48,16 @@ export default defineSchema({
 
   userProfiles: defineTable({
     // Links product profile data to the Convex Auth managed users table.
-    userId: v.id("users"),
+    // Optional so admins can pre-provision a profile before its owner signs in.
+    userId: v.optional(v.id("users")),
+
+    // Pre-provisioned profiles keep their normalized invite address until claimed.
+    // Auth-linked profiles store the normalized verified identity email separately.
+    invitedEmail: v.optional(v.string()),
+    identityEmailNormalized: v.optional(v.string()),
+    invitedAt: v.optional(v.number()),
+    invitedByUserId: v.optional(v.id("users")),
+    claimedAt: v.optional(v.number()),
 
     // Deprecated compatibility fields for clients deployed before multi-group support.
     // Authorization and capabilities come from memberships and groups.leaderProfileId.
@@ -71,6 +80,9 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
+    .index("by_userId", ["userId"])
+    .index("by_invitedEmail", ["invitedEmail"])
+    .index("by_identityEmailNormalized", ["identityEmailNormalized"])
     .index("by_role", ["role"])
     .index("by_current_group", ["currentGroupId"])
     .index("by_active_membership", ["activeMembershipId"])

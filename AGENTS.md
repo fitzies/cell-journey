@@ -1,5 +1,9 @@
 # Cell Journey — Agent Instructions
 
+## Remote development
+
+This repository runs on the headless Linux host `forge` and clients reach it over Tailscale. For any Expo, Metro, Next.js, local-server, device-testing, or preview task, use `.agents/skills/cell-journey-remote-dev/SKILL.md`. Continue to use the global `forge-preview` skill for browser previews.
+
 ## Product Summary
 
 Cell Journey is a church cell-group attendance app. It will be rebuilt as a mobile-first monorepo, starting with an Expo app for iOS/Android and Convex as the backend. A Next.js web/admin app will be added later.

@@ -1,5 +1,6 @@
 import Google from "@auth/core/providers/google";
 import { convexAuth } from "@convex-dev/auth/server";
+import { claimInvitedProfileForAuthUser } from "./profiles";
 
 // Allow our Expo dev-client and Expo Go redirect schemes. Convex Auth rejects
 // any redirectTo that isn't explicitly whitelisted here.
@@ -22,6 +23,9 @@ function isAllowedRedirect(redirectTo) {
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [Google],
   callbacks: {
+    async afterUserCreatedOrUpdated(ctx, { userId }) {
+      await claimInvitedProfileForAuthUser(ctx, userId);
+    },
     async redirect({ redirectTo }) {
       if (!isAllowedRedirect(redirectTo)) {
         throw new Error(`Invalid redirectTo URI: ${redirectTo}`);

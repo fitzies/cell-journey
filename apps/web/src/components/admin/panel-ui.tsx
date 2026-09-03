@@ -16,11 +16,8 @@ export function SearchInput({ value, onChange, placeholder }: { value: string; o
 
 export function PanelLoading() {
   return (
-    <div className="grid h-40 place-items-center rounded-lg border text-sm text-muted-foreground" role="status" aria-label="Loading data">
-      <div className="flex items-center gap-2">
-        <Spinner className="text-primary" />
-        Loading data
-      </div>
+    <div className="grid h-40 place-items-center" role="status" aria-label="Loading data">
+      <Spinner className="text-primary" />
     </div>
   );
 }
