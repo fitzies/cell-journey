@@ -260,13 +260,25 @@ function AdminDashboard() {
 
         <Tabs value={tab} onValueChange={setTab}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <TabsList className="w-full justify-start overflow-x-auto sm:w-auto">
+            <TabsList className="hidden w-full justify-start overflow-x-auto sm:flex sm:w-auto">
               <TabsTrigger value="attendance">Attendance</TabsTrigger>
               <TabsTrigger value="groups">Groups</TabsTrigger>
               <TabsTrigger value="people">People</TabsTrigger>
               <TabsTrigger value="requests">Requests{requests?.length ? ` (${requests.length})` : ""}</TabsTrigger>
               <TabsTrigger value="services">Services</TabsTrigger>
             </TabsList>
+            <Select value={tab} onValueChange={setTab}>
+              <SelectTrigger className="w-full sm:hidden" aria-label="Dashboard section">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="attendance">Attendance</SelectItem>
+                <SelectItem value="groups">Groups</SelectItem>
+                <SelectItem value="people">People</SelectItem>
+                <SelectItem value="requests">Requests{requests?.length ? ` (${requests.length})` : ""}</SelectItem>
+                <SelectItem value="services">Services</SelectItem>
+              </SelectContent>
+            </Select>
             {tab === "services" ? <CreateServiceDialog services={services} /> : <CreateGroupDialog />}
           </div>
 
