@@ -1,4 +1,4 @@
-import { useEffect, useState, type PropsWithChildren, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type PropsWithChildren, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Easing, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -31,8 +31,9 @@ export function useStaggerReveal(count: number, opts: { delay?: number; initialD
   return { values, animStyle };
 }
 
-export function OnboardingShell({ children, eyebrow, title, hint, cta, onCta, ctaDisabled, onBack, pending = false, hideProgress = false, fullWidthProgress = false, footer, progress = 0.55, animationKey, bottomContent }: PropsWithChildren<{ eyebrow?: string; title: string; hint?: string; cta?: string; onCta?: () => void; ctaDisabled?: boolean; onBack?: () => void; pending?: boolean; hideProgress?: boolean; fullWidthProgress?: boolean; footer?: ReactNode; progress?: number; animationKey?: string | number; bottomContent?: ReactNode }>) {
+export function OnboardingShell({ children, eyebrow, title, hint, cta, onCta, ctaDisabled, onBack, pending = false, hideProgress = false, fullWidthProgress = false, footer, progress = 0.55, animationKey, bottomContent, revealContentKey }: PropsWithChildren<{ eyebrow?: string; title: string; hint?: string; cta?: string; onCta?: () => void; ctaDisabled?: boolean; onBack?: () => void; pending?: boolean; hideProgress?: boolean; fullWidthProgress?: boolean; footer?: ReactNode; progress?: number; animationKey?: string | number; bottomContent?: ReactNode; revealContentKey?: string | number }>) {
   const t = useAppTheme();
+  const scrollRef = useRef<ScrollView>(null);
   const bodyAnim = usePageEntrance(animationKey);
   const reveal = useStaggerReveal(4, { initialDelay: 70, animationKey });
   const [progressAnim] = useState(() => new Animated.Value(lastProgress));
@@ -41,13 +42,18 @@ export function OnboardingShell({ children, eyebrow, title, hint, cta, onCta, ct
     Animated.timing(progressAnim, { toValue: pct, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
     lastProgress = pct;
   }, [pct, progressAnim]);
+  useEffect(() => {
+    if (revealContentKey === undefined) return;
+    const frame = requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+    return () => cancelAnimationFrame(frame);
+  }, [revealContentKey]);
   const width = progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
   return <KeyboardAvoidingView style={[styles.root, { backgroundColor: t.background }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}> 
     {!pending && !hideProgress && <SafeAreaView edges={['top']}><View style={styles.top}>{onBack ? <BackCircle onPress={onBack} /> : fullWidthProgress ? null : <View style={styles.spacer} />}<View style={[styles.rail, { backgroundColor: t.line }]}><Animated.View style={[styles.fill, { backgroundColor: t.accent, width }]} /></View>{fullWidthProgress ? null : <View style={styles.spacer} />}</View></SafeAreaView>}
     {hideProgress && <SafeAreaView edges={['top']} />}
     <Animated.View style={[styles.animatedBody, bodyAnim]}>
-      <ScrollView contentContainerStyle={[styles.body, pending && styles.pendingBody]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} contentContainerStyle={[styles.body, pending && styles.pendingBody]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View><Animated.Text style={[styles.eyebrow, { color: t.accent }, reveal.animStyle(reveal.values[0])]}>{eyebrow}</Animated.Text><Animated.Text style={[styles.title, { color: t.ink }, reveal.animStyle(reveal.values[1])]}>{title}</Animated.Text>{hint ? <Animated.Text style={[styles.hint, { color: t.muted }, reveal.animStyle(reveal.values[2])]}>{hint}</Animated.Text> : null}</View>
         <Animated.View style={[styles.content, reveal.animStyle(reveal.values[3])]}>{children}</Animated.View>
       </ScrollView>

@@ -121,7 +121,7 @@ export default function ProfileScreen() {
     );
   }
   return (
-    <OnboardingShell {...common} eyebrow="YOUR AREA" title="Where are you based?" hint="Enter the first two digits of your Singapore postal code.">
+    <OnboardingShell {...common} eyebrow="YOUR AREA" title="Where are you based?" hint="Enter the first two digits of your Singapore postal code." revealContentKey={postalSector.length === 2 ? postalSector : undefined}>
       <View style={styles.postalContent}>
         <View style={styles.fieldWrap}>
           <Text style={[styles.fieldLabel, { color: t.muted }]}>First 2 postal digits</Text>

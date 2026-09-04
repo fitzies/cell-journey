@@ -7,8 +7,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
 import { api, type Id } from '@/lib/api';
 
-const MEMBER_KEY = 'cell-journey:selected-member-group';
-const LEADER_KEY = 'cell-journey:selected-leader-group';
+const MEMBER_KEY = 'cell-journey.selected-member-group';
+const LEADER_KEY = 'cell-journey.selected-leader-group';
 
 type AppContext = FunctionReturnType<typeof api.profiles.currentContext>;
 type MemberGroup = AppContext['memberGroups'][number];

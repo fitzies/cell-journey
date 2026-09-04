@@ -1,9 +1,12 @@
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
-import { isProfileComplete } from "./profiles";
+import type { Id } from "./_generated/dataModel";
+import { isProfileComplete, normalizeEmail } from "./profiles";
 
 const MAX_MIGRATION_PAGE_SIZE = 50;
+const MAX_GOOGLE_ACCOUNT_MIGRATION_SIZE = 200;
+const MAX_AUTH_USER_MIGRATION_AUDIT_SIZE = 500;
 
 type PaginationOpts = { numItems: number; cursor: string | null };
 
@@ -16,6 +19,291 @@ function cappedPaginationOpts(options: PaginationOpts): PaginationOpts {
     numItems: Math.min(Math.max(requested, 1), MAX_MIGRATION_PAGE_SIZE),
   };
 }
+
+type GoogleEmailMigrationIssue = {
+  userId: string;
+  reason:
+    | "duplicateVerifiedEmailAcrossUsers"
+    | "invitedEmailBelongsToDifferentProfile"
+    | "linkedProfileIdentityEmailMismatch"
+    | "linkedProfileInvitedEmailMismatch"
+    | "multipleProfilesForUser"
+    | "normalizedEmailBelongsToDifferentProfile"
+    | "resendAccountOwnedByDifferentUser"
+    | "multipleResendAccounts"
+    | "userAlreadyHasDifferentResendAccount";
+};
+
+type GoogleEmailMigrationSkip = {
+  userId: string;
+  reason: "invalidEmail" | "missingUser" | "unverifiedOrMissingEmail";
+};
+
+type GoogleEmailMigrationPlan = {
+  userId: Id<"users">;
+  email: string;
+  alreadyLinked: boolean;
+  profileId?: Id<"userProfiles">;
+  backfillProfile: boolean;
+};
+
+function migratableOtpEmail(value: string) {
+  const email = normalizeEmail(value);
+  return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    ? email
+    : null;
+}
+
+/**
+ * One-time bridge from Google login to email OTP for mobile users.
+ *
+ * Google accounts remain in place for the admin dashboard. This only adds the
+ * matching `resend-otp` account to the same verified user and fills a missing
+ * normalized profile email. Every user is fully preflighted before any writes,
+ * and ambiguous ownership is reported for manual review instead of guessed.
+ */
+export const migrateGoogleUsersToEmailOtp = internalMutation({
+  args: { dryRun: v.optional(v.boolean()) },
+  handler: async (ctx, args) => {
+    const dryRun = args.dryRun ?? true;
+    const [googleAccounts, authUsers] = await Promise.all([
+      ctx.db
+        .query("authAccounts")
+        .withIndex("providerAndAccountId", (q) => q.eq("provider", "google"))
+        .take(MAX_GOOGLE_ACCOUNT_MIGRATION_SIZE + 1),
+      ctx.db.query("users").take(MAX_AUTH_USER_MIGRATION_AUDIT_SIZE + 1),
+    ]);
+
+    if (
+      googleAccounts.length > MAX_GOOGLE_ACCOUNT_MIGRATION_SIZE ||
+      authUsers.length > MAX_AUTH_USER_MIGRATION_AUDIT_SIZE
+    ) {
+      return {
+        dryRun,
+        blockedBySafetyLimit: true,
+        googleAccountSafetyLimit: MAX_GOOGLE_ACCOUNT_MIGRATION_SIZE,
+        authUserAuditSafetyLimit: MAX_AUTH_USER_MIGRATION_AUDIT_SIZE,
+        googleAccountsScanned: googleAccounts.length,
+        authUsersScanned: authUsers.length,
+        uniqueGoogleUsers: 0,
+        eligibleUsers: 0,
+        accountsToInsert: 0,
+        accountsInserted: 0,
+        alreadyLinkedAccounts: 0,
+        profilesToBackfill: 0,
+        profilesBackfilled: 0,
+        issues: [] as GoogleEmailMigrationIssue[],
+        skipped: [] as GoogleEmailMigrationSkip[],
+      };
+    }
+
+    const googleUserIds = [
+      ...new Set(googleAccounts.map((account) => account.userId)),
+    ];
+    const skipped: GoogleEmailMigrationSkip[] = [];
+    const issues: GoogleEmailMigrationIssue[] = [];
+    const verifiedUsers: Array<{ userId: Id<"users">; email: string }> = [];
+    const verifiedUserIdsByEmail = new Map<string, Id<"users">[]>();
+
+    for (const user of authUsers) {
+      if (typeof user.emailVerificationTime !== "number" || !user.email) continue;
+      const email = migratableOtpEmail(user.email);
+      if (!email) continue;
+      const userIds = verifiedUserIdsByEmail.get(email) ?? [];
+      userIds.push(user._id);
+      verifiedUserIdsByEmail.set(email, userIds);
+    }
+
+    for (const userId of googleUserIds) {
+      const user = await ctx.db.get(userId);
+      if (!user) {
+        skipped.push({ userId, reason: "missingUser" });
+        continue;
+      }
+      if (typeof user.emailVerificationTime !== "number" || !user.email) {
+        skipped.push({ userId, reason: "unverifiedOrMissingEmail" });
+        continue;
+      }
+      const email = migratableOtpEmail(user.email);
+      if (!email) {
+        skipped.push({ userId, reason: "invalidEmail" });
+        continue;
+      }
+      verifiedUsers.push({ userId, email });
+    }
+
+    const plans: GoogleEmailMigrationPlan[] = [];
+    for (const candidate of verifiedUsers) {
+      if ((verifiedUserIdsByEmail.get(candidate.email)?.length ?? 0) > 1) {
+        issues.push({
+          userId: candidate.userId,
+          reason: "duplicateVerifiedEmailAcrossUsers",
+        });
+        continue;
+      }
+
+      const [
+        resendAccounts,
+        userResendAccounts,
+        linkedProfiles,
+        identityProfiles,
+        invitedProfiles,
+      ] = await Promise.all([
+        ctx.db
+          .query("authAccounts")
+          .withIndex("providerAndAccountId", (q) =>
+            q
+              .eq("provider", "resend-otp")
+              .eq("providerAccountId", candidate.email),
+          )
+          .take(2),
+        ctx.db
+          .query("authAccounts")
+          .withIndex("userIdAndProvider", (q) =>
+            q.eq("userId", candidate.userId).eq("provider", "resend-otp"),
+          )
+          .take(2),
+        ctx.db
+          .query("userProfiles")
+          .withIndex("by_userId", (q) => q.eq("userId", candidate.userId))
+          .take(2),
+        ctx.db
+          .query("userProfiles")
+          .withIndex("by_identityEmailNormalized", (q) =>
+            q.eq("identityEmailNormalized", candidate.email),
+          )
+          .take(2),
+        ctx.db
+          .query("userProfiles")
+          .withIndex("by_invitedEmail", (q) =>
+            q.eq("invitedEmail", candidate.email),
+          )
+          .take(2),
+      ]);
+
+      if (resendAccounts.length > 1) {
+        issues.push({ userId: candidate.userId, reason: "multipleResendAccounts" });
+        continue;
+      }
+      const resendAccount = resendAccounts[0];
+      if (resendAccount && resendAccount.userId !== candidate.userId) {
+        issues.push({
+          userId: candidate.userId,
+          reason: "resendAccountOwnedByDifferentUser",
+        });
+        continue;
+      }
+      if (
+        userResendAccounts.some(
+          (account) => account.providerAccountId !== candidate.email,
+        )
+      ) {
+        issues.push({
+          userId: candidate.userId,
+          reason: "userAlreadyHasDifferentResendAccount",
+        });
+        continue;
+      }
+      if (linkedProfiles.length > 1) {
+        issues.push({ userId: candidate.userId, reason: "multipleProfilesForUser" });
+        continue;
+      }
+
+      const linkedProfile = linkedProfiles[0];
+      if (
+        linkedProfile?.identityEmailNormalized !== undefined &&
+        linkedProfile.identityEmailNormalized !== candidate.email
+      ) {
+        issues.push({
+          userId: candidate.userId,
+          reason: "linkedProfileIdentityEmailMismatch",
+        });
+        continue;
+      }
+      if (
+        linkedProfile?.invitedEmail !== undefined &&
+        linkedProfile.invitedEmail !== candidate.email
+      ) {
+        issues.push({
+          userId: candidate.userId,
+          reason: "linkedProfileInvitedEmailMismatch",
+        });
+        continue;
+      }
+      if (
+        identityProfiles.some((profile) => profile._id !== linkedProfile?._id)
+      ) {
+        issues.push({
+          userId: candidate.userId,
+          reason: "normalizedEmailBelongsToDifferentProfile",
+        });
+        continue;
+      }
+      if (invitedProfiles.some((profile) => profile._id !== linkedProfile?._id)) {
+        issues.push({
+          userId: candidate.userId,
+          reason: "invitedEmailBelongsToDifferentProfile",
+        });
+        continue;
+      }
+
+      plans.push({
+        userId: candidate.userId,
+        email: candidate.email,
+        alreadyLinked: resendAccount !== undefined,
+        ...(linkedProfile ? { profileId: linkedProfile._id } : {}),
+        backfillProfile:
+          linkedProfile !== undefined &&
+          linkedProfile.identityEmailNormalized === undefined,
+      });
+    }
+
+    const accountsToInsert = plans.filter((plan) => !plan.alreadyLinked).length;
+    const alreadyLinkedAccounts = plans.length - accountsToInsert;
+    const profilesToBackfill = plans.filter((plan) => plan.backfillProfile).length;
+    let accountsInserted = 0;
+    let profilesBackfilled = 0;
+
+    if (!dryRun) {
+      const now = Date.now();
+      for (const plan of plans) {
+        if (!plan.alreadyLinked) {
+          await ctx.db.insert("authAccounts", {
+            userId: plan.userId,
+            provider: "resend-otp",
+            providerAccountId: plan.email,
+          });
+          accountsInserted += 1;
+        }
+        if (plan.backfillProfile && plan.profileId) {
+          await ctx.db.patch(plan.profileId, {
+            identityEmailNormalized: plan.email,
+            updatedAt: now,
+          });
+          profilesBackfilled += 1;
+        }
+      }
+    }
+
+    return {
+      dryRun,
+      blockedBySafetyLimit: false,
+      googleAccountSafetyLimit: MAX_GOOGLE_ACCOUNT_MIGRATION_SIZE,
+      authUserAuditSafetyLimit: MAX_AUTH_USER_MIGRATION_AUDIT_SIZE,
+      googleAccountsScanned: googleAccounts.length,
+      authUsersScanned: authUsers.length,
+      uniqueGoogleUsers: googleUserIds.length,
+      eligibleUsers: plans.length,
+      accountsToInsert,
+      accountsInserted,
+      alreadyLinkedAccounts,
+      profilesToBackfill,
+      profilesBackfilled,
+      issues,
+      skipped,
+    };
+  },
+});
 
 /**
  * Rollout order remains widen schema -> deploy compatibility reads/writes ->

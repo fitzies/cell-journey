@@ -1,9 +1,7 @@
 import { useAuthActions } from '@convex-dev/auth/react';
-import { makeRedirectUri } from 'expo-auth-session';
 import { router } from 'expo-router';
-import { openAuthSessionAsync } from 'expo-web-browser';
 import { useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useEmailOtp } from '@/components/auth/email-otp-context';
 import { OnboardingShell, PrimaryButton } from '@/components/onboarding/ui';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
@@ -13,9 +11,8 @@ export default function AuthScreen() {
   const { signIn } = useAuthActions();
   const { beginVerification, draftEmail, setDraftEmail } = useEmailOtp();
   const t = useAppTheme();
-  const [busyMethod, setBusyMethod] = useState<'email' | 'google' | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const busy = busyMethod !== null;
 
   const handleEmail = async () => {
     const email = normalizeEmail(draftEmail);
@@ -29,7 +26,6 @@ export default function AuthScreen() {
     }
     if (provider === 'dev-otp') {
       beginVerification(email);
-      setBusyMethod(null);
       router.push('./verify-email');
       return;
     }
@@ -38,38 +34,15 @@ export default function AuthScreen() {
       return;
     }
 
-    setBusyMethod('email');
+    setBusy(true);
     try {
       await signIn(provider, { email });
       beginVerification(email);
-      setBusyMethod(null);
       router.push('./verify-email');
     } catch (err) {
       setError(emailDeliveryError(err));
-      setBusyMethod(null);
-    }
-  };
-
-  const handleGoogle = async () => {
-    setError(null);
-    setBusyMethod('google');
-    try {
-      const redirectTo = makeRedirectUri();
-      const { redirect } = await signIn('google', { redirectTo });
-      if (Platform.OS === 'web') return;
-      if (!redirect) throw new Error('Google did not return a sign-in URL');
-
-      const result = await openAuthSessionAsync(redirect.toString(), redirectTo);
-      if (result.type !== 'success') {
-        setBusyMethod(null);
-        return;
-      }
-      const code = new URL(result.url).searchParams.get('code');
-      if (!code) throw new Error('Missing authorization code in callback URL');
-      await signIn('google', { code });
-    } catch {
-      setError('Google sign-in did not finish. Please try again.');
-      setBusyMethod(null);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -84,27 +57,9 @@ export default function AuthScreen() {
           <PrimaryButton
             arrow={false}
             disabled={busy}
-            label={busyMethod === 'email' ? 'Sending code…' : 'Continue with email'}
+            label={busy ? 'Sending code…' : 'Continue with email'}
             onPress={handleEmail}
           />
-          <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.dividerRow}>
-            <View style={[styles.divider, { backgroundColor: t.line }]} />
-            <Text style={[styles.orText, { color: t.muted }]}>or</Text>
-            <View style={[styles.divider, { backgroundColor: t.line }]} />
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            disabled={busy}
-            onPress={handleGoogle}
-            style={({ pressed }) => [
-              styles.googleButton,
-              { backgroundColor: t.surface, borderColor: t.line },
-              { opacity: busy ? 0.45 : 1, transform: [{ scale: pressed && !busy ? 0.985 : 1 }] },
-            ]}
-          >
-            {busyMethod === 'google' ? <ActivityIndicator color={t.ink} size="small" /> : <Text style={[styles.googleMark, { color: t.ink }]}>G</Text>}
-            <Text style={[styles.googleLabel, { color: t.ink }]}>Continue with Google</Text>
-          </Pressable>
         </View>
       )}
     >
@@ -158,18 +113,4 @@ const styles = StyleSheet.create({
   fieldHint: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19 },
   error: { fontFamily: fonts.bodyMedium, fontSize: 13, lineHeight: 19, marginTop: 4 },
   footerActions: { gap: 12 },
-  dividerRow: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingHorizontal: 4 },
-  divider: { flex: 1, height: StyleSheet.hairlineWidth },
-  orText: { fontFamily: fonts.bodyMedium, fontSize: 13 },
-  googleButton: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    minHeight: 54,
-    paddingHorizontal: 22,
-  },
-  googleMark: { fontFamily: fonts.bodyBold, fontSize: 17, marginRight: 11 },
-  googleLabel: { fontFamily: fonts.bodySemiBold, fontSize: 17, letterSpacing: -0.2 },
 });
