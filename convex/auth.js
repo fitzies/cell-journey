@@ -1,5 +1,7 @@
 import Google from "@auth/core/providers/google";
 import { convexAuth } from "@convex-dev/auth/server";
+import { normalizeGoogleProfile } from "./authProfiles";
+import { getDevLoginProvider, ResendOTP } from "./emailOtp";
 import { claimInvitedProfileForAuthUser } from "./profiles";
 
 // Allow our Expo dev-client and Expo Go redirect schemes. Convex Auth rejects
@@ -20,8 +22,15 @@ function isAllowedRedirect(redirectTo) {
   return false;
 }
 
+const googleProvider = Google({ profile: normalizeGoogleProfile });
+const devLoginProvider = getDevLoginProvider();
+
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
-  providers: [Google],
+  providers: [
+    googleProvider,
+    ResendOTP,
+    ...(devLoginProvider ? [devLoginProvider] : []),
+  ],
   callbacks: {
     async afterUserCreatedOrUpdated(ctx, { userId }) {
       await claimInvitedProfileForAuthUser(ctx, userId);

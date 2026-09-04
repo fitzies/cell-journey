@@ -16,8 +16,9 @@
   },
   "dependencies": {
     "@babel/runtime": "^7.29.2",
+    "@cell-journey/domain": "workspace:*",
     "@cell-journey/theme": "workspace:*",
-    "@convex-dev/auth": "^0.0.92",
+    "@convex-dev/auth": "^0.0.95",
     "@expo-google-fonts/dm-sans": "^0.4.2",
     "@expo-google-fonts/fraunces": "^0.4.1",
     "@expo/dom-webview": "~57.0.1",

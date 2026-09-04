@@ -8,10 +8,7 @@ import { fonts, useAppTheme } from '@/constants/tokens';
 import { formatDay, formatTimeRange, startOfToday } from '@/lib/date';
 import { api, type Doc, type Id } from '@/lib/api';
 import { getProfileDisplayName, getProfileGreetingName } from '@/lib/name';
-
-const regionLabels: Record<string, string> = {
-  north: 'North', south: 'South', east: 'East', west: 'West', central: 'Central', northeast: 'Northeast', northwest: 'Northwest', southeast: 'Southeast', southwest: 'Southwest',
-};
+import { getProfileLocationLabel } from '@/lib/profile-location';
 
 export default function LeaderHomeScreen() {
   const t = useAppTheme();
@@ -50,9 +47,9 @@ export default function LeaderHomeScreen() {
 
   const profileDetail = (profile: Doc<'userProfiles'> | null) => {
     if (!profile) return 'Profile unavailable';
-    const region = profile.singaporeRegion ? regionLabels[profile.singaporeRegion] : 'No region selected';
+    const location = getProfileLocationLabel(profile, 'No postal district');
     const serviceNames = profile.serviceIds.map((id) => serviceMap.get(id)).filter(Boolean).join(', ');
-    return `${region}${serviceNames ? ` · ${serviceNames}` : ' · No services selected'}`;
+    return `${location}${serviceNames ? ` · ${serviceNames}` : ' · No services selected'}`;
   };
 
   const approveRequest = async (joinRequestId: Id<'joinRequests'>) => {

@@ -1,4 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { getPostalDistrictFromSector } from "@cell-journey/domain";
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -153,7 +154,7 @@ export function getProfileDisplayName(profile: Doc<"userProfiles">) {
 export function isProfileComplete(profile: Doc<"userProfiles">) {
   return Boolean(
     hasCompleteName(profile) &&
-      profile.singaporeRegion &&
+      (profile.postalDistrict || profile.singaporeRegion) &&
       profile.serviceIds.length > 0,
   );
 }
@@ -499,6 +500,27 @@ const structuredProfileWriteArgs = {
   serviceIds: v.array(v.id("services")),
 };
 
+const structuredPostalProfileWriteArgs = {
+  firstName: v.string(),
+  lastName: v.string(),
+  preferredName: v.optional(v.string()),
+  postalSector: v.string(),
+  serviceIds: v.array(v.id("services")),
+};
+
+const editablePostalProfileWriteArgs = {
+  firstName: v.string(),
+  lastName: v.string(),
+  preferredName: v.optional(v.string()),
+  postalSector: v.optional(v.string()),
+  serviceIds: v.array(v.id("services")),
+};
+
+type LocationInput =
+  | { singaporeRegion: NonNullable<Doc<"userProfiles">["singaporeRegion"]> }
+  | { postalSector: string }
+  | { preserveLocation: true };
+
 async function updateProfileFields(
   ctx: MutationCtx,
   args: {
@@ -506,9 +528,9 @@ async function updateProfileFields(
     lastName?: string;
     fullName?: string;
     preferredName?: string;
-    singaporeRegion: Doc<"userProfiles">["singaporeRegion"] & string;
     serviceIds: Id<"services">[];
   },
+  location: LocationInput,
   allowLegacyNameWrite: boolean,
 ) {
   const profile = await requireCurrentProfile(ctx);
@@ -520,13 +542,29 @@ async function updateProfileFields(
     allowLegacyNameWrite,
   );
   const now = Date.now();
+  const locationPatch = "postalSector" in location
+    ? (() => {
+        const district = getPostalDistrictFromSector(location.postalSector);
+        if (!district) throw new Error("Enter a valid two-digit postal sector");
+        return {
+          postalDistrict: district.code,
+          singaporeRegion: undefined,
+        };
+      })()
+    : "singaporeRegion" in location
+      ? { singaporeRegion: location.singaporeRegion }
+      : {};
+  const effectiveLocation = { ...profile, ...locationPatch };
+  if (!effectiveLocation.postalDistrict && !effectiveLocation.singaporeRegion) {
+    throw new Error("Enter the first two digits of your Singapore postal code");
+  }
   const patch = {
     firstName: names.firstName,
     lastName: names.lastName,
     fullName: names.fullName,
     preferredName: args.preferredName?.trim() || undefined,
-    singaporeRegion: args.singaporeRegion,
     serviceIds: names.uniqueServiceIds,
+    ...locationPatch,
     updatedAt: now,
   };
   await ctx.db.patch(profile._id, {
@@ -539,23 +577,46 @@ async function updateProfileFields(
 /** @deprecated Use updateOnboardingProfileV2 for structured-name writes. */
 export const updateOnboardingProfile = mutation({
   args: legacyProfileWriteArgs,
-  handler: async (ctx, args) => await updateProfileFields(ctx, args, true),
+  handler: async (ctx, args) =>
+    await updateProfileFields(ctx, args, { singaporeRegion: args.singaporeRegion }, true),
 });
 
 /** @deprecated Use updateProfileV2 for structured-name writes. */
 export const updateProfile = mutation({
   args: legacyProfileWriteArgs,
-  handler: async (ctx, args) => await updateProfileFields(ctx, args, true),
+  handler: async (ctx, args) =>
+    await updateProfileFields(ctx, args, { singaporeRegion: args.singaporeRegion }, true),
 });
 
 export const updateOnboardingProfileV2 = mutation({
   args: structuredProfileWriteArgs,
-  handler: async (ctx, args) => await updateProfileFields(ctx, args, false),
+  handler: async (ctx, args) =>
+    await updateProfileFields(ctx, args, { singaporeRegion: args.singaporeRegion }, false),
 });
 
 export const updateProfileV2 = mutation({
   args: structuredProfileWriteArgs,
-  handler: async (ctx, args) => await updateProfileFields(ctx, args, false),
+  handler: async (ctx, args) =>
+    await updateProfileFields(ctx, args, { singaporeRegion: args.singaporeRegion }, false),
+});
+
+export const updateOnboardingProfileV3 = mutation({
+  args: structuredPostalProfileWriteArgs,
+  handler: async (ctx, args) =>
+    await updateProfileFields(ctx, args, { postalSector: args.postalSector }, false),
+});
+
+export const updateProfileV3 = mutation({
+  args: editablePostalProfileWriteArgs,
+  handler: async (ctx, args) =>
+    await updateProfileFields(
+      ctx,
+      args,
+      args.postalSector === undefined
+        ? { preserveLocation: true }
+        : { postalSector: args.postalSector },
+      false,
+    ),
 });
 
 export type ProfileId = Id<"userProfiles">;

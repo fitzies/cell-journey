@@ -1,0 +1,11 @@
+{
+  "name": "@cell-journey/domain",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./index.ts",
+      "default": "./index.ts"
+    }
+  }
+}

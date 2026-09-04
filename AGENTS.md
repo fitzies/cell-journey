@@ -58,12 +58,25 @@ Use **Convex Auth** with:
 
 Prefer email OTP/code over email magic links for mobile UX. Phone OTP is not planned for MVP because production SMS is not meaningfully free.
 
+Email OTP reads `AUTH_RESEND_KEY`, `AUTH_OTP_SECRET`, and `AUTH_EMAIL` from the Convex deployment environment. `AUTH_OTP_SECRET` must contain at least 32 random characters. The backend defaults to `Cell Journey <onboarding@resend.dev>` when no sender is configured, but that test sender can only deliver to the Resend account owner.
+
+### Development login
+
+Agents may use this fixed account when testing the mobile app against the development Convex deployment:
+
+```txt
+Email: dev@celljourney.test
+Code: 42424242
+```
+
+The credentials above are agent-facing documentation, not runtime configuration. The development Convex deployment must set `AUTH_DEV_LOGIN_ENABLED=true`, `AUTH_DEV_EMAIL`, and `AUTH_DEV_CODE`. The Expo development environment must set `EXPO_PUBLIC_AUTH_DEV_EMAIL` to the same email. Never enable or configure the `AUTH_DEV_*` variables in production.
+
 ## Onboarding and Group Join Flow
 
 Users join groups through the mobile onboarding and profile flows:
 
 1. User signs in.
-2. User completes required profile details: full name, services attending, Singapore region.
+2. User completes required profile details: full name, services attending, and Singapore postal district.
 3. User enters a group code.
 4. User confirms the matched group.
 5. A pending join request is created.
@@ -84,16 +97,10 @@ Required for MVP:
 
 - Full name
 - Service(s) attending — multi-select
-- Singapore region — required dropdown
-  - North
-  - South
-  - East
-  - West
-  - Central
-  - Northeast
-  - Northwest
-  - Southeast
-  - Southwest
+- Singapore postal district — derived from the first two digits of the user's postal code
+  - Store only the derived district (`D01`–`D28`), not the entered postal digits.
+  - Use the static URA/SingPost postal-sector mapping. Do not call an external API.
+  - Show the matched district and general area before the user continues.
 - Group code for member onboarding
 
 Preferred name is not part of onboarding for now. It may be added later as an editable profile field.

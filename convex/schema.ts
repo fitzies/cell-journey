@@ -1,6 +1,7 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { postalDistrictCodeValidator } from "./validators";
 
 const role = v.union(v.literal("member"), v.literal("leader"));
 const onboardingStatus = v.union(
@@ -46,6 +47,24 @@ const pushPlatform = v.union(
 export default defineSchema({
   ...authTables,
 
+  authEmailOtpRequests: defineTable({
+    emailHash: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_emailHash_and_createdAt", ["emailHash", "createdAt"])
+    .index("by_createdAt", ["createdAt"]),
+
+  authEmailOtpCodes: defineTable({
+    requestId: v.id("authEmailOtpRequests"),
+    emailHash: v.string(),
+    codeHash: v.string(),
+    expiresAt: v.number(),
+    failedAttempts: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_emailHash", ["emailHash"])
+    .index("by_expiresAt", ["expiresAt"]),
+
   userProfiles: defineTable({
     // Links product profile data to the Convex Auth managed users table.
     // Optional so admins can pre-provision a profile before its owner signs in.
@@ -69,7 +88,9 @@ export default defineSchema({
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     preferredName: v.optional(v.string()),
+    // Deprecated for profiles created before postal-district onboarding.
     singaporeRegion: v.optional(singaporeRegion),
+    postalDistrict: v.optional(postalDistrictCodeValidator),
     serviceIds: v.array(v.id("services")),
 
     currentGroupId: v.optional(v.id("groups")),

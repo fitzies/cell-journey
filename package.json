@@ -13,9 +13,12 @@
     "typecheck": "pnpm theme:sync && pnpm --filter mobile exec tsc --noEmit --pretty false && pnpm exec tsc -p convex/tsconfig.json --noEmit --pretty false && pnpm --filter web exec tsc --noEmit --pretty false"
   },
   "dependencies": {
-    "@auth/core": "0.37.0",
-    "@convex-dev/auth": "^0.0.92",
-    "convex": "^1.39.1"
+    "@cell-journey/domain": "workspace:*",
+    "@auth/core": "^0.41.1",
+    "@convex-dev/auth": "^0.0.95",
+    "@oslojs/crypto": "^1.0.1",
+    "convex": "^1.39.1",
+    "resend": "^6.26.0"
   },
   "devDependencies": {
     "@edge-runtime/vm": "^5.0.0",

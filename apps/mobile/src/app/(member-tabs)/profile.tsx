@@ -10,18 +10,7 @@ import { EditProfileSheet } from '@/components/profile/EditProfileSheet';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
 import { api } from '@/lib/api';
 import { getProfileDisplayName } from '@/lib/name';
-
-const regionLabels: Record<string, string> = {
-  north: 'North',
-  south: 'South',
-  east: 'East',
-  west: 'West',
-  central: 'Central',
-  northeast: 'Northeast',
-  northwest: 'Northwest',
-  southeast: 'Southeast',
-  southwest: 'Southwest',
-};
+import { getProfileLocationLabel } from '@/lib/profile-location';
 
 function initials(name?: string) {
   const parts = name?.trim().split(/\s+/).filter(Boolean) ?? [];
@@ -48,7 +37,7 @@ export default function MemberProfileScreen() {
   if (profile === undefined || context === undefined || services === undefined) return <LoadingState />;
 
   const displayName = getProfileDisplayName(profile, 'Member');
-  const region = profile?.singaporeRegion ? regionLabels[profile.singaporeRegion] : 'Not set';
+  const location = getProfileLocationLabel(profile);
 
   const confirmLeave = () => {
     Alert.alert(
@@ -115,7 +104,7 @@ export default function MemberProfileScreen() {
           <Text style={[styles.sectionTitle, { color: t.ink }]}>Profile info</Text>
           <View style={styles.infoList}>
             <InfoCard title="Services" detail={serviceNames.length ? serviceNames.join(', ') : 'Not set'} mark="✦" />
-            <InfoCard title="Region" detail={region} mark="◇" />
+            <InfoCard title="Postal district" detail={location} mark="◇" />
             <InfoCard title="First name" detail={profile?.firstName?.trim() || 'Not confirmed'} mark="○" />
             <InfoCard title="Last name" detail={profile?.lastName?.trim() || 'Not confirmed'} mark="○" />
           </View>

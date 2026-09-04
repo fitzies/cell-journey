@@ -1,25 +1,11 @@
+import { getPostalDistrictFromSector } from '@cell-journey/domain';
 import { useMutation } from 'convex/react';
 import { useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
 import { api, type Doc, type Id } from '@/lib/api';
-
-type Region = NonNullable<Doc<'userProfiles'>['singaporeRegion']>;
-
-const regions: Region[] = ['north', 'south', 'east', 'west', 'central', 'northeast', 'northwest', 'southeast', 'southwest'];
-
-const regionLabels: Record<Region, string> = {
-  north: 'North',
-  south: 'South',
-  east: 'East',
-  west: 'West',
-  central: 'Central',
-  northeast: 'Northeast',
-  northwest: 'Northwest',
-  southeast: 'Southeast',
-  southwest: 'Southwest',
-};
+import { getProfileLocationLabel } from '@/lib/profile-location';
 
 export function EditProfileSheet({
   profile,
@@ -34,7 +20,7 @@ export function EditProfileSheet({
 }) {
   const t = useAppTheme();
   const insets = useSafeAreaInsets();
-  const updateProfile = useMutation(api.profiles.updateProfileV2);
+  const updateProfile = useMutation(api.profiles.updateProfileV3);
   const savedFirstName = profile?.firstName?.trim() ?? '';
   const savedLastName = profile?.lastName?.trim() ?? '';
   const activeServiceIds = new Set(services.map((service) => service._id));
@@ -43,7 +29,7 @@ export function EditProfileSheet({
   const [legacyFullName] = useState<string | null>(
     !savedFirstName || !savedLastName ? profile?.fullName?.trim() || null : null,
   );
-  const [region, setRegion] = useState<Region | null>(profile?.singaporeRegion ?? null);
+  const [postalSector, setPostalSector] = useState('');
   const [selected, setSelected] = useState<Id<'services'>[]>(
     () => profile?.serviceIds.filter((serviceId) => activeServiceIds.has(serviceId)) ?? [],
   );
@@ -71,8 +57,13 @@ export function EditProfileSheet({
       Alert.alert('Choose at least one service', 'Your service helps leaders understand your regular rhythm.');
       return;
     }
-    if (!region) {
-      Alert.alert('Choose your region', 'Select the Singapore region closest to where you are based.');
+    const district = postalSector ? getPostalDistrictFromSector(postalSector) : null;
+    if (postalSector && !district) {
+      Alert.alert('Check your postal digits', 'Enter the first two digits of a valid Singapore postal code.');
+      return;
+    }
+    if (!district && !profile.postalDistrict && !profile.singaporeRegion) {
+      Alert.alert('Add your postal district', 'Enter the first two digits of your Singapore postal code.');
       return;
     }
 
@@ -82,7 +73,7 @@ export function EditProfileSheet({
         firstName: trimmedFirstName,
         lastName: trimmedLastName,
         preferredName: profile.preferredName?.trim() || undefined,
-        singaporeRegion: region,
+        postalSector: postalSector || undefined,
         serviceIds: selected,
       });
       onSaved?.();
@@ -94,7 +85,10 @@ export function EditProfileSheet({
     }
   };
 
-  const canSave = Boolean(firstName.trim() && lastName.trim() && region && selected.length > 0 && !saving && profile);
+  const district = getPostalDistrictFromSector(postalSector);
+  const hasSavedLocation = Boolean(profile?.postalDistrict || profile?.singaporeRegion);
+  const hasValidLocation = postalSector.length === 0 ? hasSavedLocation : Boolean(district);
+  const canSave = Boolean(firstName.trim() && lastName.trim() && hasValidLocation && selected.length > 0 && !saving && profile);
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
@@ -166,12 +160,35 @@ export function EditProfileSheet({
             </View>
 
             <View style={styles.fieldWrap}>
-              <Text style={[styles.label, { color: t.muted }]}>Singapore region</Text>
-              <View style={styles.regionGrid}>
-                {regions.map((item) => (
-                  <RegionChip key={item} label={regionLabels[item]} selected={region === item} disabled={saving} onPress={() => setRegion(item)} />
-                ))}
-              </View>
+              <Text style={[styles.label, { color: t.muted }]}>Postal district</Text>
+              <TextInput
+                value={postalSector}
+                onChangeText={(value) => setPostalSector(value.replace(/\D/g, '').slice(0, 2))}
+                editable={!saving}
+                keyboardType="number-pad"
+                inputMode="numeric"
+                maxLength={2}
+                returnKeyType="done"
+                placeholder="52"
+                placeholderTextColor={t.muted}
+                accessibilityLabel="First two digits of postal code"
+                style={[styles.input, styles.postalInput, { backgroundColor: t.background, borderColor: district ? t.accent : postalSector.length === 2 ? t.danger : t.line, color: t.ink }]}
+              />
+              <Text style={[styles.helper, { color: t.muted }]}>Enter 52 for a postal code such as 520123. We use the digits to find your district, then discard them.</Text>
+              {district ? (
+                <View accessibilityLiveRegion="polite" style={[styles.locationCard, { backgroundColor: t.selected, borderColor: t.accent }]}>
+                  <Text style={[styles.locationTitle, { color: t.ink }]}>District {district.number}</Text>
+                  <Text style={[styles.locationArea, { color: t.muted }]}>{district.area}</Text>
+                </View>
+              ) : postalSector.length === 2 ? (
+                <Text accessibilityLiveRegion="polite" style={[styles.locationError, { color: t.danger }]}>We could not match those digits. Check your postal code.</Text>
+              ) : hasSavedLocation ? (
+                <View style={[styles.currentLocation, { backgroundColor: t.soft, borderColor: t.line }]}>
+                  <Text style={[styles.currentLocationLabel, { color: t.muted }]}>Current area</Text>
+                  <Text style={[styles.currentLocationValue, { color: t.ink }]}>{getProfileLocationLabel(profile)}</Text>
+                  <Text style={[styles.currentLocationHint, { color: t.muted }]}>Leave this blank to keep it.</Text>
+                </View>
+              ) : null}
             </View>
 
             <Text style={[styles.helper, { color: t.muted }]}>Role and group assignment are managed separately, so attendance history stays intact.</Text>
@@ -207,27 +224,6 @@ function ChoiceRow({ label, selected, disabled, onPress }: { label: string; sele
         <Text style={[styles.checkText, { color: selected ? t.accentInk : t.accent }]}>{selected ? '✓' : ''}</Text>
       </View>
       <Text style={[styles.choiceText, { color: selected ? t.accent : t.ink }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function RegionChip({ label, selected, disabled, onPress }: { label: string; selected: boolean; disabled?: boolean; onPress: () => void }) {
-  const t = useAppTheme();
-  return (
-    <Pressable
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.regionChip,
-        {
-          backgroundColor: selected ? t.selected : t.background,
-          borderColor: selected ? t.accent : t.line,
-          opacity: disabled ? 0.55 : 1,
-          transform: [{ scale: pressed && !disabled ? 0.98 : 1 }],
-        },
-      ]}
-    >
-      <Text style={[styles.regionText, { color: selected ? t.accent : t.ink }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -277,9 +273,15 @@ const styles = StyleSheet.create({
   check: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   checkText: { fontFamily: fonts.bodyBold, fontSize: 12 },
   choiceText: { flex: 1, fontFamily: fonts.bodySemiBold, fontSize: 15.5, letterSpacing: -0.2 },
-  regionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
-  regionChip: { borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 11 },
-  regionText: { fontFamily: fonts.bodySemiBold, fontSize: 14.5, letterSpacing: -0.15 },
+  postalInput: { width: 112, fontSize: 22, letterSpacing: 6, textAlign: 'center' },
+  locationCard: { borderWidth: 1, borderRadius: radius.lg, padding: 14 },
+  locationTitle: { fontFamily: fonts.bodyBold, fontSize: 16, letterSpacing: -0.2 },
+  locationArea: { marginTop: 4, fontFamily: fonts.body, fontSize: 13.5, lineHeight: 19 },
+  locationError: { fontFamily: fonts.bodySemiBold, fontSize: 13, lineHeight: 18 },
+  currentLocation: { borderWidth: 1, borderRadius: radius.lg, padding: 14 },
+  currentLocationLabel: { fontFamily: fonts.bodyBold, fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase' },
+  currentLocationValue: { marginTop: 5, fontFamily: fonts.bodySemiBold, fontSize: 14.5, lineHeight: 20 },
+  currentLocationHint: { marginTop: 4, fontFamily: fonts.body, fontSize: 12.5, lineHeight: 18 },
   helper: { marginTop: -4, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
   actions: { gap: 9 },
   button: { minHeight: 50, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },

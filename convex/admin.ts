@@ -93,6 +93,7 @@ function publicProfile(profile: Doc<"userProfiles">) {
     preferredName: profile.preferredName ?? null,
     displayName: getProfileDisplayName(profile),
     profileComplete: isProfileComplete(profile),
+    postalDistrict: profile.postalDistrict ?? null,
     singaporeRegion: profile.singaporeRegion ?? null,
     currentGroupId: profile.currentGroupId ?? null,
     leaderGroupId: profile.leaderGroupId ?? null,

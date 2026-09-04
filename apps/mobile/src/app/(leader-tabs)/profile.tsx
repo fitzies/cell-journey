@@ -10,10 +10,7 @@ import { ActionButton, Card, LeaderScreen, Mark, RowCard, SectionHeader } from '
 import { fonts, useAppTheme } from '@/constants/tokens';
 import { api } from '@/lib/api';
 import { getProfileDisplayName } from '@/lib/name';
-
-const regionLabels: Record<string, string> = {
-  north: 'North', south: 'South', east: 'East', west: 'West', central: 'Central', northeast: 'Northeast', northwest: 'Northwest', southeast: 'Southeast', southwest: 'Southwest',
-};
+import { getProfileLocationLabel } from '@/lib/profile-location';
 
 function initials(name?: string) {
   const parts = name?.trim().split(/\s+/).filter(Boolean) ?? [];
@@ -38,7 +35,7 @@ export default function LeaderProfileScreen() {
   if (profile === undefined || context === undefined || services === undefined) return <LoadingState />;
 
   const displayName = getProfileDisplayName(profile, 'Leader');
-  const region = profile?.singaporeRegion ? regionLabels[profile.singaporeRegion] : 'Not set';
+  const location = getProfileLocationLabel(profile);
 
   const handleSignOut = async () => {
     setBusy(true);
@@ -75,7 +72,7 @@ export default function LeaderProfileScreen() {
       <SectionHeader title="Profile info" />
       <View style={{ gap: 10 }}>
         <RowCard mark={<Mark>✦</Mark>} title="Services" detail={serviceNames.length ? serviceNames.join(', ') : 'Not set'} />
-        <RowCard mark={<Mark>◇</Mark>} title="Region" detail={region} />
+        <RowCard mark={<Mark>◇</Mark>} title="Postal district" detail={location} />
         <RowCard mark={<Mark>○</Mark>} title="First name" detail={profile?.firstName?.trim() || 'Not confirmed'} />
         <RowCard mark={<Mark>○</Mark>} title="Last name" detail={profile?.lastName?.trim() || 'Not confirmed'} />
       </View>
