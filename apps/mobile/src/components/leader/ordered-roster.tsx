@@ -3,7 +3,8 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Alert, FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable-flatlist';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { fonts, radius, useAppTheme } from '@/constants/tokens';
+import { AppHeader } from '@/components/app-header';
+import { fonts, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
 
 type RosterSection = 'active' | 'inactive';
 
@@ -19,17 +20,13 @@ type ListItem<T> =
   | { key: string; kind: 'empty'; section: RosterSection };
 
 type OrderedRosterScreenProps<T> = {
-  eyebrow: string;
   title: string;
-  hint?: string;
   headerContent?: ReactNode;
   activeRows: OrderedRosterEntry<T>[];
   inactiveRows: OrderedRosterEntry<T>[];
   activeTitle?: string;
-  activeDescription?: string;
   activeEmptyText?: string;
   inactiveTitle?: string;
-  inactiveDescription?: string;
   inactiveEmptyText?: string;
   showSections?: boolean;
   canReorder?: boolean;
@@ -53,17 +50,13 @@ function rowsFromOrder<T>(order: string[], source: OrderedRosterEntry<T>[]) {
 }
 
 export function OrderedRosterScreen<T>({
-  eyebrow,
   title,
-  hint,
   headerContent,
   activeRows,
   inactiveRows,
   activeTitle = 'Active members',
-  activeDescription,
   activeEmptyText = 'No active members.',
   inactiveTitle = 'Inactive · optional',
-  inactiveDescription = 'Not required for attendance.',
   inactiveEmptyText = 'No inactive members.',
   showSections = true,
   canReorder = false,
@@ -141,11 +134,7 @@ export function OrderedRosterScreen<T>({
 
   const header = (
     <>
-      <View style={styles.header}>
-        <Text style={[styles.eyebrow, { color: t.accent }]}>{eyebrow}</Text>
-        <Text style={[styles.title, { color: t.ink }]}>{title}</Text>
-        {hint ? <Text style={[styles.hint, { color: t.muted }]}>{hint}</Text> : null}
-      </View>
+      <AppHeader title={title} mode="leader" />
       {headerContent}
     </>
   );
@@ -154,14 +143,12 @@ export function OrderedRosterScreen<T>({
     if (item.kind === 'header') {
       const isInactive = item.section === 'inactive';
       const rows = isInactive ? orderedInactive : orderedActive;
-      const description = isInactive ? inactiveDescription : activeDescription;
       return (
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleRow}>
             <Text style={[styles.sectionTitle, { color: t.ink }]}>{isInactive ? inactiveTitle : activeTitle}</Text>
             <Text style={[styles.sectionMeta, { color: t.muted }]}>{rows.length}</Text>
           </View>
-          {description ? <Text style={[styles.sectionDescription, { color: t.muted }]}>{description}</Text> : null}
           {showReorderHint && canReorder && rows.filter((row) => row.reorderable !== false).length > 1 ? (
             <Text style={[styles.reorderHint, { color: t.muted }]}>
               {reorderControls === 'inline-handle'
@@ -177,7 +164,7 @@ export function OrderedRosterScreen<T>({
 
     if (item.kind === 'empty') {
       return (
-        <View style={[styles.emptyRow, { backgroundColor: t.surface, borderColor: t.line }]}>
+        <View style={[styles.emptyRow, { backgroundColor: t.surface, ...surfaceShadow(t) }]}>
           <Text style={[styles.emptyText, { color: t.muted }]}>{item.section === 'active' ? activeEmptyText : inactiveEmptyText}</Text>
         </View>
       );
@@ -307,7 +294,7 @@ export function OrderedRosterScreen<T>({
   };
 
   return (
-    <SafeAreaView edges={['top']} style={[styles.root, { backgroundColor: t.background }]}>
+    <SafeAreaView edges={[]} style={[styles.root, { backgroundColor: t.background }]}>
       {Platform.OS === 'web' ? (
         <FlatList
           {...commonProps}
@@ -329,16 +316,11 @@ export function OrderedRosterScreen<T>({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { paddingHorizontal: 24, paddingTop: 28, paddingBottom: 108 },
-  header: { marginBottom: 24 },
-  eyebrow: { fontFamily: fonts.bodyBold, fontSize: 11, letterSpacing: 2.6, textTransform: 'uppercase' },
-  title: { marginTop: 12, fontFamily: fonts.display, fontSize: 36, lineHeight: 40, letterSpacing: -0.9 },
-  hint: { marginTop: 10, fontFamily: fonts.body, fontSize: 14, lineHeight: 21 },
+  content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 108 },
   sectionHeader: { marginTop: 28, marginBottom: 12 },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle: { fontFamily: fonts.bodyBold, fontSize: 18, letterSpacing: -0.3 },
+  sectionTitle: { ...textStyles.section },
   sectionMeta: { fontFamily: fonts.bodyMedium, fontSize: 13 },
-  sectionDescription: { marginTop: 5, fontFamily: fonts.body, fontSize: 13.5, lineHeight: 19 },
   reorderHint: { marginTop: 7, fontFamily: fonts.bodyMedium, fontSize: 11.5, lineHeight: 17 },
   rosterRow: { flexDirection: 'row', alignItems: 'stretch', gap: 8, marginBottom: 10 },
   rowContent: { flex: 1, minWidth: 0 },
@@ -349,6 +331,6 @@ const styles = StyleSheet.create({
   gripText: { fontFamily: fonts.bodyBold, fontSize: 20, lineHeight: 22, transform: [{ rotate: '90deg' }] },
   inlineHandle: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   inlineHandleText: { fontFamily: fonts.bodyBold, fontSize: 20, lineHeight: 22 },
-  emptyRow: { borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 16, paddingVertical: 18, marginBottom: 10 },
+  emptyRow: { borderRadius: radius.lg, paddingHorizontal: 16, paddingVertical: 18, marginBottom: 10 },
   emptyText: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20 },
 });

@@ -4,7 +4,8 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { GroupSwitcher, ModeSwitchButton, useGroups } from '@/components/group-context';
+import { AppHeader } from '@/components/app-header';
+import { useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { EditProfileSheet } from '@/components/profile/EditProfileSheet';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
@@ -76,13 +77,9 @@ export default function MemberProfileScreen() {
   };
 
   return (
-    <SafeAreaView edges={['top']} style={[styles.root, { backgroundColor: t.background }]}>
+    <SafeAreaView edges={[]} style={[styles.root, { backgroundColor: t.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={[styles.eyebrow, { color: t.accent }]}>PROFILE</Text>
-          <Text style={[styles.title, { color: t.ink }]}>Your details.</Text>
-          <Text style={[styles.hint, { color: t.muted }]}>Manage your member profile and current cell group.</Text>
-        </View>
+        <AppHeader title="Profile" mode="member" />
 
         <View style={[styles.identityCard, { backgroundColor: t.surface, borderColor: t.line }]}>
           <View style={[styles.avatar, { backgroundColor: t.accent }]}>
@@ -96,7 +93,6 @@ export default function MemberProfileScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: t.ink }]}>Cell groups</Text>
-          <GroupSwitcher mode="member" />
           <InfoCard title={group?.name ?? 'No active group'} detail={`${context.memberGroups.length} active membership${context.memberGroups.length === 1 ? '' : 's'}`} mark="⌁" />
         </View>
 
@@ -114,7 +110,6 @@ export default function MemberProfileScreen() {
           <ActionButton label="Edit profile details" filled disabled={!profile || busy !== null} onPress={() => setEditOpen(true)} />
           <ActionButton label="Join another group" disabled={busy !== null} onPress={() => router.push('/(onboarding)/group-code')} />
           {context.pendingRequests.length > 0 ? <ActionButton label={`Pending requests (${context.pendingRequests.length})`} disabled={busy !== null} onPress={() => router.push('/(onboarding)/pending')} /> : null}
-          <ModeSwitchButton current="member" />
           <ActionButton label={busy === 'leave' ? 'Leaving…' : 'Leave selected group'} danger disabled={!group || busy !== null} onPress={confirmLeave} />
           <ActionButton label={busy === 'signOut' ? 'Signing out…' : 'Sign out'} disabled={busy !== null} onPress={handleSignOut} />
         </View>
@@ -158,10 +153,6 @@ function ActionButton({ label, onPress, danger, disabled, filled }: { label: str
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { paddingHorizontal: 24, paddingTop: 28, paddingBottom: 108 },
-  header: { marginBottom: 24 },
-  eyebrow: { fontFamily: fonts.bodyBold, fontSize: 11, letterSpacing: 2.6 },
-  title: { marginTop: 12, fontFamily: fonts.display, fontSize: 36, lineHeight: 40, letterSpacing: -0.9 },
-  hint: { marginTop: 10, fontFamily: fonts.body, fontSize: 14, lineHeight: 21 },
   identityCard: { borderWidth: 1, borderRadius: 28, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 16 },
   avatar: { width: 64, height: 64, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontFamily: fonts.display, fontSize: 24, letterSpacing: -0.6 },

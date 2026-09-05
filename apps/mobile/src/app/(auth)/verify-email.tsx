@@ -90,7 +90,6 @@ export default function VerifyEmailScreen() {
   return (
     <OnboardingShell
       hideProgress
-      eyebrow={isDevelopmentLogin ? 'DEVELOPMENT LOGIN' : 'CHECK YOUR EMAIL'}
       title="Enter your sign-in code."
       hint={isDevelopmentLogin
         ? `Use the development sign-in code for ${pendingEmail.address}.`

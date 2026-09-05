@@ -21,6 +21,7 @@
     "@convex-dev/auth": "^0.0.95",
     "@expo-google-fonts/dm-sans": "^0.4.2",
     "@expo-google-fonts/fraunces": "^0.4.1",
+    "@expo-google-fonts/inter-tight": "^0.4.2",
     "@expo/dom-webview": "~57.0.1",
     "@expo/metro-runtime": "^57.0.14",
     "@react-native-community/datetimepicker": "9.1.0",

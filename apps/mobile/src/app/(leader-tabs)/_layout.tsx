@@ -18,20 +18,17 @@ function tabIcon(name: SolarTabIconName) {
 }
 
 const homeIcon = tabIcon('home');
-const attendanceIcon = tabIcon('attendance');
+const profileOptions = { title: 'Profile', tabBarIcon: tabIcon('profile') };
 const scheduleIcon = tabIcon('schedule');
 const membersIcon = tabIcon('members');
-const profileIcon = tabIcon('profile');
 const homeOptions = { title: 'Home', tabBarIcon: homeIcon };
-const attendanceOptions = { title: 'Attendance', tabBarIcon: attendanceIcon };
-const scheduleOptions = { title: 'Schedule', tabBarIcon: scheduleIcon };
+const attendanceOptions = { title: 'Events', tabBarIcon: scheduleIcon };
 const membersOptions = { title: 'Members', tabBarIcon: membersIcon };
-const profileOptions = { title: 'Profile', tabBarIcon: profileIcon };
 
 export default function LeaderTabs() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const profile = useQuery(api.profiles.currentOrNull, isAuthenticated ? {} : 'skip');
-  const { context, selectedLeaderGroup } = useGroups();
+  const { context } = useGroups();
   const t = useAppTheme();
   const screenOptions = useMemo(() => ({
     headerShown: false,
@@ -52,14 +49,15 @@ export default function LeaderTabs() {
   if (profile === null) return <Redirect href="/(onboarding)" />;
   if (context === undefined) return <LoadingState />;
   if (context.ledGroups.length === 0) {
-    return <Redirect href={context.memberGroups.length > 0 ? '/(member-tabs)' : '/(onboarding)'} />;
+    return <Redirect href={context.memberGroups.length > 0 ? '/(member-tabs)/home' : '/(onboarding)'} />;
   }
+  const canManageAnyMembers = context.ledGroups.some((group) => group.capabilities.manageMembers);
   return (
     <Tabs screenOptions={screenOptions}>
-      <Tabs.Screen name="index" options={homeOptions} />
+      <Tabs.Screen name="home" options={homeOptions} />
       <Tabs.Screen name="attendance" options={attendanceOptions} />
-      <Tabs.Screen name="schedule" options={scheduleOptions} />
-      <Tabs.Protected guard={selectedLeaderGroup?.capabilities.manageMembers === true}>
+      <Tabs.Screen name="schedule" options={{ href: null }} />
+      <Tabs.Protected guard={canManageAnyMembers}>
         <Tabs.Screen name="members" options={membersOptions} />
       </Tabs.Protected>
       <Tabs.Screen name="profile" options={profileOptions} />

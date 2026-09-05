@@ -19,14 +19,14 @@ export default function GroupCodeScreen() {
   const hasMembership = context.memberGroups.length > 0;
   const goBack = () => {
     if (router.canGoBack()) router.back();
-    else router.replace(hasMembership ? '/(member-tabs)/profile' : '/(onboarding)/profile');
+    else router.replace(hasMembership ? '/profile?mode=member' : '/(onboarding)/profile');
   };
 
   const submit = async () => {
     setBusy(true);
     try {
       await join({ code });
-      router.replace(hasMembership ? '/(member-tabs)/profile' : '/(onboarding)/pending');
+      router.replace(hasMembership ? '/profile?mode=member' : '/(onboarding)/pending');
     } catch (err) {
       Alert.alert('Could not request to join', err instanceof Error ? err.message : 'Please try again.');
     } finally {
@@ -39,7 +39,6 @@ export default function GroupCodeScreen() {
       <OnboardingShell
         animationKey="review"
         progress={1}
-        eyebrow="CONFIRM GROUP"
         title="Is this your cell group?"
         hint="Check before sending your request."
         cta={busy ? 'Sending…' : 'Request to join'}
@@ -60,7 +59,6 @@ export default function GroupCodeScreen() {
     <OnboardingShell
       animationKey="code"
       progress={4 / 6}
-      eyebrow="GROUP CODE"
       title={hasMembership ? 'Join another group.' : 'Enter your cell code.'}
       hint="Your leader shares the code, then approves your request."
       cta="Find group"

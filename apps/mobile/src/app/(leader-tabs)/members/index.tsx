@@ -2,7 +2,7 @@ import { useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { GroupSwitcher, useGroups } from '@/components/group-context';
+import { useGroups } from '@/components/group-context';
 import { OrderedRosterScreen, type OrderedRosterEntry } from '@/components/leader/ordered-roster';
 import { EmptyState, Mark, RowCard, StatPill } from '@/components/leader/ui';
 import { LoadingState } from '@/components/onboarding/ui';
@@ -25,9 +25,7 @@ export default function LeaderMembersScreen() {
   if (!group) {
     return (
       <OrderedRosterScreen
-        eyebrow="Members"
-        title="Care for your group."
-        hint="Your leader account is not assigned yet."
+        title="Members"
         headerContent={<EmptyState title="No group assigned." body="Once this leader is assigned to a group, members will appear here." />}
         activeRows={[]}
         inactiveRows={[]}
@@ -40,17 +38,12 @@ export default function LeaderMembersScreen() {
   if (!isOwner) {
     return (
       <OrderedRosterScreen
-        eyebrow="Members"
-        title="Roster overview."
-        hint="The primary owner manages roster status and ordering."
+        title="Members"
         headerContent={(
-          <>
-            <GroupSwitcher mode="leader" />
-            <EmptyState
-              title="Owner-managed roster."
-              body="You can use the ordered roster while taking attendance. Only the primary owner can reorder members."
-            />
-          </>
+          <EmptyState
+            title="Owner-managed roster."
+            body="You can use the ordered roster while taking attendance. Only the primary owner can reorder members."
+          />
         )}
         activeRows={[]}
         inactiveRows={[]}
@@ -88,28 +81,21 @@ export default function LeaderMembersScreen() {
   };
 
   const headerContent = (
-    <>
-      <GroupSwitcher mode="leader" />
-      <View style={styles.stats}>
-        <StatPill label="Active" value={activeEntries.length} />
-        <StatPill label="Inactive" value={inactiveEntries.length} />
-      </View>
-    </>
+    <View style={styles.stats}>
+      <StatPill label="Active" value={activeEntries.length} />
+      <StatPill label="Inactive" value={inactiveEntries.length} />
+    </View>
   );
 
   return (
     <OrderedRosterScreen
-      eyebrow="Members"
-      title="Care for your group."
-      hint="Drag members into the order you use for attendance."
+      title="Members"
       headerContent={headerContent}
       activeRows={activeEntries}
       inactiveRows={inactiveEntries}
       activeTitle="Active · required"
-      activeDescription="Required for attendance at future events."
       activeEmptyText="No active members."
       inactiveTitle="Inactive · optional"
-      inactiveDescription="Not required for attendance, but they can still be marked present."
       inactiveEmptyText="No inactive members."
       canReorder
       reorderControls="inline-handle"

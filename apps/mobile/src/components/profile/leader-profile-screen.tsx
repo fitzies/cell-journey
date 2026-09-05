@@ -3,7 +3,7 @@ import { useQuery } from 'convex/react';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
-import { GroupSwitcher, ModeSwitchButton, useGroups } from '@/components/group-context';
+import { useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { EditProfileSheet } from '@/components/profile/EditProfileSheet';
 import { ActionButton, Card, LeaderScreen, Mark, RowCard, SectionHeader } from '@/components/leader/ui';
@@ -48,7 +48,7 @@ export default function LeaderProfileScreen() {
   };
 
   return (
-    <LeaderScreen eyebrow="Profile" title="Leader profile." hint="Your assignment and visible profile details.">
+    <LeaderScreen title="Profile">
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
           <View style={{ width: 64, height: 64, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: t.accent }}>
@@ -66,7 +66,6 @@ export default function LeaderProfileScreen() {
       </View>
 
       <SectionHeader title="Leadership groups" />
-      <GroupSwitcher mode="leader" />
       <RowCard mark={<Mark>⌁</Mark>} title={group?.name ?? 'No assigned group'} detail={group ? `You lead ${context.ledGroups.length} group${context.ledGroups.length === 1 ? '' : 's'}` : 'Ask the app owner to assign a group.'} />
 
       <SectionHeader title="Profile info" />
@@ -78,7 +77,6 @@ export default function LeaderProfileScreen() {
       </View>
 
       <View style={{ marginTop: 30, gap: 10 }}>
-        <ModeSwitchButton current="leader" />
         <ActionButton label={busy ? 'Signing out…' : 'Sign out'} disabled={busy} onPress={handleSignOut} />
       </View>
 

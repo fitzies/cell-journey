@@ -63,7 +63,7 @@ export default function ProfileScreen() {
 
   if (step === 0) {
     return (
-      <OnboardingShell {...common} eyebrow="YOUR NAME" title="What’s your name?" hint="Enter your first and last name as your leader would know them.">
+      <OnboardingShell {...common} title="What’s your name?" hint="Enter your first and last name as your leader would know them.">
         <View style={styles.nameFields}>
           <View style={styles.fieldWrap}>
             <Text style={[styles.fieldLabel, { color: t.muted }]}>First name</Text>
@@ -106,7 +106,7 @@ export default function ProfileScreen() {
   }
   if (step === 1) {
     return (
-      <OnboardingShell {...common} eyebrow="SERVICES" title="Which service do you attend?" hint="Pick one or more.">
+      <OnboardingShell {...common} title="Which service do you attend?" hint="Pick one or more.">
         <View style={{ gap: 9 }}>
           {rows.map((service) => (
             <OptionPill
@@ -121,7 +121,7 @@ export default function ProfileScreen() {
     );
   }
   return (
-    <OnboardingShell {...common} eyebrow="YOUR AREA" title="Where are you based?" hint="Enter the first two digits of your Singapore postal code." revealContentKey={postalSector.length === 2 ? postalSector : undefined}>
+    <OnboardingShell {...common} title="Where are you based?" hint="Enter the first two digits of your Singapore postal code." revealContentKey={postalSector.length === 2 ? postalSector : undefined}>
       <View style={styles.postalContent}>
         <View style={styles.fieldWrap}>
           <Text style={[styles.fieldLabel, { color: t.muted }]}>First 2 postal digits</Text>

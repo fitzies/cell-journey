@@ -49,7 +49,6 @@ export default function AuthScreen() {
   return (
     <OnboardingShell
       hideProgress
-      eyebrow="WELCOME"
       title="Sign in to Cell Journey."
       hint="Join your cell group and keep attendance in one quiet place."
       footer={(

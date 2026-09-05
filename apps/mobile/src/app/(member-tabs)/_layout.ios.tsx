@@ -6,7 +6,15 @@ import { useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { api } from '@/lib/api';
 
-const nativeTint = DynamicColorIOS({ light: '#92400e', dark: '#c2956a' });
+const nativeTint = DynamicColorIOS({ light: '#111111', dark: '#F5F5F3' });
+const nativeMuted = DynamicColorIOS({ light: '#666663', dark: '#A3A3A0' });
+const nativeLine = DynamicColorIOS({ light: '#D9D9D5', dark: '#30302E' });
+const nativeIcons = {
+  profile: require('../../../assets/images/solar-tabs/profile.png'),
+  home: require('../../../assets/images/solar-tabs/home.png'),
+  schedule: require('../../../assets/images/solar-tabs/schedule.png'),
+  attendance: require('../../../assets/images/solar-tabs/attendance.png'),
+} as const;
 
 export default function MemberTabs() {
   const { isAuthenticated, isLoading } = useConvexAuth();
@@ -20,18 +28,27 @@ export default function MemberTabs() {
   if (context.memberGroups.length === 0) return <Redirect href="/(onboarding)" />;
 
   return (
-    <NativeTabs tintColor={nativeTint}>
-      <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} />
+    <NativeTabs
+      blurEffect="systemDefault"
+      iconColor={{ default: nativeMuted, selected: nativeTint }}
+      shadowColor={nativeLine}
+      tintColor={nativeTint}
+    >
+      <NativeTabs.Trigger name="home" accessibilityLabel="Home">
+        <NativeTabs.Trigger.Icon src={nativeIcons.home} renderingMode="template" />
+        <NativeTabs.Trigger.Label hidden />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="schedule">
-        <NativeTabs.Trigger.Icon sf="calendar" />
+      <NativeTabs.Trigger name="schedule" accessibilityLabel="Events">
+        <NativeTabs.Trigger.Icon src={nativeIcons.schedule} renderingMode="template" />
+        <NativeTabs.Trigger.Label hidden />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="attendance">
-        <NativeTabs.Trigger.Icon sf={{ default: 'checkmark.rectangle', selected: 'checkmark.rectangle.fill' }} />
+      <NativeTabs.Trigger name="attendance" accessibilityLabel="Attendance">
+        <NativeTabs.Trigger.Icon src={nativeIcons.attendance} renderingMode="template" />
+        <NativeTabs.Trigger.Label hidden />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="profile">
-        <NativeTabs.Trigger.Icon sf={{ default: 'person.crop.circle', selected: 'person.crop.circle.fill' }} />
+      <NativeTabs.Trigger name="profile" accessibilityLabel="Profile">
+        <NativeTabs.Trigger.Icon src={nativeIcons.profile} renderingMode="template" />
+        <NativeTabs.Trigger.Label hidden />
       </NativeTabs.Trigger>
     </NativeTabs>
   );

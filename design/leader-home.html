@@ -1,0 +1,2147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f7f5">
+  <title>Cell Journey · leader prototype</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      view-transition-name: none;
+      --canvas: #ececea;
+      --background: #f7f7f5;
+      --surface: #ffffff;
+      --surface-soft: #ededeb;
+      --ink: #111111;
+      --muted: #70706c;
+      --faint: #a5a5a0;
+      --line: rgba(17, 17, 17, 0.09);
+      --primary: #1d1d1f;
+      --primary-ink: #ffffff;
+      --glass: rgba(250, 250, 248, 0.78);
+      --focus: #007aff;
+      --shadow: 0 12px 32px rgba(25, 25, 24, 0.09);
+      --status-upcoming-ink: #315f91;
+      --status-open-ink: #8b5b00;
+      --status-complete-ink: #286842;
+      --status-action-ink: #9a3733;
+      --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { margin: 0; min-height: 100%; }
+
+    body {
+      background: var(--canvas);
+      color: var(--ink);
+      font-family: var(--font);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    button, a { font: inherit; }
+
+    button {
+      color: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .app {
+      position: relative;
+      width: min(100%, 430px);
+      min-height: 100dvh;
+      margin-inline: auto;
+      overflow-x: hidden;
+      background: var(--background);
+    }
+
+    .prototype-switcher {
+      position: fixed;
+      z-index: 80;
+      top: 24px;
+      left: 24px;
+      display: none;
+      width: 210px;
+      padding: 14px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow: 0 16px 50px rgba(0, 0, 0, 0.10);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+    }
+
+    .prototype-switcher p {
+      margin: 0 8px 8px;
+      color: #72726e;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .prototype-switcher p:not(:first-child) { margin-top: 16px; }
+
+    .prototype-switcher [data-switcher-page][hidden] { display: none; }
+
+    .prototype-switcher a {
+      display: flex;
+      align-items: center;
+      min-height: 38px;
+      padding: 0 10px;
+      border-radius: 10px;
+      color: #222220;
+      font-size: 13px;
+      font-weight: 550;
+      text-decoration: none;
+    }
+
+    .prototype-switcher a[aria-current="true"] {
+      background: #1d1d1f;
+      color: #ffffff;
+    }
+
+    .native-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      min-height: calc(58px + env(safe-area-inset-top));
+      padding: calc(8px + env(safe-area-inset-top)) 18px 6px;
+      pointer-events: none;
+    }
+
+    .profile-button {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      flex: 0 0 44px;
+      padding: 0;
+      border: 1px solid rgba(255, 255, 255, 0.72);
+      border-radius: 50%;
+      background: var(--glass);
+      box-shadow: 0 7px 24px rgba(24, 24, 23, 0.10), inset 0 0 0 0.5px var(--line);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    .profile-button svg { width: 22px; height: 22px; }
+
+    main {
+      padding: 12px 20px calc(116px + env(safe-area-inset-bottom));
+    }
+
+    .app-page[hidden] { display: none; }
+
+    .intro-label {
+      margin: 0 0 4px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(38px, 11vw, 46px);
+      font-weight: 650;
+      line-height: 1.03;
+      letter-spacing: -0.045em;
+    }
+
+    .group-button {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 44px;
+      margin: 12px 0 2px -10px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--ink);
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      cursor: pointer;
+    }
+
+    .group-button .chevron { color: var(--faint); }
+
+    .group-meta {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .primary-action {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      min-height: 58px;
+      margin-top: 24px;
+      padding: 0 20px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--primary);
+      color: var(--primary-ink);
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      box-shadow: 0 10px 26px rgba(17, 17, 17, 0.12);
+      cursor: pointer;
+    }
+
+    .primary-action svg { width: 21px; height: 21px; }
+
+    .section { margin-top: 30px; }
+
+    .section-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .section-heading h2 {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .text-button {
+      min-height: 34px;
+      padding: 0 4px;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .event-card {
+      display: grid;
+      grid-template-columns: 68px 1fr auto;
+      align-items: center;
+      gap: 16px;
+      width: 100%;
+      min-height: 132px;
+      padding: 20px 18px;
+      border: 0;
+      border-radius: 24px;
+      background: var(--surface-soft);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .empty-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      width: 100%;
+      min-height: 108px;
+      padding: 18px;
+      border: 0;
+      border-radius: 24px;
+      background: var(--surface-soft);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .empty-icon {
+      display: grid;
+      place-items: center;
+      width: 52px;
+      height: 52px;
+      flex: 0 0 52px;
+      border-radius: 17px;
+      background: var(--surface);
+      box-shadow: inset 0 0 0 0.5px var(--line);
+    }
+
+    .empty-icon svg { width: 23px; height: 23px; }
+
+    .empty-copy strong {
+      display: block;
+      font-size: 17px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+    }
+
+    .empty-copy span {
+      display: block;
+      max-width: 235px;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .date {
+      display: grid;
+      justify-items: center;
+      align-content: center;
+      width: 68px;
+      height: 82px;
+      border-radius: 19px;
+      background: var(--surface);
+      box-shadow: inset 0 0 0 0.5px var(--line);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .date span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    .date strong {
+      margin-top: 2px;
+      font-size: 32px;
+      font-weight: 650;
+      line-height: 1;
+      letter-spacing: -0.04em;
+    }
+
+    .event-copy { min-width: 0; }
+
+    .event-copy strong {
+      display: block;
+      overflow: hidden;
+      color: var(--ink);
+      font-size: 18px;
+      font-weight: 650;
+      letter-spacing: -0.025em;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .event-copy span {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .event-card > svg,
+    .attention-row > svg,
+    .upcoming-row > svg {
+      width: 17px;
+      height: 17px;
+      color: var(--faint);
+    }
+
+    .attention-row {
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 11px;
+      width: 100%;
+      min-height: 68px;
+      padding: 12px 14px;
+      border: 0;
+      border-radius: 18px;
+      background: var(--surface);
+      box-shadow: var(--shadow), inset 0 0 0 0.5px var(--line);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .attention-icon {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: var(--surface-soft);
+    }
+
+    .attention-icon svg { width: 19px; height: 19px; }
+
+    .attention-copy { min-width: 0; }
+
+    .attention-copy strong {
+      display: block;
+      font-size: 15px;
+      font-weight: 650;
+      letter-spacing: -0.015em;
+    }
+
+    .attention-copy span {
+      display: block;
+      margin-top: 3px;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 12px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .count {
+      display: grid;
+      place-items: center;
+      min-width: 27px;
+      height: 27px;
+      padding-inline: 8px;
+      border-radius: 999px;
+      background: var(--primary);
+      color: var(--primary-ink);
+      font-size: 12px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .upcoming-list { border-top: 1px solid var(--line); }
+
+    .upcoming-row {
+      display: grid;
+      grid-template-columns: 46px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      min-height: 66px;
+      padding: 8px 2px;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .mini-date {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      line-height: 1.25;
+      text-align: center;
+      text-transform: uppercase;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .upcoming-copy strong {
+      display: block;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+    }
+
+    .upcoming-copy span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .attendance-page { padding-bottom: 78px; }
+
+    .attendance-listing { margin-top: 27px; }
+    .attendance-listing[hidden], .attendance-active[hidden] { display: none; }
+
+    .event-list-overview {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .event-list-overview strong {
+      font-size: 16px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+    }
+
+    .event-list-overview span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 550;
+    }
+
+    .event-feed-section + .event-feed-section { margin-top: 31px; }
+
+    .event-feed-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 11px;
+    }
+
+    .event-feed-heading h2 {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .event-feed-heading span {
+      color: var(--faint);
+      font-size: 11px;
+      font-weight: 550;
+    }
+
+    .event-feed {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .attendance-event-card {
+      --event-border: var(--line);
+      position: relative;
+      display: grid;
+      grid-template-columns: 54px minmax(0, 1fr) 15px;
+      align-items: center;
+      gap: 13px;
+      width: 100%;
+      min-height: 96px;
+      padding: 13px 13px 13px 15px;
+      overflow: hidden;
+      border: 0;
+      border-radius: 22px;
+      background: var(--surface-soft);
+      box-shadow: inset 0 0 0 1px var(--event-border);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .attendance-event-card[data-kind="upcoming"] { --event-border: color-mix(in srgb, var(--status-upcoming-ink) 46%, transparent); }
+    .attendance-event-card[data-kind="open"] { --event-border: color-mix(in srgb, var(--status-open-ink) 46%, transparent); }
+    .attendance-event-card[data-kind="complete"] { --event-border: color-mix(in srgb, var(--status-complete-ink) 46%, transparent); }
+    .attendance-event-card[data-kind="needs"] { --event-border: color-mix(in srgb, var(--status-action-ink) 46%, transparent); }
+
+    .event-card-date {
+      display: grid;
+      place-items: center;
+      align-content: center;
+      width: 54px;
+      height: 60px;
+      border-radius: 16px;
+      background: var(--surface);
+      color: var(--muted);
+      box-shadow: inset 0 0 0 0.5px var(--line);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .event-card-date span {
+      font-size: 9px;
+      font-weight: 750;
+      letter-spacing: 0.08em;
+    }
+
+    .event-card-date strong {
+      margin-top: 2px;
+      color: var(--ink);
+      font-size: 24px;
+      font-weight: 650;
+      line-height: 1;
+    }
+
+    .event-card-main { min-width: 0; }
+
+    .event-card-main strong,
+    .event-card-main span { display: block; }
+
+    .event-card-main strong {
+      overflow: hidden;
+      font-size: 15px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .event-card-meta {
+      margin-top: 5px;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 11px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .event-card-tail {
+      display: grid;
+      place-items: center;
+    }
+
+    .event-status {
+      margin-top: 5px;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .event-card-tail svg {
+      width: 15px;
+      height: 15px;
+      color: var(--faint);
+    }
+
+    .attendance-event-card:active { transform: scale(0.985); }
+
+    .attendance-active.is-entering .attendance-detail-content {
+      animation: detail-reveal 210ms 80ms cubic-bezier(0.23, 1, 0.32, 1) both;
+    }
+
+    .attendance-active.transition-pending .attendance-detail-content { opacity: 0; }
+
+    @keyframes detail-reveal {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    ::view-transition-group(selected-event) {
+      z-index: 100;
+      animation-duration: 290ms;
+      animation-timing-function: cubic-bezier(0.77, 0, 0.175, 1);
+    }
+
+    ::view-transition-old(selected-event),
+    ::view-transition-new(selected-event) {
+      height: 100%;
+      overflow: clip;
+      border-radius: 22px;
+      mix-blend-mode: normal;
+    }
+
+    .attendance-topline {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .attendance-group {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .event-picker {
+      --event-border: var(--line);
+      position: relative;
+      display: grid;
+      grid-template-columns: 54px minmax(0, 1fr) 17px;
+      align-items: center;
+      gap: 14px;
+      width: 100%;
+      min-height: 84px;
+      margin-top: 25px;
+      padding: 13px 15px;
+      border: 0;
+      border-radius: 22px;
+      overflow: hidden;
+      background: var(--surface-soft);
+      box-shadow: inset 0 0 0 1px var(--event-border);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .event-picker[data-kind="upcoming"] { --event-border: color-mix(in srgb, var(--status-upcoming-ink) 46%, transparent); }
+    .event-picker[data-kind="open"] { --event-border: color-mix(in srgb, var(--status-open-ink) 46%, transparent); }
+    .event-picker[data-kind="complete"] { --event-border: color-mix(in srgb, var(--status-complete-ink) 46%, transparent); }
+    .event-picker[data-kind="needs"] { --event-border: color-mix(in srgb, var(--status-action-ink) 46%, transparent); }
+
+    .event-picker-date {
+      display: grid;
+      place-items: center;
+      align-content: center;
+      width: 54px;
+      height: 58px;
+      border-radius: 16px;
+      background: var(--surface);
+      box-shadow: inset 0 0 0 0.5px var(--line);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .event-picker-date span {
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    .event-picker-date strong {
+      margin-top: 1px;
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .event-picker-copy { min-width: 0; }
+
+    .event-picker-copy strong,
+    .event-picker-copy span { display: block; }
+
+    .event-picker-copy strong {
+      overflow: hidden;
+      font-size: 16px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .event-picker-copy span {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .event-picker-copy .event-status {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .event-picker > svg {
+      width: 17px;
+      height: 17px;
+      color: var(--faint);
+      transform: rotate(180deg);
+    }
+
+    .event-context {
+      margin: 13px 2px 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .attendance-page[data-selected-kind="upcoming"] .status-actions {
+      opacity: 0.34;
+      pointer-events: none;
+    }
+
+    .attendance-progress { margin-top: 25px; }
+
+    .progress-copy {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .progress-copy strong {
+      font-size: 22px;
+      font-weight: 650;
+      letter-spacing: -0.035em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .progress-copy > span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 550;
+    }
+
+    .progress-track {
+      height: 5px;
+      margin-top: 10px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: var(--surface-soft);
+    }
+
+    .progress-fill {
+      width: 57%;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--primary);
+      transition: width 220ms ease;
+    }
+
+    .filter-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      margin-top: 24px;
+      padding: 4px;
+      border-radius: 15px;
+      background: var(--surface-soft);
+    }
+
+    .filter-tab {
+      min-height: 36px;
+      padding: 0 5px;
+      border: 0;
+      border-radius: 11px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .filter-tab[aria-selected="true"] {
+      background: var(--surface);
+      color: var(--ink);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05), inset 0 0 0 0.5px var(--line);
+    }
+
+    .member-list {
+      margin-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .member-row {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      min-height: 72px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .member-row[hidden] { display: none; }
+
+    .member-avatar {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--surface-soft);
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+    }
+
+    .member-copy { min-width: 0; }
+
+    .member-copy strong,
+    .member-copy span { display: block; }
+
+    .member-copy strong {
+      overflow: hidden;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .member-copy span {
+      margin-top: 3px;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 11px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .member-row[data-status="self"] .member-copy span::before {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      margin-right: 6px;
+      border-radius: 50%;
+      background: var(--ink);
+      vertical-align: 1px;
+    }
+
+    .status-actions {
+      display: flex;
+      gap: 7px;
+    }
+
+    .status-button {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: transparent;
+      color: var(--faint);
+      cursor: pointer;
+    }
+
+    .status-button svg { width: 17px; height: 17px; }
+
+    .member-row[data-status="present"] .status-button[data-status-choice="present"],
+    .member-row[data-status="absent"] .status-button[data-status-choice="absent"] {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: var(--primary-ink);
+    }
+
+    .member-row[data-status="self"] .status-button[data-status-choice="present"] {
+      border: 2px solid var(--ink);
+      color: var(--ink);
+    }
+
+    .attendance-empty {
+      display: grid;
+      justify-items: center;
+      padding: 74px 26px 0;
+      text-align: center;
+    }
+
+    .attendance-empty[hidden] { display: none; }
+
+    .attendance-empty-icon {
+      display: grid;
+      place-items: center;
+      width: 72px;
+      height: 72px;
+      border-radius: 24px;
+      background: var(--surface-soft);
+    }
+
+    .attendance-empty-icon svg { width: 29px; height: 29px; }
+
+    .attendance-empty h2 {
+      margin: 20px 0 0;
+      font-size: 21px;
+      font-weight: 650;
+      letter-spacing: -0.03em;
+    }
+
+    .attendance-empty p {
+      max-width: 260px;
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .empty-action {
+      min-height: 46px;
+      margin-top: 22px;
+      padding: 0 19px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--primary);
+      color: var(--primary-ink);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .attendance-loading { display: none; padding-top: 24px; }
+    .attendance-page[data-attendance-state="loading"] .attendance-active { display: none; }
+    .attendance-page[data-attendance-state="loading"] .attendance-loading { display: block; }
+
+    .save-dock {
+      position: fixed;
+      z-index: 29;
+      right: max(20px, calc((100vw - 430px) / 2 + 20px));
+      bottom: calc(91px + env(safe-area-inset-bottom));
+      left: max(20px, calc((100vw - 430px) / 2 + 20px));
+      display: none;
+      transition: opacity 140ms ease-out;
+    }
+
+    .save-dock.transition-pending { opacity: 0; }
+
+    .save-dock[hidden] { display: none !important; }
+
+    .app[data-page="attendance"] .save-dock { display: block; }
+    .app[data-page="attendance"] .attendance-page[data-attendance-state="no-event"] ~ .save-dock,
+    .app[data-page="attendance"] .attendance-page[data-attendance-state="no-members"] ~ .save-dock,
+    .app[data-page="attendance"] .attendance-page[data-attendance-state="loading"] ~ .save-dock { display: none; }
+
+    .save-button {
+      width: 100%;
+      min-height: 54px;
+      padding: 0 20px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--primary);
+      color: var(--primary-ink);
+      box-shadow: 0 12px 28px rgba(17, 17, 17, 0.18);
+      font-size: 15px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    .native-tabs {
+      position: fixed;
+      z-index: 30;
+      right: max(10px, calc((100vw - 430px) / 2 + 10px));
+      bottom: max(8px, env(safe-area-inset-bottom));
+      left: max(10px, calc((100vw - 430px) / 2 + 10px));
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      min-height: 74px;
+      padding: 5px 6px;
+      border: 1px solid rgba(255, 255, 255, 0.68);
+      border-radius: 27px;
+      background: var(--glass);
+      box-shadow: 0 16px 44px rgba(15, 15, 15, 0.15), inset 0 0 0 0.5px var(--line);
+      backdrop-filter: blur(28px) saturate(190%);
+      -webkit-backdrop-filter: blur(28px) saturate(190%);
+    }
+
+    .tab {
+      position: relative;
+      display: grid;
+      place-items: center;
+      align-content: center;
+      gap: 3px;
+      min-width: 0;
+      min-height: 62px;
+      padding: 4px 2px;
+      border: 0;
+      border-radius: 21px;
+      background: transparent;
+      color: #8e8e93;
+      cursor: pointer;
+    }
+
+    .tab svg { width: 23px; height: 23px; }
+
+    .tab span {
+      overflow: hidden;
+      width: 100%;
+      font-size: 10px;
+      font-weight: 550;
+      line-height: 1.1;
+      text-align: center;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tab[aria-current="page"] {
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--ink);
+      box-shadow: 0 3px 13px rgba(0, 0, 0, 0.06);
+    }
+
+    .menu {
+      position: absolute;
+      z-index: 40;
+      top: calc(158px + env(safe-area-inset-top));
+      left: 20px;
+      width: min(300px, calc(100% - 40px));
+      padding: 7px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--glass);
+      box-shadow: 0 18px 46px rgba(15, 15, 15, 0.16);
+      backdrop-filter: blur(26px) saturate(180%);
+      -webkit-backdrop-filter: blur(26px) saturate(180%);
+    }
+
+    .menu[hidden] { display: none; }
+
+    .menu button {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      min-height: 44px;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .menu button + button { border-top: 1px solid var(--line); }
+
+    .toast {
+      position: fixed;
+      z-index: 60;
+      right: 50%;
+      bottom: calc(96px + env(safe-area-inset-bottom));
+      max-width: calc(100vw - 40px);
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(24, 24, 24, 0.90);
+      color: white;
+      font-size: 13px;
+      font-weight: 550;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(50%, 8px);
+      transition: opacity 160ms ease, transform 160ms ease;
+    }
+
+    .toast.show { opacity: 1; transform: translate(50%, 0); }
+
+    .loading-view { display: none; padding-top: 12px; }
+
+    .app[data-state="loading"] .content-view { display: none; }
+    .app[data-state="loading"] .loading-view { display: block; }
+
+    .skeleton {
+      overflow: hidden;
+      position: relative;
+      border-radius: 999px;
+      background: var(--surface-soft);
+    }
+
+    .skeleton::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.62) 46%, transparent 72%);
+      transform: translateX(-100%);
+      animation: shimmer 1.35s ease-in-out infinite;
+    }
+
+    .skeleton-label { width: 112px; height: 14px; }
+    .skeleton-title { width: 210px; height: 46px; margin-top: 10px; border-radius: 16px; }
+    .skeleton-group { width: 170px; height: 22px; margin-top: 34px; border-radius: 8px; }
+    .skeleton-meta { width: 124px; height: 13px; margin-top: 14px; }
+    .skeleton-action { width: 100%; height: 58px; margin-top: 26px; }
+    .skeleton-heading { width: 118px; height: 12px; margin-top: 32px; border-radius: 5px; }
+    .skeleton-card { width: 100%; height: 132px; margin-top: 14px; border-radius: 24px; }
+    .skeleton-row { width: 100%; height: 68px; margin-top: 30px; border-radius: 18px; }
+
+    @keyframes shimmer { to { transform: translateX(100%); } }
+
+    :focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+    }
+
+    .pressable { transition: transform 120ms ease, opacity 120ms ease; }
+    .pressable:active { opacity: 0.76; transform: scale(0.98); }
+
+    @media (hover: hover) {
+      .group-button:hover, .text-button:hover, .upcoming-row:hover { background: rgba(0, 0, 0, 0.035); }
+      .profile-button:hover, .attention-row:hover { box-shadow: 0 12px 30px rgba(24, 24, 23, 0.14), inset 0 0 0 0.5px var(--line); }
+    }
+
+    @media (min-width: 520px) {
+      .app { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04), 0 28px 80px rgba(0, 0, 0, 0.12); }
+    }
+
+    @media (min-width: 920px) {
+      .prototype-switcher { display: block; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-delay: 0ms !important;
+        transition-duration: 0.01ms !important;
+      }
+
+      .attendance-active.is-entering .attendance-detail-content {
+        animation: reduced-detail-reveal 120ms linear both !important;
+      }
+    }
+
+    @keyframes reduced-detail-reveal {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --canvas: #050505;
+        --background: #0b0b0b;
+        --surface: #1a1a1a;
+        --surface-soft: #202020;
+        --ink: #f5f5f3;
+        --muted: #a0a09b;
+        --faint: #767672;
+        --line: rgba(255, 255, 255, 0.10);
+        --primary: #f5f5f3;
+        --primary-ink: #111111;
+        --glass: rgba(31, 31, 31, 0.76);
+        --shadow: 0 12px 32px rgba(0, 0, 0, 0.30);
+        --status-upcoming-ink: #8bbbec;
+        --status-open-ink: #e5b95b;
+        --status-complete-ink: #78c795;
+        --status-action-ink: #e98e89;
+      }
+
+      .profile-button,
+      .native-tabs { border-color: rgba(255, 255, 255, 0.10); }
+      .tab[aria-current="page"] { background: rgba(255, 255, 255, 0.10); }
+    }
+  </style>
+</head>
+<body>
+  <svg aria-hidden="true" width="0" height="0" style="position:absolute">
+    <defs>
+      <symbol id="person" viewBox="0 0 24 24">
+        <circle cx="12" cy="8" r="3.4" fill="currentColor"></circle>
+        <path d="M5.3 19.4c.7-4 3.2-6 6.7-6s6 2 6.7 6c-1.8 1.2-4 1.8-6.7 1.8s-4.9-.6-6.7-1.8Z" fill="currentColor"></path>
+      </symbol>
+      <symbol id="check" viewBox="0 0 24 24">
+        <path d="m5 12.5 4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+      </symbol>
+      <symbol id="chevron" viewBox="0 0 24 24">
+        <path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+      </symbol>
+      <symbol id="chevron-down" viewBox="0 0 24 24">
+        <path d="m5 9 7 7 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+      </symbol>
+      <symbol id="people" viewBox="0 0 24 24">
+        <circle cx="9" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.9"></circle>
+        <circle cx="17" cy="9" r="2.3" fill="none" stroke="currentColor" stroke-width="1.7"></circle>
+        <path d="M3.8 19c.5-4 2.3-6 5.2-6s4.8 2 5.3 6M14.1 14c2.9-.7 5 .9 5.7 4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"></path>
+      </symbol>
+      <symbol id="home" viewBox="0 0 24 24">
+        <path d="M3.5 10.4 12 3.5l8.5 6.9V21h-6v-6.2h-5V21h-6V10.4Z" fill="currentColor"></path>
+      </symbol>
+      <symbol id="attendance" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.9"></circle>
+        <path d="m7.7 12.2 2.8 2.8 5.9-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+      </symbol>
+      <symbol id="calendar" viewBox="0 0 24 24">
+        <rect x="3" y="5" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"></rect>
+        <path d="M7.5 3v4M16.5 3v4M3 9h18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+        <circle cx="8" cy="13" r="1" fill="currentColor"></circle>
+        <circle cx="12" cy="13" r="1" fill="currentColor"></circle>
+        <circle cx="16" cy="13" r="1" fill="currentColor"></circle>
+        <circle cx="8" cy="17" r="1" fill="currentColor"></circle>
+        <circle cx="12" cy="17" r="1" fill="currentColor"></circle>
+      </symbol>
+      <symbol id="search" viewBox="0 0 24 24">
+        <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"></circle>
+        <path d="m15.5 15.5 4.2 4.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+      </symbol>
+      <symbol id="xmark" viewBox="0 0 24 24">
+        <path d="m7 7 10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path>
+      </symbol>
+    </defs>
+  </svg>
+
+  <aside class="prototype-switcher" aria-label="Prototype states">
+    <p>Page</p>
+    <a href="?page=home&amp;state=default" data-page-link="home">Home</a>
+    <a href="?page=attendance&amp;attendance-state=list" data-page-link="attendance">Attendance</a>
+
+    <div data-switcher-page="home">
+      <p>Home state</p>
+      <a href="?page=home&amp;state=default" data-state-link="default">Ready for attendance</a>
+      <a href="?page=home&amp;state=many-requests" data-state-link="many-requests">Many join requests</a>
+      <a href="?page=home&amp;state=no-requests" data-state-link="no-requests">No join requests</a>
+      <a href="?page=home&amp;state=no-upcoming" data-state-link="no-upcoming">No upcoming events</a>
+      <a href="?page=home&amp;state=empty" data-state-link="empty">New empty group</a>
+      <a href="?page=home&amp;state=loading" data-state-link="loading">Loading</a>
+    </div>
+
+    <div data-switcher-page="attendance" hidden>
+      <p>Attendance state</p>
+      <a href="?page=attendance&amp;attendance-state=list" data-attendance-state-link="list">Event list</a>
+      <a href="?page=attendance&amp;attendance-state=active" data-attendance-state-link="active">In progress</a>
+      <a href="?page=attendance&amp;attendance-state=complete" data-attendance-state-link="complete">Completed</a>
+      <a href="?page=attendance&amp;attendance-state=no-event" data-attendance-state-link="no-event">No event</a>
+      <a href="?page=attendance&amp;attendance-state=no-members" data-attendance-state-link="no-members">No members</a>
+      <a href="?page=attendance&amp;attendance-state=loading" data-attendance-state-link="loading">Loading</a>
+    </div>
+  </aside>
+
+  <div class="app" id="app">
+    <header class="native-header" aria-label="App controls">
+      <button class="profile-button pressable" type="button" aria-label="Open profile" data-message="Profile opens here in the native app">
+        <svg aria-hidden="true"><use href="#person"></use></svg>
+      </button>
+    </header>
+
+    <main>
+      <section class="home-page app-page" id="homePage" aria-label="Leader home">
+      <div class="content-view" id="contentView">
+      <p class="intro-label">Good evening</p>
+      <h1>Oliver</h1>
+
+      <button class="group-button pressable" id="groupButton" type="button" aria-haspopup="menu" aria-expanded="false">
+        <span id="groupName">River Valley Cell</span>
+        <svg class="chevron" width="15" height="15" aria-hidden="true"><use href="#chevron-down"></use></svg>
+      </button>
+      <p class="group-meta" id="groupMeta">14 members · 2 requests</p>
+
+      <button class="primary-action pressable" id="primaryAction" type="button" data-message="Opening attendance for tonight's gathering">
+        <svg aria-hidden="true" id="primaryIcon"><use href="#check"></use></svg>
+        <span id="primaryLabel">Take attendance</span>
+      </button>
+
+      <section class="section" id="nextSection" aria-labelledby="next-title">
+        <div class="section-heading">
+          <h2 id="next-title">Next gathering</h2>
+        </div>
+        <div id="nextContent">
+        <button class="event-card pressable" type="button" aria-label="Cell gathering, Friday 12 September at 7:30 PM, 21 River Valley Road" data-message="Opening gathering details">
+          <span class="date" aria-hidden="true"><span>FRI</span><strong>12</strong></span>
+          <span class="event-copy">
+            <strong>Cell gathering</strong>
+            <span>7:30–9:30 PM</span>
+            <span>21 River Valley Road</span>
+          </span>
+          <svg aria-hidden="true"><use href="#chevron"></use></svg>
+        </button>
+        </div>
+      </section>
+
+      <section class="section" id="attentionSection" aria-labelledby="attention-title">
+        <div class="section-heading">
+          <h2 id="attention-title">Needs your attention</h2>
+        </div>
+        <div id="attentionContent">
+        <button class="attention-row pressable" type="button" aria-label="Review 2 join requests" data-message="Opening join requests">
+          <span class="attention-icon" aria-hidden="true"><svg><use href="#people"></use></svg></span>
+          <span class="attention-copy"><strong>Join requests</strong><span>Jamie and one other person</span></span>
+          <span class="count" aria-hidden="true">2</span>
+          <svg aria-hidden="true"><use href="#chevron"></use></svg>
+        </button>
+        </div>
+      </section>
+
+      <section class="section" id="upcomingSection" aria-labelledby="upcoming-title">
+        <div class="section-heading">
+          <h2 id="upcoming-title">Upcoming</h2>
+          <button class="text-button pressable" type="button" data-message="Opening the full schedule">See schedule</button>
+        </div>
+        <div class="upcoming-list" id="upcomingContent">
+          <button class="upcoming-row pressable" type="button" data-message="Opening 19 September gathering">
+            <span class="mini-date">19<br>Sep</span>
+            <span class="upcoming-copy"><strong>Cell gathering</strong><span>7:30 PM · Daniel's home</span></span>
+            <svg aria-hidden="true"><use href="#chevron"></use></svg>
+          </button>
+          <button class="upcoming-row pressable" type="button" data-message="Opening 26 September gathering">
+            <span class="mini-date">26<br>Sep</span>
+            <span class="upcoming-copy"><strong>Cell gathering</strong><span>7:30 PM · Venue TBC</span></span>
+            <svg aria-hidden="true"><use href="#chevron"></use></svg>
+          </button>
+        </div>
+      </section>
+      </div>
+
+      <div class="loading-view" id="loadingView" aria-busy="true" aria-label="Loading leader home">
+        <div class="skeleton skeleton-label"></div>
+        <div class="skeleton skeleton-title"></div>
+        <div class="skeleton skeleton-group"></div>
+        <div class="skeleton skeleton-meta"></div>
+        <div class="skeleton skeleton-action"></div>
+        <div class="skeleton skeleton-heading"></div>
+        <div class="skeleton skeleton-card"></div>
+        <div class="skeleton skeleton-row"></div>
+      </div>
+      </section>
+
+      <section class="attendance-page app-page" id="attendancePage" data-attendance-state="list" aria-labelledby="attendance-title" hidden>
+        <div class="attendance-topline">
+          <div>
+            <h1 id="attendance-title">Attendance</h1>
+            <p class="attendance-group">River Valley Cell</p>
+          </div>
+        </div>
+
+        <div class="attendance-listing" id="attendanceListing">
+          <div class="event-list-overview">
+            <strong>6 gatherings</strong>
+            <span>Sorted by date</span>
+          </div>
+
+          <section class="event-feed-section" aria-labelledby="open-events-title">
+            <div class="event-feed-heading"><h2 id="open-events-title">Open now</h2><span>1 event</span></div>
+            <ul class="event-feed">
+              <li>
+                <button class="attendance-event-card pressable" type="button" data-event-id="sep-04" data-kind="open" data-month="SEP" data-day="04" data-title="Cell gathering" data-detail-meta="4 Sep · 7:30–9:30 PM" data-marked="8" aria-label="Cell gathering, Friday 4 September 2026, 7:30 to 9:30 PM, 21 River Valley Road. Check-in open, 8 of 14 marked.">
+                  <span class="event-card-date" aria-hidden="true"><span>SEP</span><strong>04</strong></span>
+                  <span class="event-card-main"><strong>Cell gathering</strong><span class="event-card-meta">7:30 PM · 21 River Valley Road</span><span class="event-status">Check-in open · 8/14 marked</span></span>
+                  <span class="event-card-tail" aria-hidden="true"><svg><use href="#chevron"></use></svg></span>
+                </button>
+              </li>
+            </ul>
+          </section>
+
+          <section class="event-feed-section" aria-labelledby="upcoming-events-title">
+            <div class="event-feed-heading"><h2 id="upcoming-events-title">Upcoming</h2><span>2 events</span></div>
+            <ul class="event-feed">
+              <li>
+                <button class="attendance-event-card pressable" type="button" data-event-id="sep-11" data-kind="upcoming" data-month="SEP" data-day="11" data-title="Cell gathering" data-detail-meta="11 Sep · 7:30–9:30 PM" data-marked="0" aria-label="Cell gathering, Friday 11 September 2026, 7:30 to 9:30 PM, Daniel's home. Upcoming.">
+                  <span class="event-card-date" aria-hidden="true"><span>SEP</span><strong>11</strong></span>
+                  <span class="event-card-main"><strong>Cell gathering</strong><span class="event-card-meta">7:30 PM · Daniel’s home</span><span class="event-status">Upcoming</span></span>
+                  <span class="event-card-tail" aria-hidden="true"><svg><use href="#chevron"></use></svg></span>
+                </button>
+              </li>
+              <li>
+                <button class="attendance-event-card pressable" type="button" data-event-id="sep-18" data-kind="upcoming" data-month="SEP" data-day="18" data-title="Worship and dinner" data-detail-meta="18 Sep · 6:30–9:00 PM" data-marked="0" aria-label="Worship and dinner, Friday 18 September 2026, 6:30 to 9 PM, venue to be confirmed. Upcoming.">
+                  <span class="event-card-date" aria-hidden="true"><span>SEP</span><strong>18</strong></span>
+                  <span class="event-card-main"><strong>Worship and dinner</strong><span class="event-card-meta">6:30 PM · Venue TBC</span><span class="event-status">Upcoming</span></span>
+                  <span class="event-card-tail" aria-hidden="true"><svg><use href="#chevron"></use></svg></span>
+                </button>
+              </li>
+            </ul>
+          </section>
+
+          <section class="event-feed-section" aria-labelledby="past-events-title">
+            <div class="event-feed-heading"><h2 id="past-events-title">Past</h2><span>3 events</span></div>
+            <ul class="event-feed">
+              <li>
+                <button class="attendance-event-card pressable" type="button" data-event-id="aug-28" data-kind="complete" data-month="AUG" data-day="28" data-title="Cell gathering" data-detail-meta="28 Aug · 7:30–9:30 PM" data-marked="14" aria-label="Cell gathering, Friday 28 August 2026, 7:30 to 9:30 PM, 21 River Valley Road. Complete, 14 of 14 marked.">
+                  <span class="event-card-date" aria-hidden="true"><span>AUG</span><strong>28</strong></span>
+                  <span class="event-card-main"><strong>Cell gathering</strong><span class="event-card-meta">7:30 PM · 21 River Valley Road</span><span class="event-status">Complete · 14/14 marked</span></span>
+                  <span class="event-card-tail" aria-hidden="true"><svg><use href="#chevron"></use></svg></span>
+                </button>
+              </li>
+              <li>
+                <button class="attendance-event-card pressable" type="button" data-event-id="aug-21" data-kind="needs" data-month="AUG" data-day="21" data-title="Cell gathering" data-detail-meta="21 Aug · 7:30–9:30 PM" data-marked="9" aria-label="Cell gathering, Friday 21 August 2026, 7:30 to 9:30 PM, Daniel's home. Needs attendance, 9 of 14 marked.">
+                  <span class="event-card-date" aria-hidden="true"><span>AUG</span><strong>21</strong></span>
+                  <span class="event-card-main"><strong>Cell gathering</strong><span class="event-card-meta">7:30 PM · Daniel’s home</span><span class="event-status">Needs attendance · 9/14 marked</span></span>
+                  <span class="event-card-tail" aria-hidden="true"><svg><use href="#chevron"></use></svg></span>
+                </button>
+              </li>
+              <li>
+                <button class="attendance-event-card pressable" type="button" data-event-id="aug-14" data-kind="complete" data-month="AUG" data-day="14" data-title="Prayer night" data-detail-meta="14 Aug · 7:30–9:00 PM" data-marked="14" aria-label="Prayer night, Friday 14 August 2026, 7:30 to 9 PM, 21 River Valley Road. Complete, 14 of 14 marked.">
+                  <span class="event-card-date" aria-hidden="true"><span>AUG</span><strong>14</strong></span>
+                  <span class="event-card-main"><strong>Prayer night</strong><span class="event-card-meta">7:30 PM · 21 River Valley Road</span><span class="event-status">Complete · 14/14 marked</span></span>
+                  <span class="event-card-tail" aria-hidden="true"><svg><use href="#chevron"></use></svg></span>
+                </button>
+              </li>
+            </ul>
+          </section>
+        </div>
+
+        <div class="attendance-active" id="attendanceActive" hidden>
+          <button class="event-picker pressable" id="selectedEventCard" type="button" data-kind="open" aria-label="Back to gatherings">
+            <span class="event-picker-date" aria-hidden="true"><span id="selectedEventMonth">SEP</span><strong id="selectedEventDay">04</strong></span>
+            <span class="event-picker-copy"><strong id="selectedEventTitle">Cell gathering</strong><span id="selectedEventMeta">4 Sep · 7:30–9:30 PM</span><span class="event-status" id="selectedEventStatus">Check-in open · 8/14 marked</span></span>
+            <svg aria-hidden="true"><use href="#chevron-down"></use></svg>
+          </button>
+
+          <div class="attendance-detail-content">
+          <p class="event-context" id="selectedEventContext">Check-in is open now. Review self-marked attendance or mark the remaining members.</p>
+
+          <div class="attendance-progress" aria-live="polite">
+            <div class="progress-copy">
+              <strong><span id="markedCount">8</span> of 14 marked</strong>
+              <span id="reviewCount">6 remaining</span>
+            </div>
+            <div class="progress-track" role="progressbar" aria-label="Attendance marked" aria-valuemin="0" aria-valuemax="14" aria-valuenow="8">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+          </div>
+
+          <div class="filter-tabs" role="tablist" aria-label="Filter members">
+            <button class="filter-tab" type="button" role="tab" aria-selected="true" data-filter="all">All <span data-filter-count="all">14</span></button>
+            <button class="filter-tab" type="button" role="tab" aria-selected="false" data-filter="review">To review <span data-filter-count="review">6</span></button>
+            <button class="filter-tab" type="button" role="tab" aria-selected="false" data-filter="marked">Marked <span data-filter-count="marked">8</span></button>
+          </div>
+
+          <div class="member-list" id="memberList" aria-label="Member attendance">
+            <div class="member-row" data-name="Jamie Lim" data-status="self">
+              <span class="member-avatar" aria-hidden="true">JL</span>
+              <span class="member-copy"><strong>Jamie Lim</strong><span>Self-marked present · review</span></span>
+              <span class="status-actions">
+                <button class="status-button pressable" type="button" data-status-choice="present" aria-label="Confirm Jamie Lim as present" aria-pressed="false"><svg aria-hidden="true"><use href="#check"></use></svg></button>
+                <button class="status-button pressable" type="button" data-status-choice="absent" aria-label="Mark Jamie Lim absent" aria-pressed="false"><svg aria-hidden="true"><use href="#xmark"></use></svg></button>
+              </span>
+            </div>
+            <div class="member-row" data-name="Sarah Tan" data-status="absent">
+              <span class="member-avatar" aria-hidden="true">ST</span>
+              <span class="member-copy"><strong>Sarah Tan</strong><span>Absent</span></span>
+              <span class="status-actions">
+                <button class="status-button pressable" type="button" data-status-choice="present" aria-label="Mark Sarah Tan present" aria-pressed="false"><svg aria-hidden="true"><use href="#check"></use></svg></button>
+                <button class="status-button pressable" type="button" data-status-choice="absent" aria-label="Mark Sarah Tan absent" aria-pressed="true"><svg aria-hidden="true"><use href="#xmark"></use></svg></button>
+              </span>
+            </div>
+            <div class="member-row" data-name="Marcus Ong" data-status="present">
+              <span class="member-avatar" aria-hidden="true">MO</span>
+              <span class="member-copy"><strong>Marcus Ong</strong><span>Present</span></span>
+              <span class="status-actions">
+                <button class="status-button pressable" type="button" data-status-choice="present" aria-label="Mark Marcus Ong present" aria-pressed="true"><svg aria-hidden="true"><use href="#check"></use></svg></button>
+                <button class="status-button pressable" type="button" data-status-choice="absent" aria-label="Mark Marcus Ong absent" aria-pressed="false"><svg aria-hidden="true"><use href="#xmark"></use></svg></button>
+              </span>
+            </div>
+            <div class="member-row" data-name="Grace Lee" data-status="self">
+              <span class="member-avatar" aria-hidden="true">GL</span>
+              <span class="member-copy"><strong>Grace Lee</strong><span>Self-marked present · review</span></span>
+              <span class="status-actions">
+                <button class="status-button pressable" type="button" data-status-choice="present" aria-label="Confirm Grace Lee as present" aria-pressed="false"><svg aria-hidden="true"><use href="#check"></use></svg></button>
+                <button class="status-button pressable" type="button" data-status-choice="absent" aria-label="Mark Grace Lee absent" aria-pressed="false"><svg aria-hidden="true"><use href="#xmark"></use></svg></button>
+              </span>
+            </div>
+            <div class="member-row" data-name="Daniel Koh" data-status="unmarked">
+              <span class="member-avatar" aria-hidden="true">DK</span>
+              <span class="member-copy"><strong>Daniel Koh</strong><span>Not marked</span></span>
+              <span class="status-actions">
+                <button class="status-button pressable" type="button" data-status-choice="present" aria-label="Mark Daniel Koh present" aria-pressed="false"><svg aria-hidden="true"><use href="#check"></use></svg></button>
+                <button class="status-button pressable" type="button" data-status-choice="absent" aria-label="Mark Daniel Koh absent" aria-pressed="false"><svg aria-hidden="true"><use href="#xmark"></use></svg></button>
+              </span>
+            </div>
+            <div class="member-row" data-name="Rachel Goh" data-status="present">
+              <span class="member-avatar" aria-hidden="true">RG</span>
+              <span class="member-copy"><strong>Rachel Goh</strong><span>Present</span></span>
+              <span class="status-actions">
+                <button class="status-button pressable" type="button" data-status-choice="present" aria-label="Mark Rachel Goh present" aria-pressed="true"><svg aria-hidden="true"><use href="#check"></use></svg></button>
+                <button class="status-button pressable" type="button" data-status-choice="absent" aria-label="Mark Rachel Goh absent" aria-pressed="false"><svg aria-hidden="true"><use href="#xmark"></use></svg></button>
+              </span>
+            </div>
+            <div class="member-row" data-name="Caleb Wong" data-status="present">
+              <span class="member-avatar" aria-hidden="true">CW</span>
+              <span class="member-copy"><strong>Caleb Wong</strong><span>Present</span></span>
+              <span class="status-actions">
+                <button class="status-button pressable" type="button" data-status-choice="present" aria-label="Mark Caleb Wong present" aria-pressed="true"><svg aria-hidden="true"><use href="#check"></use></svg></button>
+                <button class="status-button pressable" type="button" data-status-choice="absent" aria-label="Mark Caleb Wong absent" aria-pressed="false"><svg aria-hidden="true"><use href="#xmark"></use></svg></button>
+              </span>
+            </div>
+            <div class="member-row" data-name="Chloe Ng" data-status="absent">
+              <span class="member-avatar" aria-hidden="true">CN</span>
+              <span class="member-copy"><strong>Chloe Ng</strong><span>Absent</span></span>
+              <span class="status-actions">
+                <button class="status-button pressable" type="button" data-status-choice="present" aria-label="Mark Chloe Ng present" aria-pressed="false"><svg aria-hidden="true"><use href="#check"></use></svg></button>
+                <button class="status-button pressable" type="button" data-status-choice="absent" aria-label="Mark Chloe Ng absent" aria-pressed="true"><svg aria-hidden="true"><use href="#xmark"></use></svg></button>
+              </span>
+            </div>
+            <div class="member-row" data-name="Ethan Low" data-status="present">
+              <span class="member-avatar" aria-hidden="true">EL</span>
+              <span class="member-copy"><strong>Ethan Low</strong><span>Present</span></span>
+              <span class="status-actions">
+                <button class="status-button pressable" type="button" data-status-choice="present" aria-label="Mark Ethan Low present" aria-pressed="true"><svg aria-hidden="true"><use href="#check"></use></svg></button>
+                <button class="status-button pressable" type="button" data-status-choice="absent" aria-label="Mark Ethan Low absent" aria-pressed="false"><svg aria-hidden="true"><use href="#xmark"></use></svg></button>
+              </span>
+            </div>
+            <div class="member-row" data-name="Hannah Teo" data-status="unmarked">
+              <span class="member-avatar" aria-hidden="true">HT</span>
+              <span class="member-copy"><strong>Hannah Teo</strong><span>Not marked</span></span>
+              <span class="status-actions">
+                <button class="status-button pressable" type="button" data-status-choice="present" aria-label="Mark Hannah Teo present" aria-pressed="false"><svg aria-hidden="true"><use href="#check"></use></svg></button>
+                <button class="status-button pressable" type="button" data-status-choice="absent" aria-label="Mark Hannah Teo absent" aria-pressed="false"><svg aria-hidden="true"><use href="#xmark"></use></svg></button>
+              </span>
+            </div>
+            <div class="member-row" data-name="Isaac Ho" data-status="present">
+              <span class="member-avatar" aria-hidden="true">IH</span>
+              <span class="member-copy"><strong>Isaac Ho</strong><span>Present</span></span>
+              <span class="status-actions">
+                <button class="status-button pressable" type="button" data-status-choice="present" aria-label="Mark Isaac Ho present" aria-pressed="true"><svg aria-hidden="true"><use href="#check"></use></svg></button>
+                <button class="status-button pressable" type="button" data-status-choice="absent" aria-label="Mark Isaac Ho absent" aria-pressed="false"><svg aria-hidden="true"><use href="#xmark"></use></svg></button>
+              </span>
+            </div>
+            <div class="member-row" data-name="Nicole Tan" data-status="present">
+              <span class="member-avatar" aria-hidden="true">NT</span>
+              <span class="member-copy"><strong>Nicole Tan</strong><span>Present</span></span>
+              <span class="status-actions">
+                <button class="status-button pressable" type="button" data-status-choice="present" aria-label="Mark Nicole Tan present" aria-pressed="true"><svg aria-hidden="true"><use href="#check"></use></svg></button>
+                <button class="status-button pressable" type="button" data-status-choice="absent" aria-label="Mark Nicole Tan absent" aria-pressed="false"><svg aria-hidden="true"><use href="#xmark"></use></svg></button>
+              </span>
+            </div>
+            <div class="member-row" data-name="Aaron Lim" data-status="unmarked">
+              <span class="member-avatar" aria-hidden="true">AL</span>
+              <span class="member-copy"><strong>Aaron Lim</strong><span>Not marked</span></span>
+              <span class="status-actions">
+                <button class="status-button pressable" type="button" data-status-choice="present" aria-label="Mark Aaron Lim present" aria-pressed="false"><svg aria-hidden="true"><use href="#check"></use></svg></button>
+                <button class="status-button pressable" type="button" data-status-choice="absent" aria-label="Mark Aaron Lim absent" aria-pressed="false"><svg aria-hidden="true"><use href="#xmark"></use></svg></button>
+              </span>
+            </div>
+            <div class="member-row" data-name="Maya Chan" data-status="unmarked">
+              <span class="member-avatar" aria-hidden="true">MC</span>
+              <span class="member-copy"><strong>Maya Chan</strong><span>Not marked</span></span>
+              <span class="status-actions">
+                <button class="status-button pressable" type="button" data-status-choice="present" aria-label="Mark Maya Chan present" aria-pressed="false"><svg aria-hidden="true"><use href="#check"></use></svg></button>
+                <button class="status-button pressable" type="button" data-status-choice="absent" aria-label="Mark Maya Chan absent" aria-pressed="false"><svg aria-hidden="true"><use href="#xmark"></use></svg></button>
+              </span>
+            </div>
+          </div>
+          </div>
+        </div>
+
+        <div class="attendance-empty" id="attendanceEmpty" hidden>
+          <span class="attendance-empty-icon" aria-hidden="true"><svg><use href="#calendar"></use></svg></span>
+          <h2 id="attendanceEmptyTitle">No gathering selected</h2>
+          <p id="attendanceEmptyCopy">Choose a gathering before taking attendance.</p>
+          <button class="empty-action pressable" id="attendanceEmptyAction" type="button">Choose a gathering</button>
+        </div>
+
+        <div class="attendance-loading" aria-busy="true" aria-label="Loading attendance">
+          <div class="skeleton skeleton-title"></div>
+          <div class="skeleton skeleton-meta"></div>
+          <div class="skeleton skeleton-card"></div>
+          <div class="skeleton skeleton-heading"></div>
+          <div class="skeleton skeleton-row"></div>
+          <div class="skeleton skeleton-row"></div>
+          <div class="skeleton skeleton-row"></div>
+        </div>
+      </section>
+
+      <div class="save-dock" id="saveDock" hidden>
+        <button class="save-button pressable" id="saveAttendance" type="button">Save attendance</button>
+      </div>
+    </main>
+
+    <div class="menu" id="groupMenu" role="menu" hidden>
+      <button type="button" role="menuitemradio" aria-checked="true" data-group="River Valley Cell"><span>River Valley Cell</span><span>✓</span></button>
+      <button type="button" role="menuitemradio" aria-checked="false" data-group="Tiong Bahru Cell"><span>Tiong Bahru Cell</span><span></span></button>
+    </div>
+
+    <nav class="native-tabs" aria-label="Leader tabs">
+      <button class="tab pressable" type="button" aria-current="page" data-tab="Home" data-page-target="home">
+        <svg aria-hidden="true"><use href="#home"></use></svg><span>Home</span>
+      </button>
+      <button class="tab pressable" type="button" data-tab="Attendance" data-page-target="attendance">
+        <svg aria-hidden="true"><use href="#attendance"></use></svg><span>Attendance</span>
+      </button>
+      <button class="tab pressable" type="button" data-tab="Schedule">
+        <svg aria-hidden="true"><use href="#calendar"></use></svg><span>Schedule</span>
+      </button>
+      <button class="tab pressable" type="button" data-tab="Members">
+        <svg aria-hidden="true"><use href="#people"></use></svg><span>Members</span>
+      </button>
+    </nav>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const app = document.querySelector('#app');
+    const homePage = document.querySelector('#homePage');
+    const attendancePage = document.querySelector('#attendancePage');
+    const groupButton = document.querySelector('#groupButton');
+    const groupMenu = document.querySelector('#groupMenu');
+    const groupName = document.querySelector('#groupName');
+    const toast = document.querySelector('#toast');
+    const primaryAction = document.querySelector('#primaryAction');
+    const memberRows = [...document.querySelectorAll('.member-row')];
+    const saveDock = document.querySelector('#saveDock');
+    const saveAttendance = document.querySelector('#saveAttendance');
+    const attendanceListing = document.querySelector('#attendanceListing');
+    const attendanceActive = document.querySelector('#attendanceActive');
+    const selectedEventCard = document.querySelector('#selectedEventCard');
+    const attendanceEventCards = [...document.querySelectorAll('.attendance-event-card')];
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const changedMembers = new Set();
+    let toastTimer;
+    let activeFilter = 'all';
+    let selectedEventId = 'sep-04';
+    let attendanceListScrollY = 0;
+    let isAttendanceTransitioning = false;
+
+    const homeStates = new Set(['default', 'many-requests', 'no-requests', 'no-upcoming', 'empty', 'loading']);
+    const attendanceStates = new Set(['list', 'active', 'complete', 'no-event', 'no-members', 'loading']);
+    const initialParams = new URLSearchParams(location.search);
+    let currentHomeState = homeStates.has(initialParams.get('state')) ? initialParams.get('state') : 'default';
+    let currentAttendanceState = attendanceStates.has(initialParams.get('attendance-state')) ? initialParams.get('attendance-state') : 'list';
+    const initialPage = initialParams.get('page') === 'attendance' ? 'attendance' : 'home';
+
+    memberRows.forEach((row) => {
+      row.dataset.initialStatus = row.dataset.status;
+      row.dataset.savedStatus = row.dataset.status;
+    });
+
+    const eventCard = `
+      <button class="event-card pressable" type="button" aria-label="Cell gathering, Friday 12 September at 7:30 PM, 21 River Valley Road" data-message="Opening gathering details">
+        <span class="date" aria-hidden="true"><span>FRI</span><strong>12</strong></span>
+        <span class="event-copy"><strong>Cell gathering</strong><span>7:30–9:30 PM</span><span>21 River Valley Road</span></span>
+        <svg aria-hidden="true"><use href="#chevron"></use></svg>
+      </button>`;
+
+    function emptyEvent(title, detail, message) {
+      return `<button class="empty-card pressable" type="button" data-message="${message}">
+        <span class="empty-icon" aria-hidden="true"><svg><use href="#calendar"></use></svg></span>
+        <span class="empty-copy"><strong>${title}</strong><span>${detail}</span></span>
+      </button>`;
+    }
+
+    function requestCard(count, names) {
+      return `<button class="attention-row pressable" type="button" aria-label="Review ${count} join requests" data-message="Opening ${count} join requests">
+        <span class="attention-icon" aria-hidden="true"><svg><use href="#people"></use></svg></span>
+        <span class="attention-copy"><strong>Join requests</strong><span>${names}</span></span>
+        <span class="count" aria-hidden="true">${count}</span>
+        <svg aria-hidden="true"><use href="#chevron"></use></svg>
+      </button>`;
+    }
+
+    function applyHomeState(state) {
+      currentHomeState = homeStates.has(state) ? state : 'default';
+      state = currentHomeState;
+      app.dataset.state = state;
+      document.querySelectorAll('[data-state-link]').forEach((link) => {
+        if (link.dataset.stateLink === state) link.setAttribute('aria-current', 'true');
+        else link.removeAttribute('aria-current');
+      });
+
+      if (state === 'loading') return;
+
+      const groupMeta = document.querySelector('#groupMeta');
+      const primaryLabel = document.querySelector('#primaryLabel');
+      const primaryIcon = document.querySelector('#primaryIcon');
+      const nextContent = document.querySelector('#nextContent');
+      const attentionSection = document.querySelector('#attentionSection');
+      const attentionContent = document.querySelector('#attentionContent');
+      const upcomingSection = document.querySelector('#upcomingSection');
+
+      groupMeta.textContent = '14 members · 2 requests';
+      primaryLabel.textContent = 'Take attendance';
+      primaryIcon.innerHTML = '<use href="#check"></use>';
+      primaryAction.dataset.homeAction = 'attendance';
+      delete primaryAction.dataset.message;
+      nextContent.innerHTML = eventCard;
+      attentionSection.hidden = false;
+      attentionContent.innerHTML = requestCard(2, 'Jamie and one other person');
+      upcomingSection.hidden = false;
+
+      if (state === 'many-requests') {
+        groupMeta.textContent = '14 members · 7 requests';
+        attentionContent.innerHTML = requestCard(7, 'Jamie, Sarah, Marcus and 4 others');
+      }
+
+      if (state === 'no-requests') {
+        groupMeta.textContent = '14 members · No requests';
+        attentionSection.hidden = true;
+      }
+
+      if (state === 'no-upcoming') {
+        primaryLabel.textContent = 'Create an event';
+        primaryIcon.innerHTML = '<use href="#calendar"></use>';
+        primaryAction.dataset.homeAction = 'create-event';
+        nextContent.innerHTML = emptyEvent('Nothing scheduled', 'Create the next gathering when the date is confirmed.', 'Opening event creation');
+        upcomingSection.hidden = true;
+      }
+
+      if (state === 'empty') {
+        groupMeta.textContent = 'No members or requests yet';
+        primaryLabel.textContent = 'Create your first event';
+        primaryIcon.innerHTML = '<use href="#calendar"></use>';
+        primaryAction.dataset.homeAction = 'create-event';
+        nextContent.innerHTML = emptyEvent('Start with a gathering', 'Once scheduled, members will see it here.', 'Opening first event creation');
+        attentionSection.hidden = true;
+        upcomingSection.hidden = true;
+      }
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+    }
+
+    function updateMemberRow(row) {
+      const status = row.dataset.status;
+      const note = row.querySelector('.member-copy span');
+      const name = row.dataset.name;
+      const labels = {
+        present: 'Present',
+        absent: 'Absent',
+        self: 'Self-marked present · review',
+        unmarked: 'Not marked'
+      };
+      note.textContent = labels[status];
+      row.querySelectorAll('[data-status-choice]').forEach((button) => {
+        const selected = status === button.dataset.statusChoice;
+        button.setAttribute('aria-pressed', String(selected));
+        if (status === 'self' && button.dataset.statusChoice === 'present') {
+          button.setAttribute('aria-label', `Confirm ${name} as present`);
+        } else {
+          button.setAttribute('aria-label', `Mark ${name} ${button.dataset.statusChoice}`);
+        }
+      });
+    }
+
+    function matchesFilter(row) {
+      const status = row.dataset.status;
+      if (activeFilter === 'review') return status === 'self' || status === 'unmarked';
+      if (activeFilter === 'marked') return status === 'present' || status === 'absent';
+      return true;
+    }
+
+    function refreshAttendance() {
+      const marked = memberRows.filter((row) => row.dataset.status === 'present' || row.dataset.status === 'absent').length;
+      const review = memberRows.length - marked;
+      memberRows.forEach((row) => {
+        updateMemberRow(row);
+        row.hidden = !matchesFilter(row);
+      });
+
+      document.querySelector('#markedCount').textContent = marked;
+      document.querySelector('#reviewCount').textContent = review === 0 ? 'Complete' : `${review} remaining`;
+      document.querySelector('#progressFill').style.width = `${Math.round((marked / memberRows.length) * 100)}%`;
+      const progress = document.querySelector('.progress-track');
+      progress.setAttribute('aria-valuenow', String(marked));
+      document.querySelector('[data-filter-count="all"]').textContent = memberRows.length;
+      document.querySelector('[data-filter-count="review"]').textContent = review;
+      document.querySelector('[data-filter-count="marked"]').textContent = marked;
+
+      if (changedMembers.size > 0) {
+        saveAttendance.textContent = `Save ${changedMembers.size} ${changedMembers.size === 1 ? 'change' : 'changes'}`;
+      } else if (marked === memberRows.length) {
+        saveAttendance.textContent = 'Attendance complete';
+      } else {
+        saveAttendance.textContent = 'Save attendance';
+      }
+    }
+
+    function setMemberStatus(row, status) {
+      if (row.dataset.status === status) return;
+      row.dataset.status = status;
+      if (row.dataset.savedStatus === status) changedMembers.delete(row.dataset.name);
+      else changedMembers.add(row.dataset.name);
+      refreshAttendance();
+    }
+
+    function resetAttendanceFilters() {
+      changedMembers.clear();
+      activeFilter = 'all';
+      document.querySelectorAll('[data-filter]').forEach((button) => {
+        button.setAttribute('aria-selected', String(button.dataset.filter === 'all'));
+      });
+    }
+
+    function syncAttendanceSwitcher() {
+      document.querySelectorAll('[data-attendance-state-link]').forEach((link) => {
+        if (link.dataset.attendanceStateLink === currentAttendanceState) link.setAttribute('aria-current', 'true');
+        else link.removeAttribute('aria-current');
+      });
+    }
+
+    function configureSelectedEvent(card) {
+      const kind = card.dataset.kind;
+      selectedEventId = card.dataset.eventId;
+      selectedEventCard.dataset.kind = kind;
+      attendancePage.dataset.selectedKind = kind;
+      document.querySelector('#selectedEventMonth').textContent = card.dataset.month;
+      document.querySelector('#selectedEventDay').textContent = card.dataset.day;
+      document.querySelector('#selectedEventTitle').textContent = card.dataset.title;
+      document.querySelector('#selectedEventMeta').textContent = card.dataset.detailMeta;
+      document.querySelector('#selectedEventStatus').textContent = card.querySelector('.event-status').textContent;
+      selectedEventCard.setAttribute('aria-label', `Back to gatherings. Selected: ${card.getAttribute('aria-label')}`);
+
+      const contexts = {
+        open: 'Check-in is open now. Review self-marked attendance or mark the remaining members.',
+        upcoming: 'Attendance is not open yet. You can review the member list now and return when the gathering begins.',
+        needs: 'This gathering still needs attention. Mark the remaining members to complete attendance.',
+        complete: 'Attendance is complete. You can still make a correction if something changed.'
+      };
+      document.querySelector('#selectedEventContext').textContent = contexts[kind];
+
+      resetAttendanceFilters();
+      memberRows.forEach((row) => {
+        row.dataset.status = row.dataset.initialStatus;
+        row.dataset.savedStatus = row.dataset.initialStatus;
+      });
+
+      if (kind === 'upcoming') {
+        memberRows.forEach((row) => {
+          row.dataset.status = 'unmarked';
+          row.dataset.savedStatus = 'unmarked';
+        });
+      } else if (kind === 'needs') {
+        const firstUnmarked = memberRows.find((row) => row.dataset.status === 'unmarked');
+        firstUnmarked.dataset.status = 'present';
+        firstUnmarked.dataset.savedStatus = 'present';
+      } else if (kind === 'complete') {
+        memberRows.forEach((row) => {
+          row.dataset.status = 'present';
+          row.dataset.savedStatus = 'present';
+        });
+      }
+
+      const isReadOnly = kind === 'upcoming';
+      document.querySelectorAll('.status-button').forEach((button) => { button.disabled = isReadOnly; });
+      refreshAttendance();
+    }
+
+    function renderAttendanceState(state) {
+      currentAttendanceState = attendanceStates.has(state) ? state : 'list';
+      state = currentAttendanceState;
+      attendancePage.dataset.attendanceState = state;
+      const empty = document.querySelector('#attendanceEmpty');
+      const emptyTitle = document.querySelector('#attendanceEmptyTitle');
+      const emptyCopy = document.querySelector('#attendanceEmptyCopy');
+      const emptyAction = document.querySelector('#attendanceEmptyAction');
+      attendanceListing.hidden = state !== 'list';
+      attendanceActive.hidden = state !== 'active' && state !== 'complete';
+      empty.hidden = state !== 'no-event' && state !== 'no-members';
+
+      if (state === 'no-event') {
+        emptyTitle.textContent = 'Nothing to mark yet';
+        emptyCopy.textContent = 'Create or choose a gathering before taking attendance.';
+        emptyAction.textContent = 'Create an event';
+        emptyAction.dataset.message = 'Opening event creation';
+      }
+
+      if (state === 'no-members') {
+        emptyTitle.textContent = 'No members to mark';
+        emptyCopy.textContent = 'Approved members will appear here for this gathering.';
+        emptyAction.textContent = 'View join requests';
+        emptyAction.dataset.message = 'Opening join requests';
+      }
+
+      syncAttendanceSwitcher();
+      syncSaveDock();
+    }
+
+    function applyAttendanceState(state, eventId) {
+      const nextState = attendanceStates.has(state) ? state : 'list';
+      if (nextState === 'active' || nextState === 'complete') {
+        const requestedCard = attendanceEventCards.find((card) => card.dataset.eventId === eventId);
+        const fallbackCard = nextState === 'complete'
+          ? attendanceEventCards.find((card) => card.dataset.kind === 'complete')
+          : attendanceEventCards.find((card) => card.dataset.kind === 'open');
+        configureSelectedEvent(requestedCard || fallbackCard);
+      } else {
+        resetAttendanceFilters();
+        refreshAttendance();
+      }
+      renderAttendanceState(nextState);
+    }
+
+    function syncSaveDock() {
+      const hasEditableRoster = (currentAttendanceState === 'active' || currentAttendanceState === 'complete')
+        && attendancePage.dataset.selectedKind !== 'upcoming';
+      saveDock.hidden = app.dataset.page !== 'attendance' || !hasEditableRoster;
+    }
+
+    function updateAttendanceUrl(state, eventId, mode = 'push') {
+      const url = new URL(location.href);
+      url.searchParams.set('page', 'attendance');
+      url.searchParams.set('attendance-state', state);
+      if (eventId) url.searchParams.set('event', eventId);
+      else url.searchParams.delete('event');
+      const historyState = state === 'list' ? {} : { attendanceDetail: true, eventId };
+      history[`${mode}State`](historyState, '', url);
+    }
+
+    function runAttendanceMorph(source, destination, update, finish) {
+      if (isAttendanceTransitioning) return;
+      const canMorph = typeof document.startViewTransition === 'function' && !reduceMotion.matches;
+
+      if (!canMorph) {
+        update();
+        requestAnimationFrame(finish);
+        return;
+      }
+
+      isAttendanceTransitioning = true;
+      source.style.viewTransitionName = 'selected-event';
+      let transition;
+
+      try {
+        transition = document.startViewTransition(() => {
+          source.style.viewTransitionName = '';
+          update();
+          destination.style.viewTransitionName = 'selected-event';
+        });
+      } catch (error) {
+        source.style.viewTransitionName = '';
+        update();
+        isAttendanceTransitioning = false;
+        requestAnimationFrame(finish);
+        return;
+      }
+
+      transition.finished.finally(() => {
+        source.style.viewTransitionName = '';
+        destination.style.viewTransitionName = '';
+        isAttendanceTransitioning = false;
+        finish();
+      });
+    }
+
+    function revealAttendanceDetail() {
+      attendanceActive.classList.remove('transition-pending');
+      saveDock.classList.remove('transition-pending');
+      attendanceActive.classList.remove('is-entering');
+      void attendanceActive.offsetWidth;
+      attendanceActive.classList.add('is-entering');
+      setTimeout(() => attendanceActive.classList.remove('is-entering'), reduceMotion.matches ? 140 : 330);
+      selectedEventCard.focus({ preventScroll: true });
+    }
+
+    function openAttendanceEvent(card, updateHistory = true) {
+      if (isAttendanceTransitioning || !attendanceListing.offsetParent) return;
+      attendanceListScrollY = window.scrollY;
+      configureSelectedEvent(card);
+      const detailState = card.dataset.kind === 'complete' ? 'complete' : 'active';
+      attendanceActive.classList.add('transition-pending');
+      saveDock.classList.add('transition-pending');
+
+      runAttendanceMorph(card, selectedEventCard, () => {
+        renderAttendanceState(detailState);
+        window.scrollTo({ top: 0, behavior: 'auto' });
+        if (updateHistory) updateAttendanceUrl(detailState, card.dataset.eventId);
+      }, revealAttendanceDetail);
+    }
+
+    function returnToAttendanceList(replaceHistory = false) {
+      if (isAttendanceTransitioning || attendanceActive.hidden) return;
+      const targetCard = attendanceEventCards.find((card) => card.dataset.eventId === selectedEventId) || attendanceEventCards[0];
+      saveDock.classList.add('transition-pending');
+
+      runAttendanceMorph(selectedEventCard, targetCard, () => {
+        renderAttendanceState('list');
+        window.scrollTo({ top: attendanceListScrollY, behavior: 'auto' });
+        if (replaceHistory) updateAttendanceUrl('list', null, 'replace');
+      }, () => {
+        saveDock.classList.remove('transition-pending');
+        targetCard.focus({ preventScroll: true });
+      });
+    }
+
+    function switchPage(page, updateHistory = true) {
+      const nextPage = page === 'attendance' ? 'attendance' : 'home';
+      app.dataset.page = nextPage;
+      homePage.hidden = nextPage !== 'home';
+      attendancePage.hidden = nextPage !== 'attendance';
+      closeGroupMenu();
+
+      document.querySelectorAll('[data-page-target]').forEach((button) => {
+        if (button.dataset.pageTarget === nextPage) button.setAttribute('aria-current', 'page');
+        else button.removeAttribute('aria-current');
+      });
+      document.querySelectorAll('[data-page-link]').forEach((link) => {
+        if (link.dataset.pageLink === nextPage) link.setAttribute('aria-current', 'true');
+        else link.removeAttribute('aria-current');
+      });
+      document.querySelectorAll('[data-switcher-page]').forEach((group) => {
+        group.hidden = group.dataset.switcherPage !== nextPage;
+      });
+
+      document.title = `Cell Journey · leader ${nextPage}`;
+      syncSaveDock();
+
+      if (updateHistory) {
+        const url = new URL(location.href);
+        url.searchParams.set('page', nextPage);
+        url.searchParams.set('state', currentHomeState);
+        url.searchParams.set('attendance-state', currentAttendanceState);
+        history.pushState({}, '', url);
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function closeGroupMenu() {
+      groupMenu.hidden = true;
+      groupButton.setAttribute('aria-expanded', 'false');
+    }
+
+    groupButton.addEventListener('click', () => {
+      const willOpen = groupMenu.hidden;
+      groupMenu.hidden = !willOpen;
+      groupButton.setAttribute('aria-expanded', String(willOpen));
+    });
+
+    groupMenu.querySelectorAll('[data-group]').forEach((button) => {
+      button.addEventListener('click', () => {
+        groupName.textContent = button.dataset.group;
+        groupMenu.querySelectorAll('[data-group]').forEach((item) => {
+          const selected = item === button;
+          item.setAttribute('aria-checked', String(selected));
+          item.lastElementChild.textContent = selected ? '✓' : '';
+        });
+        closeGroupMenu();
+        showToast(`Switched to ${button.dataset.group}`);
+      });
+    });
+
+    document.addEventListener('click', (event) => {
+      if (!groupMenu.hidden && !groupMenu.contains(event.target) && !groupButton.contains(event.target)) closeGroupMenu();
+    });
+
+    primaryAction.addEventListener('click', () => {
+      if (primaryAction.dataset.homeAction === 'attendance') switchPage('attendance');
+      else showToast('Opening event creation');
+    });
+
+    document.querySelectorAll('[data-page-target]').forEach((button) => {
+      button.addEventListener('click', () => {
+        switchPage(button.dataset.pageTarget);
+      });
+    });
+
+    document.querySelectorAll('[data-tab]:not([data-page-target])').forEach((button) => {
+      button.addEventListener('click', () => {
+        showToast(`${button.dataset.tab} is a separate page prototype`);
+      });
+    });
+
+    attendanceEventCards.forEach((card) => {
+      card.addEventListener('click', () => openAttendanceEvent(card));
+    });
+
+    selectedEventCard.addEventListener('click', () => {
+      if (history.state?.attendanceDetail) history.back();
+      else returnToAttendanceList(true);
+    });
+
+    document.querySelectorAll('.status-button').forEach((button) => {
+      button.addEventListener('click', () => {
+        setMemberStatus(button.closest('.member-row'), button.dataset.statusChoice);
+      });
+    });
+
+    document.querySelectorAll('[data-filter]').forEach((button) => {
+      button.addEventListener('click', () => {
+        activeFilter = button.dataset.filter;
+        document.querySelectorAll('[data-filter]').forEach((item) => {
+          item.setAttribute('aria-selected', String(item === button));
+        });
+        refreshAttendance();
+      });
+    });
+
+    saveAttendance.addEventListener('click', () => {
+      memberRows.forEach((row) => { row.dataset.savedStatus = row.dataset.status; });
+      changedMembers.clear();
+      refreshAttendance();
+      showToast('Attendance saved');
+    });
+
+    document.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-message]');
+      if (button && button !== primaryAction) showToast(button.dataset.message);
+    });
+
+    window.addEventListener('popstate', () => {
+      const params = new URLSearchParams(location.search);
+      const targetPage = params.get('page') === 'attendance' ? 'attendance' : 'home';
+      const targetAttendanceState = attendanceStates.has(params.get('attendance-state'))
+        ? params.get('attendance-state')
+        : 'list';
+      const targetEventId = params.get('event');
+      applyHomeState(params.get('state') || 'default');
+
+      if (targetPage === 'attendance' && app.dataset.page === 'attendance') {
+        const isShowingDetail = currentAttendanceState === 'active' || currentAttendanceState === 'complete';
+        if (targetAttendanceState === 'list' && isShowingDetail) {
+          returnToAttendanceList(false);
+          return;
+        }
+
+        if ((targetAttendanceState === 'active' || targetAttendanceState === 'complete') && currentAttendanceState === 'list') {
+          const card = attendanceEventCards.find((item) => item.dataset.eventId === targetEventId);
+          if (card) {
+            openAttendanceEvent(card, false);
+            return;
+          }
+        }
+      }
+
+      applyAttendanceState(targetAttendanceState, targetEventId);
+      switchPage(targetPage, false);
+    });
+
+    applyHomeState(currentHomeState);
+    applyAttendanceState(currentAttendanceState, initialParams.get('event'));
+    switchPage(initialPage, false);
+  </script>
+</body>
+</html>

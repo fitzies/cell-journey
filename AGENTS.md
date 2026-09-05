@@ -195,8 +195,18 @@ Use Expo with:
 
 Initial approved-user tabs:
 
-- Member: Home, Schedule, Attendance, Profile
-- Leader: Home, Attendance, Schedule, Members, Profile
+- Member: Home, Events, Attendance, Profile
+- Leader: Home, Events, Members, Profile
+- Profile is the fourth native tab. The leader Events tab reuses the attendance feed and its zooming event detail pages. The old leader schedule page is hidden. Event editing is deferred.
+
+On iOS, keep tabs and top-right profile controls platform-native:
+
+- Use Expo Router native tabs so iOS owns the tab bar and its Liquid Glass appearance.
+- Put the group/mode switcher in the native stack header as the right-side system menu. Switching groups within the same mode preserves the current tab.
+- On the main tabs, place matching 22/28 semibold SF Pro titles in the left native toolbar: Home, Events, Members, and Profile, plus Attendance in member mode. Keep the centered header title empty and native action menus on the right.
+- Leader Events uses a native plus menu immediately before the group/mode switcher for create and CSV/XLSX import actions.
+- Creating an event opens a native full-screen modal with a native back chevron and Done checkmark in its header. There is no bottom submit button.
+- Do not replace these controls with React Native views that imitate Apple glass styling.
 
 Users select one group at a time within each mode. The selected group is UI state, not canonical membership data.
 

@@ -18,13 +18,12 @@ function tabIcon(name: SolarTabIconName) {
 }
 
 const homeIcon = tabIcon('home');
+const profileOptions = { title: 'Profile', tabBarIcon: tabIcon('profile') };
 const scheduleIcon = tabIcon('schedule');
 const attendanceIcon = tabIcon('attendance');
-const profileIcon = tabIcon('profile');
 const homeOptions = { title: 'Home', tabBarIcon: homeIcon };
-const scheduleOptions = { title: 'Schedule', tabBarIcon: scheduleIcon };
+const scheduleOptions = { title: 'Events', tabBarIcon: scheduleIcon };
 const attendanceOptions = { title: 'Attendance', tabBarIcon: attendanceIcon };
-const profileOptions = { title: 'Profile', tabBarIcon: profileIcon };
 
 export default function MemberTabs() {
   const { isAuthenticated, isLoading } = useConvexAuth();
@@ -52,7 +51,7 @@ export default function MemberTabs() {
   if (context.memberGroups.length === 0) return <Redirect href="/(onboarding)" />;
   return (
     <Tabs screenOptions={screenOptions}>
-      <Tabs.Screen name="index" options={homeOptions} />
+      <Tabs.Screen name="home" options={homeOptions} />
       <Tabs.Screen name="schedule" options={scheduleOptions} />
       <Tabs.Screen name="attendance" options={attendanceOptions} />
       <Tabs.Screen name="profile" options={profileOptions} />

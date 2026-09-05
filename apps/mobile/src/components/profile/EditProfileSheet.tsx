@@ -98,8 +98,7 @@ export function EditProfileSheet({
           <View style={[styles.sheetHandle, { backgroundColor: t.line }]} />
           <View style={styles.sheetHeader}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.eyebrow, { color: t.accent }]}>Edit profile</Text>
-              <Text style={[styles.title, { color: t.ink }]}>Keep your details current.</Text>
+              <Text style={[styles.title, { color: t.ink }]}>Edit profile</Text>
             </View>
             <Pressable disabled={saving} onPress={onClose} hitSlop={10} style={({ pressed }) => [styles.closeButton, { backgroundColor: t.soft, opacity: saving ? 0.45 : 1, transform: [{ scale: pressed && !saving ? 0.96 : 1 }] }]}>
               <Text style={[styles.closeText, { color: t.ink }]}>×</Text>
@@ -258,8 +257,7 @@ const styles = StyleSheet.create({
   sheetBody: { paddingTop: 18, paddingBottom: 8, gap: 18 },
   closeButton: { width: 40, height: 40, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   closeText: { marginTop: -2, fontFamily: fonts.bodySemiBold, fontSize: 26, lineHeight: 28 },
-  eyebrow: { fontFamily: fonts.bodyBold, fontSize: 10.5, letterSpacing: 1.7, textTransform: 'uppercase' },
-  title: { marginTop: 6, fontFamily: fonts.bodyBold, fontSize: 20, letterSpacing: -0.4 },
+  title: { fontFamily: fonts.bodyBold, fontSize: 20, letterSpacing: -0.4 },
   nameNotice: { borderWidth: 1, borderRadius: radius.lg, padding: 14 },
   nameNoticeTitle: { fontFamily: fonts.bodyBold, fontSize: 15, letterSpacing: -0.2 },
   nameNoticeBody: { marginTop: 5, fontFamily: fonts.body, fontSize: 13.5, lineHeight: 19 },

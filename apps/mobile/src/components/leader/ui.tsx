@@ -1,18 +1,15 @@
 import { type PropsWithChildren, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { fonts, radius, useAppTheme } from '@/constants/tokens';
+import { AppHeader, type AppHeaderProps } from '@/components/app-header';
+import { fonts, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
 
-export function LeaderScreen({ eyebrow, title, hint, children }: PropsWithChildren<{ eyebrow: string; title: string; hint?: string }>) {
+export function LeaderScreen({ title, profile, headerShown = true, eventActions, contentStyle, children }: PropsWithChildren<{ title: string; profile?: boolean; headerShown?: boolean; eventActions?: AppHeaderProps['eventActions']; contentStyle?: StyleProp<ViewStyle> }>) {
   const t = useAppTheme();
   return (
-    <SafeAreaView edges={['top']} style={[styles.root, { backgroundColor: t.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={[styles.eyebrow, { color: t.accent }]}>{eyebrow}</Text>
-          <Text style={[styles.title, { color: t.ink }]}>{title}</Text>
-          {hint ? <Text style={[styles.hint, { color: t.muted }]}>{hint}</Text> : null}
-        </View>
+    <SafeAreaView edges={headerShown ? [] : ['top']} style={[styles.root, { backgroundColor: t.background }]}>
+      {headerShown ? <AppHeader title={title} mode="leader" profile={profile} eventActions={eventActions} /> : null}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, contentStyle]}>
         {children}
       </ScrollView>
     </SafeAreaView>
@@ -31,7 +28,7 @@ export function SectionHeader({ title, meta }: { title: string; meta?: string })
 
 export function Card({ children, accent }: PropsWithChildren<{ accent?: boolean }>) {
   const t = useAppTheme();
-  return <View style={[styles.card, { backgroundColor: accent ? t.accent : t.surface, borderColor: accent ? t.accent : t.line }]}>{children}</View>;
+  return <View style={[styles.card, surfaceShadow(t), { backgroundColor: accent ? t.accent : t.surface }]}>{children}</View>;
 }
 
 export function Mark({ children, success, danger, compact }: PropsWithChildren<{ success?: boolean; danger?: boolean; compact?: boolean }>) {
@@ -58,13 +55,15 @@ export function ActionButton({ label, onPress, danger, disabled, filled }: { lab
   const t = useAppTheme();
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: Boolean(disabled) }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
+        surfaceShadow(t, filled ? 'buttonFilled' : 'button'),
         {
           backgroundColor: filled ? t.accent : t.surface,
-          borderColor: filled ? t.accent : t.line,
           opacity: disabled ? 0.45 : 1,
           transform: [{ scale: pressed && !disabled ? 0.985 : 1 }],
         },
@@ -78,7 +77,7 @@ export function ActionButton({ label, onPress, danger, disabled, filled }: { lab
 export function StatPill({ label, value }: { label: string; value: string | number }) {
   const t = useAppTheme();
   return (
-    <View style={[styles.statPill, { backgroundColor: t.surface, borderColor: t.line }]}>
+    <View style={[styles.statPill, surfaceShadow(t), { backgroundColor: t.surface }]}>
       <Text style={[styles.statValue, { color: t.ink }]}>{value}</Text>
       <Text style={[styles.statLabel, { color: t.muted }]}>{label}</Text>
     </View>
@@ -88,7 +87,7 @@ export function StatPill({ label, value }: { label: string; value: string | numb
 export function RowCard({ mark, title, detail, right, compact, children }: PropsWithChildren<{ mark: ReactNode; title: string; detail?: string; right?: ReactNode; compact?: boolean }>) {
   const t = useAppTheme();
   return (
-    <View style={[styles.rowCard, compact && styles.compactRowCard, { backgroundColor: t.surface, borderColor: t.line }]}>
+    <View style={[styles.rowCard, surfaceShadow(t), compact && styles.compactRowCard, { backgroundColor: t.surface }]}>
       {mark}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={[styles.rowTitle, { color: t.ink }]}>{title}</Text>
@@ -102,28 +101,24 @@ export function RowCard({ mark, title, detail, right, compact, children }: Props
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { paddingHorizontal: 24, paddingTop: 28, paddingBottom: 108 },
-  header: { marginBottom: 24 },
-  eyebrow: { fontFamily: fonts.bodyBold, fontSize: 11, letterSpacing: 2.6, textTransform: 'uppercase' },
-  title: { marginTop: 12, fontFamily: fonts.display, fontSize: 36, lineHeight: 40, letterSpacing: -0.9 },
-  hint: { marginTop: 10, fontFamily: fonts.body, fontSize: 14, lineHeight: 21 },
+  content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 108 },
   sectionRow: { marginTop: 28, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle: { fontFamily: fonts.bodyBold, fontSize: 18, letterSpacing: -0.3 },
+  sectionTitle: { ...textStyles.section },
   sectionMeta: { fontFamily: fonts.bodyMedium, fontSize: 13 },
-  card: { borderWidth: 1, borderRadius: 28, padding: 20, overflow: 'hidden' },
+  card: { borderRadius: radius.lg, borderCurve: 'continuous', padding: 18 },
   mark: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   markText: { fontFamily: fonts.bodyBold },
   compactMark: { width: 30, height: 30, borderRadius: 10 },
   compactMarkText: { fontSize: 13 },
-  emptyTitle: { marginTop: 18, fontFamily: fonts.bodyBold, fontSize: 18, letterSpacing: -0.3 },
-  emptyBody: { marginTop: 7, fontFamily: fonts.body, fontSize: 14, lineHeight: 20 },
-  button: { minHeight: 46, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
-  buttonText: { fontFamily: fonts.bodySemiBold, fontSize: 14.5, letterSpacing: -0.15 },
-  statPill: { flex: 1, borderWidth: 1, borderRadius: 22, padding: 16 },
+  emptyTitle: { ...textStyles.section, marginTop: 16 },
+  emptyBody: { ...textStyles.body, marginTop: 7 },
+  button: { minHeight: 46, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 12 },
+  buttonText: { ...textStyles.button, textAlign: 'center' },
+  statPill: { flex: 1, borderRadius: radius.md, borderCurve: 'continuous', padding: 16 },
   statValue: { fontFamily: fonts.display, fontSize: 34, lineHeight: 38, letterSpacing: -1 },
   statLabel: { marginTop: 4, fontFamily: fonts.bodyBold, fontSize: 10.5, letterSpacing: 1.4, textTransform: 'uppercase' },
-  rowCard: { borderWidth: 1, borderRadius: 20, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 13 },
+  rowCard: { borderRadius: radius.md, borderCurve: 'continuous', padding: 14, flexDirection: 'row', alignItems: 'center', gap: 13 },
   compactRowCard: { minHeight: 56, borderRadius: 16, paddingVertical: 5, paddingLeft: 10, paddingRight: 4, gap: 10 },
-  rowTitle: { fontFamily: fonts.bodySemiBold, fontSize: 16, letterSpacing: -0.25 },
-  rowDetail: { marginTop: 4, fontFamily: fonts.body, fontSize: 13.5, lineHeight: 19 },
+  rowTitle: { ...textStyles.body, fontFamily: fonts.bodySemiBold, letterSpacing: -0.3 },
+  rowDetail: { ...textStyles.body, marginTop: 4 },
 });

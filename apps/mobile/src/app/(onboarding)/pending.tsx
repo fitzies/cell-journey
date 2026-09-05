@@ -10,8 +10,8 @@ export default function PendingScreen() {
   if (context === undefined) return <LoadingState />;
 
   if (context.pendingRequests.length === 0) {
-    if (context.memberGroups.length > 0) return <Redirect href="/(member-tabs)" />;
-    if (context.ledGroups.length > 0) return <Redirect href="/(leader-tabs)" />;
+    if (context.memberGroups.length > 0) return <Redirect href="/(member-tabs)/home" />;
+    if (context.ledGroups.length > 0) return <Redirect href="/(leader-tabs)/home" />;
     return <Redirect href="/(onboarding)/group-code" />;
   }
 
@@ -27,13 +27,12 @@ export default function PendingScreen() {
     <OnboardingShell
       pending
       animationKey="pending"
-      eyebrow="REQUESTS SENT"
       title="Waiting for leader approval."
       hint={hasMembership ? 'You can keep using your existing groups while these are reviewed.' : 'A leader will review each request.'}
       footer={
         <View style={{ gap: 10 }}>
           <PrimaryButton ghost label="Join another group" onPress={() => router.push('/(onboarding)/group-code')} />
-          {hasMembership ? <PrimaryButton label="Back to app" onPress={() => router.replace('/(member-tabs)')} /> : null}
+          {hasMembership ? <PrimaryButton label="Back to app" onPress={() => router.replace('/(member-tabs)/home')} /> : null}
         </View>
       }
     >
