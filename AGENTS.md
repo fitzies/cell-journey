@@ -197,7 +197,7 @@ Initial approved-user tabs:
 
 - Member: Home, Events, Attendance, Profile
 - Leader: Home, Events, Members, Profile
-- Profile is the fourth native tab. The leader Events tab reuses the attendance feed and its zooming event detail pages. The old leader schedule page is hidden. Event editing is deferred.
+- Profile is the fourth native tab. The leader Events tab reuses the attendance feed and its zooming event detail pages. The old leader schedule page is hidden. Leaders long-press event cards for native Edit and Delete actions. Editing reuses the event creation modal with existing values; deleting requires confirmation and preserves historical attendance records.
 
 On iOS, keep tabs and top-right profile controls platform-native:
 

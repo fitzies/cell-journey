@@ -10,6 +10,7 @@ import { InterTight_500Medium } from '@expo-google-fonts/inter-tight/500Medium';
 import { InterTight_600SemiBold } from '@expo-google-fonts/inter-tight/600SemiBold';
 import { InterTight_700Bold } from '@expo-google-fonts/inter-tight/700Bold';
 import { GroupContextProvider } from '@/components/group-context';
+import { AccountActionsProvider } from '@/components/account-actions';
 import { palettes } from '@/constants/tokens';
 import { convex } from '@/lib/convex';
 
@@ -56,6 +57,7 @@ export default function RootLayout() {
         client={convex}
         storage={Platform.OS === 'ios' || Platform.OS === 'android' ? secureStorage : undefined}
       >
+        <AccountActionsProvider>
         <GroupContextProvider>
           <ThemeProvider value={scheme === 'dark' ? darkNavigationTheme : lightNavigationTheme}>
             <Stack screenOptions={{ headerShown: false }}>
@@ -64,6 +66,7 @@ export default function RootLayout() {
             </Stack>
           </ThemeProvider>
         </GroupContextProvider>
+        </AccountActionsProvider>
       </ConvexAuthProvider>
     </GestureHandlerRootView>
   );

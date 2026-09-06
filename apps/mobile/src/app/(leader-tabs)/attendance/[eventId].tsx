@@ -1,3 +1,4 @@
+import { ProfileAvatar } from '@/components/profile-avatar';
 import { useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
 import { Link, router, useLocalSearchParams } from 'expo-router';
@@ -221,7 +222,6 @@ function FilterButton({ label, value, selected, onPress }: { label: string; valu
 
 function MemberRow({ row, value, touched, disabled, onChoose }: { row: AttendanceRow; value: AttendanceStatus; touched: boolean; disabled: boolean; onChoose: (value: AttendanceStatus) => void }) {
   const t = useAppTheme();
-  const initials = (row.displayName || 'Member').split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
   const selfMarked = !row.attendance?.finalStatus && row.attendance?.memberSubmittedStatus === 'present' && !touched;
   const detail = touched
     ? value === null ? 'Will clear optional attendance' : `Ready to mark ${value}`
@@ -235,7 +235,7 @@ function MemberRow({ row, value, touched, disabled, onChoose }: { row: Attendanc
 
   return (
     <View style={[styles.memberRow, { borderBottomColor: t.line }]}>
-      <View style={[styles.avatar, { backgroundColor: t.soft }]}><Text style={[styles.initials, { color: t.ink }]}>{initials}</Text></View>
+      <ProfileAvatar photoUrl={row.profile.photoUrl} name={row.displayName || 'Unnamed member'} />
       <View style={styles.memberCopy}>
         <Text style={[styles.memberName, { color: t.ink }]} numberOfLines={1}>{row.displayName || 'Unnamed member'}</Text>
         <Text style={[styles.memberDetail, { color: t.muted }]} numberOfLines={1}>{detail}</Text>

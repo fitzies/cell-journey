@@ -1,11 +1,11 @@
 import { useQuery } from 'convex/react';
-import { router } from 'expo-router';
+import { router, type ErrorBoundaryProps } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ActionSheetIOS, Alert, AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { leaderAccessLabel, useGroups } from '@/components/group-context';
 import { EmptyState, LeaderScreen } from '@/components/leader/ui';
-import { LoadingState } from '@/components/onboarding/ui';
+import { LeaderConnectionNotice, LeaderLoadError, LeaderLoadingState } from '@/components/leader/query-state';
 import { fonts, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
 import { formatDateParts, formatTimeRange } from '@/lib/date';
 import { api, type Doc } from '@/lib/api';
@@ -47,7 +47,7 @@ export default function LeaderHomeScreen() {
     (group && events === undefined) ||
     (canManageJoinRequests && pending === undefined) ||
     (canManageMembers && members === undefined)
-  ) return <LoadingState />;
+  ) return <LeaderLoadingState title="Home" label="Loading your group…" />;
 
   if (!group) {
     return (
@@ -86,7 +86,7 @@ export default function LeaderHomeScreen() {
 
   return (
     <LeaderScreen title="Home" contentStyle={styles.pageContent}>
-
+      <LeaderConnectionNotice />
       <Pressable
         accessibilityRole={groups.ledGroups.length > 1 ? 'button' : 'text'}
         accessibilityLabel={groups.ledGroups.length > 1 ? `Switch group. Current group: ${group.name}` : group.name}
@@ -290,3 +290,7 @@ const styles = StyleSheet.create({
   upcomingTitle: { fontFamily: fonts.bodySemiBold, fontSize: 15, letterSpacing: -0.2 },
   upcomingMeta: { ...textStyles.body, marginTop: 3 },
 });
+
+export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
+  return <LeaderLoadError title="Home" body="Couldn't load your group." retry={retry} />;
+}

@@ -91,7 +91,7 @@ function ContextMenuButton({ mode }: { mode: AppMode }) {
         onPress={() => setOpen((value) => !value)}
         style={styles.iconButton}
       >
-        <SolarIcon name="members" color={t.ink} />
+        <SolarIcon name="transfer-horizontal-linear" color={t.strong} />
       </Pressable>
       {open ? (
         <View accessibilityRole="menu" style={[styles.menu, surfaceShadow(t), { backgroundColor: t.surface }]}>

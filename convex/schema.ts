@@ -46,6 +46,7 @@ const pushPlatform = v.union(
 
 export default defineSchema({
   ...authTables,
+  authVerifiers: authTables.authVerifiers.index("by_sessionId", ["sessionId"]),
 
   authEmailOtpRequests: defineTable({
     emailHash: v.string(),
@@ -88,6 +89,7 @@ export default defineSchema({
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     preferredName: v.optional(v.string()),
+    avatarStorageId: v.optional(v.id("_storage")),
     // Deprecated for profiles created before postal-district onboarding.
     singaporeRegion: v.optional(singaporeRegion),
     postalDistrict: v.optional(postalDistrictCodeValidator),

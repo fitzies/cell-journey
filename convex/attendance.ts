@@ -1,3 +1,4 @@
+import { withProfilePhoto } from "./lib/profilePhoto";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
@@ -126,7 +127,7 @@ async function rosterForEvent(
       rows.push({
         eligibility,
         membership,
-        profile,
+        profile: (await withProfilePhoto(ctx, profile))!,
         displayName: getProfileDisplayName(profile),
         attendance,
         effectiveStatus: effectiveStatus(attendance),

@@ -302,11 +302,9 @@ export async function requireLeaderProfile(ctx: DbCtx) {
   return { ...profile, leaderGroupId: activeGroups[0]._id };
 }
 
-async function validateProfileInput(
-  ctx: MutationCtx,
+function validateProfileName(
   profile: Doc<"userProfiles">,
   names: { firstName?: string; lastName?: string; fullName?: string },
-  serviceIds: Id<"services">[],
   allowLegacyNameWrite: boolean,
 ) {
   const firstName = cleanName(names.firstName);
@@ -335,6 +333,14 @@ async function validateProfileInput(
     }
   }
 
+  return {
+    firstName: submittedStructuredName ? firstName : profile.firstName,
+    lastName: submittedStructuredName ? lastName : profile.lastName,
+    fullName: submittedStructuredName ? `${firstName} ${lastName}` : submittedFullName,
+  };
+}
+
+async function validateProfileServices(ctx: MutationCtx, serviceIds: Id<"services">[]) {
   const uniqueServiceIds = [...new Set(serviceIds)];
   if (uniqueServiceIds.length === 0) throw new Error("Select at least one service");
 
@@ -343,12 +349,19 @@ async function validateProfileInput(
     if (!service || !service.isActive) throw new Error("Invalid service selected");
   }
 
-  return {
-    firstName: submittedStructuredName ? firstName : profile.firstName,
-    lastName: submittedStructuredName ? lastName : profile.lastName,
-    fullName: submittedStructuredName ? `${firstName} ${lastName}` : submittedFullName,
-    uniqueServiceIds,
-  };
+  return uniqueServiceIds;
+}
+
+async function validateProfileInput(
+  ctx: MutationCtx,
+  profile: Doc<"userProfiles">,
+  names: { firstName?: string; lastName?: string; fullName?: string },
+  serviceIds: Id<"services">[],
+  allowLegacyNameWrite: boolean,
+) {
+  const validatedNames = validateProfileName(profile, names, allowLegacyNameWrite);
+  const uniqueServiceIds = await validateProfileServices(ctx, serviceIds);
+  return { ...validatedNames, uniqueServiceIds };
 }
 
 function getCompatibilityOnboardingStatus(profile: Doc<"userProfiles">) {
@@ -617,6 +630,36 @@ export const updateProfileV3 = mutation({
         : { postalSector: args.postalSector },
       false,
     ),
+});
+
+/** Edits one profile detail without resubmitting unrelated client snapshot fields. */
+export const updateProfileField = mutation({
+  args: {
+    change: v.union(
+      v.object({ field: v.literal("name"), firstName: v.string(), lastName: v.string() }),
+      v.object({ field: v.literal("services"), serviceIds: v.array(v.id("services")) }),
+      v.object({ field: v.literal("postal"), postalSector: v.string() }),
+    ),
+  },
+  handler: async (ctx, { change }) => {
+    const profile = await requireCurrentProfile(ctx);
+    let patch: Partial<Doc<"userProfiles">>;
+    if (change.field === "name") {
+      patch = validateProfileName(profile, change, false);
+    } else if (change.field === "services") {
+      patch = { serviceIds: await validateProfileServices(ctx, change.serviceIds) };
+    } else {
+      const district = getPostalDistrictFromSector(change.postalSector);
+      if (!district) throw new Error("Enter a valid two-digit postal sector");
+      patch = { postalDistrict: district.code, singaporeRegion: undefined };
+    }
+    await ctx.db.patch(profile._id, {
+      ...patch,
+      updatedAt: Date.now(),
+      onboardingStatus: getCompatibilityOnboardingStatus({ ...profile, ...patch }),
+    });
+    return await ctx.db.get(profile._id);
+  },
 });
 
 export type ProfileId = Id<"userProfiles">;

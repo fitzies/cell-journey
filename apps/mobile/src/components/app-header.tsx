@@ -5,7 +5,7 @@ import { useAppTheme } from '@/constants/tokens';
 import type { AppHeaderProps } from './app-header.types';
 export type { AppHeaderProps, AppMode } from './app-header.types';
 
-const switcherIcon = require('@/assets/images/solar-tabs/members.png');
+const switcherIcon = require('@/assets/images/toolbar/transfer-horizontal-linear.png');
 
 export function AppHeader({ title, mode, profile = false, eventActions }: AppHeaderProps) {
   const t = useAppTheme();

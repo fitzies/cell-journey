@@ -20,6 +20,7 @@ import { CreateUserDialog } from "@/components/admin/create-user-dialog";
 import { GroupLeadershipControls } from "@/components/admin/group-leadership-controls";
 import { PanelLoading, SearchInput } from "@/components/admin/panel-ui";
 import { PeoplePanel } from "@/components/admin/people-panel";
+import { ProfileAvatar } from "@/components/admin/profile-avatar";
 import { profileDisplayName } from "@/components/admin/profile-display-name";
 import { CreateServiceDialog, ServicesPanel } from "@/components/admin/services-panel";
 import type {
@@ -713,7 +714,7 @@ function RequestsPanel({ requests }: { requests: RequestRows | undefined }) {
       accessorFn: (row) => profileDisplayName(row.profile, "Unnamed member"),
       id: "member",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Member" />,
-      cell: ({ row }) => <span className="font-medium">{row.getValue("member")}</span>,
+      cell: ({ row }) => <div className="flex items-center gap-3"><ProfileAvatar photoUrl={row.original.profile?.photoUrl} name={profileDisplayName(row.original.profile, "Unnamed member")} /><span className="font-medium">{row.getValue("member")}</span></div>,
     },
     {
       accessorFn: (row) => row.group?.name ?? "Unknown group",

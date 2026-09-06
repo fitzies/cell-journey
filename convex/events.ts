@@ -283,6 +283,18 @@ export const importForGroup = mutation({
   },
 });
 
+export const getForEditing = query({
+  args: { eventId: v.string() },
+  handler: async (ctx, args) => {
+    const profile = await requireCurrentProfile(ctx);
+    const eventId = ctx.db.normalizeId("events", args.eventId);
+    const event = eventId ? await ctx.db.get(eventId) : null;
+    if (!event || event.cancelledAt) return null;
+    const access = await getLeadershipAccessForGroup(ctx, profile._id, event.groupId);
+    return access?.capabilities.updateEvents ? event : null;
+  },
+});
+
 export const update = mutation({
   args: {
     eventId: v.id("events"),

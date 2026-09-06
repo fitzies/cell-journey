@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as accountDeletion from "../accountDeletion.js";
 import type * as admin from "../admin.js";
 import type * as attendance from "../attendance.js";
 import type * as auth from "../auth.js";
@@ -19,9 +20,11 @@ import type * as events from "../events.js";
 import type * as groups from "../groups.js";
 import type * as http from "../http.js";
 import type * as joinRequestFlow from "../joinRequestFlow.js";
+import type * as lib_profilePhoto from "../lib/profilePhoto.js";
 import type * as membershipActivity from "../membershipActivity.js";
 import type * as membershipOrdering from "../membershipOrdering.js";
 import type * as migrations from "../migrations.js";
+import type * as profilePhotos from "../profilePhotos.js";
 import type * as profiles from "../profiles.js";
 import type * as seed from "../seed.js";
 import type * as validators from "../validators.js";
@@ -33,6 +36,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  accountDeletion: typeof accountDeletion;
   admin: typeof admin;
   attendance: typeof attendance;
   auth: typeof auth;
@@ -44,9 +48,11 @@ declare const fullApi: ApiFromModules<{
   groups: typeof groups;
   http: typeof http;
   joinRequestFlow: typeof joinRequestFlow;
+  "lib/profilePhoto": typeof lib_profilePhoto;
   membershipActivity: typeof membershipActivity;
   membershipOrdering: typeof membershipOrdering;
   migrations: typeof migrations;
+  profilePhotos: typeof profilePhotos;
   profiles: typeof profiles;
   seed: typeof seed;
   validators: typeof validators;

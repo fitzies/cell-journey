@@ -1,10 +1,12 @@
 import { router, Stack } from 'expo-router';
-import { StyleSheet, Text } from 'react-native';
+import { Platform, StyleSheet, Text } from 'react-native';
 import { leaderAccessLabel, useGroups } from '@/components/group-context';
 import { useAppTheme } from '@/constants/tokens';
 
 import type { AppHeaderProps } from './app-header.types';
 export type { AppHeaderProps, AppMode } from './app-header.types';
+
+const supportsScrollEdgeEffects = Number.parseInt(String(Platform.Version), 10) >= 26;
 
 export function AppHeader({ title, mode, profile = false, eventActions }: AppHeaderProps) {
   const t = useAppTheme();
@@ -12,9 +14,12 @@ export function AppHeader({ title, mode, profile = false, eventActions }: AppHea
 
   return (
     <>
-      <Stack.Screen options={{ headerShown: true, title: '' }} />
+      <Stack.Screen options={{ headerShown: true, title: '', scrollEdgeEffects: { top: 'soft' } }} />
       <Stack.Header
-        style={{ backgroundColor: t.background, color: t.ink, shadowColor: 'transparent' }}
+        transparent
+        // iOS 26 supplies the soft edge itself; combining it with blur doubles the effect.
+        blurEffect={supportsScrollEdgeEffects ? undefined : 'systemMaterial'}
+        style={{ backgroundColor: 'transparent', color: t.ink, shadowColor: 'transparent' }}
       />
       {isTabTitle ? (
         <Stack.Toolbar placement="left">
@@ -58,7 +63,8 @@ function ContextToolbar({ mode, eventActions }: Pick<AppHeaderProps, 'mode' | 'e
       ) : null}
       {canSwitch ? <Stack.Toolbar.Menu
         accessibilityLabel="Switch group or mode"
-        icon="person.2.fill"
+        icon={require('@/assets/images/toolbar/transfer-horizontal-linear.png')}
+        iconRenderingMode="template"
         separateBackground
         title="Switch group or mode"
       >

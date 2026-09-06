@@ -1,3 +1,4 @@
+import { withProfilePhoto } from "./lib/profilePhoto";
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -324,7 +325,7 @@ async function pendingRowsForGroup(ctx: QueryCtx, groupId: Id<"groups">) {
     .take(100);
   const rows = [];
   for (const request of requests) {
-    rows.push({ request, profile: await ctx.db.get(request.profileId) });
+    rows.push({ request, profile: await withProfilePhoto(ctx, await ctx.db.get(request.profileId)) });
   }
   return rows;
 }
@@ -584,7 +585,7 @@ export const listMembers = query({
     const memberships = await connectedMembershipsForGroup(ctx, args.groupId);
     const rows = [];
     for (const membership of memberships) {
-      rows.push({ membership, profile: await ctx.db.get(membership.profileId) });
+      rows.push({ membership, profile: await withProfilePhoto(ctx, await ctx.db.get(membership.profileId)) });
     }
     return rows;
   },
@@ -603,7 +604,7 @@ export const listMyMembers = query({
     const memberships = await connectedMembershipsForGroup(ctx, groups[0]._id);
     const rows = [];
     for (const membership of memberships) {
-      rows.push({ membership, profile: await ctx.db.get(membership.profileId) });
+      rows.push({ membership, profile: await withProfilePhoto(ctx, await ctx.db.get(membership.profileId)) });
     }
     return rows;
   },

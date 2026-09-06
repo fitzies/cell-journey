@@ -286,6 +286,7 @@ export function OrderedRosterScreen<T>({
   };
 
   const commonProps = {
+    contentInsetAdjustmentBehavior: 'automatic' as const,
     data,
     keyExtractor: (item: ListItem<T>) => item.key,
     ListHeaderComponent: header,

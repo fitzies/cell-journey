@@ -9,7 +9,7 @@ export function LeaderScreen({ title, profile, headerShown = true, eventActions,
   return (
     <SafeAreaView edges={headerShown ? [] : ['top']} style={[styles.root, { backgroundColor: t.background }]}>
       {headerShown ? <AppHeader title={title} mode="leader" profile={profile} eventActions={eventActions} /> : null}
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, contentStyle]}>
+      <ScrollView contentInsetAdjustmentBehavior={headerShown ? 'automatic' : 'never'} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, contentStyle]}>
         {children}
       </ScrollView>
     </SafeAreaView>

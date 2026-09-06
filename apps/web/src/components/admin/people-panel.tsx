@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
 
+import { ProfileAvatar } from "./profile-avatar";
 import { PanelLoading, SearchInput } from "./panel-ui";
 import { PeopleManagementControls } from "./people-management-controls";
 import { profileDisplayName } from "./profile-display-name";
@@ -110,18 +111,10 @@ export function PeoplePanel({
 
 function PersonIdentity({ row }: { row: UserRow }) {
   const name = profileDisplayName(row.profile, row.displayName);
-  const initials = name
-    .split(/\s+/)
-    .map((word) => word[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
 
   return (
     <div className="flex min-w-56 items-center gap-3">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary ring-1 ring-inset ring-primary/15">
-        {initials || "?"}
-      </div>
+      <ProfileAvatar photoUrl={row.profile.photoUrl} name={name} />
       <div className="min-w-0">
         <p className="truncate font-medium">{name}</p>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">{row.user.email ?? "No email"}</p>

@@ -81,8 +81,9 @@ async function userSummary(ctx: QueryCtx, userId: Id<"users">) {
   };
 }
 
-function publicProfile(profile: Doc<"userProfiles">) {
+async function publicProfile(ctx: QueryCtx, profile: Doc<"userProfiles">) {
   return {
+    photoUrl: profile.avatarStorageId ? await ctx.storage.getUrl(profile.avatarStorageId) : null,
     _id: profile._id,
     userId: profile.userId ?? null,
     role: profile.role,
@@ -262,7 +263,7 @@ export const listUsers = query({
       if (search && !haystack.includes(search)) continue;
 
       rows.push({
-        profile: publicProfile(profile),
+        profile: await publicProfile(ctx, profile),
         user,
         accountStatus,
         displayName,
@@ -376,7 +377,7 @@ export const listGroups = query({
         if (profile) {
           coLeaders.push({
             assignment,
-            profile: publicProfile(profile),
+            profile: await publicProfile(ctx, profile),
             displayName: getProfileDisplayName(profile),
             capabilities: CO_LEADER_CAPABILITIES,
           });
@@ -388,7 +389,7 @@ export const listGroups = query({
         .take(200);
       rows.push({
         group,
-        leader: leader ? publicProfile(leader) : null,
+        leader: leader ? await publicProfile(ctx, leader) : null,
         leaderName: leader ? getProfileDisplayName(leader) : null,
         leaderCapabilities: leader ? OWNER_CAPABILITIES : null,
         coLeaders,
@@ -438,7 +439,7 @@ export const listCoLeaderAssignments = query({
       rows.push({
         assignment,
         group,
-        profile: profile ? publicProfile(profile) : null,
+        profile: profile ? await publicProfile(ctx, profile) : null,
         displayName: profile ? getProfileDisplayName(profile) : null,
         capabilities: CO_LEADER_CAPABILITIES,
       });
@@ -637,7 +638,7 @@ export const listPendingJoinRequests = query({
     for (const request of requests) {
       const profile = await ctx.db.get(request.profileId);
       const group = await ctx.db.get(request.groupId);
-      rows.push({ request, profile: profile ? publicProfile(profile) : null, group });
+      rows.push({ request, profile: profile ? await publicProfile(ctx, profile) : null, group });
     }
     return rows;
   },

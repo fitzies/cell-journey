@@ -137,3 +137,45 @@ describe("event spreadsheet imports", () => {
     })).rejects.toThrow("Unauthorized");
   });
 });
+
+describe("leader event editing", () => {
+  test("loads only editable events and handles stale or malformed links", async () => {
+    const t = makeTest();
+    const owner = await seedLeaderAndGroup(t);
+    const other = await seedLeaderAndGroup(t);
+    const client = asUser(t, owner.userId);
+    const event = await client.mutation(api.events.createForGroup, {
+      groupId: owner.groupId, title: "Gathering", startAt: 1000, endAt: 2000,
+    });
+    expect(await client.query(api.events.getForEditing, { eventId: event!._id })).toEqual(event);
+    expect(await asUser(t, other.userId).query(api.events.getForEditing, { eventId: event!._id })).toBeNull();
+    expect(await client.query(api.events.getForEditing, { eventId: "invalid" })).toBeNull();
+    await client.mutation(api.events.cancel, { eventId: event!._id });
+    expect(await client.query(api.events.getForEditing, { eventId: event!._id })).toBeNull();
+    await expect(client.mutation(api.events.update, {
+      eventId: event!._id, title: "Edited", startAt: 1000, endAt: 2000,
+    })).rejects.toThrow("Cancelled events cannot be edited");
+    expect(await client.query(api.events.listForGroup, { groupId: owner.groupId })).toEqual([]);
+    expect(await t.run((ctx) => ctx.db.get(event!._id))).toMatchObject({ title: "Gathering", cancelledByProfileId: owner.profileId });
+  });
+
+  test("updates a past event in place, clears optional fields, and preserves ownership", async () => {
+    const t = makeTest();
+    const owner = await seedLeaderAndGroup(t);
+    const client = asUser(t, owner.userId);
+    const event = await client.mutation(api.events.createForGroup, {
+      groupId: owner.groupId, title: "Gathering", venue: "Home", word: "Alice",
+      worship: "Bob", remarks: "Bring snacks", startAt: 1000, endAt: 2000,
+    });
+    const edited = await client.mutation(api.events.update, {
+      eventId: event!._id, title: " Prayer night ", venue: "", word: "", worship: "", remarks: "",
+      startAt: 3000, endAt: 4000,
+    });
+    expect(edited).toMatchObject({
+      _id: event!._id, groupId: owner.groupId, createdByProfileId: owner.profileId,
+      createdAt: event!.createdAt, title: "Prayer night", location: "", startAt: 3000, endAt: 4000,
+    });
+    for (const field of ['venue', 'word', 'worship', 'remarks'] as const) expect(edited![field]).toBeUndefined();
+    expect(await client.query(api.events.listForGroup, { groupId: owner.groupId })).toHaveLength(1);
+  });
+});

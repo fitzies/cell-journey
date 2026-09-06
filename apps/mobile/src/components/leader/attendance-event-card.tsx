@@ -1,9 +1,13 @@
-import { Link } from 'expo-router';
+import { useMutation } from 'convex/react';
+import * as Haptics from 'expo-haptics';
+import { useRef, useState } from 'react';
+import { Link, router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Alert, Platform, type PressableProps, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { fonts, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
 import { formatDateParts } from '@/lib/date';
-import type { Doc } from '@/lib/api';
+import { api, type Doc } from '@/lib/api';
+import { useGroups } from '@/components/group-context';
 
 export type AttendanceEventKind = 'open' | 'upcoming' | 'complete' | 'needs';
 
@@ -25,7 +29,61 @@ export function AttendanceEventCard({
   status: string;
   zoom?: boolean;
 }) {
-  const content = <AttendanceEventCardContent event={event} kind={kind} status={status} />;
+  const { ledGroups } = useGroups();
+  const group = ledGroups.find((candidate) => candidate._id === event.groupId);
+  const canEdit = !!group?.capabilities.updateEvents && !event.cancelledAt;
+  const canDelete = !!group?.capabilities.cancelEvents && !event.cancelledAt;
+  const cancelEvent = useMutation(api.events.cancel);
+  const deletingRef = useRef(false);
+  const [deleting, setDeleting] = useState(false);
+  const edit = () => {
+    if (!canEdit || deletingRef.current) return;
+    router.push({ pathname: '/create-event', params: { groupId: event.groupId, eventId: event._id } });
+  };
+  const remove = async () => {
+    if (!canDelete || deletingRef.current) return;
+    deletingRef.current = true;
+    setDeleting(true);
+    try {
+      await cancelEvent({ eventId: event._id });
+    } catch (error) {
+      Alert.alert('Could not delete event', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      deletingRef.current = false;
+      setDeleting(false);
+    }
+  };
+  const confirmDelete = () => {
+    if (!canDelete || deletingRef.current) return;
+    Alert.alert('Delete event?', `"${event.title}" will be removed from the schedule. Existing attendance records will be kept.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete event', style: 'destructive', onPress: () => { void remove(); } },
+    ]);
+  };
+  const showMenu = () => {
+    if (deletingRef.current) return;
+    void Haptics.selectionAsync().catch(() => {});
+    Alert.alert(event.title, undefined, [
+      ...(canEdit ? [{ text: 'Edit', onPress: edit }] : []),
+      ...(canDelete ? [{ text: 'Delete', style: 'destructive' as const, onPress: confirmDelete }] : []),
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+  const hasActions = canEdit || canDelete;
+  const content = <AttendanceEventCardContent
+    event={event} kind={kind} status={deleting ? 'Deleting…' : status}
+    disabled={deleting}
+    accessibilityHint={hasActions ? 'Touch and hold for event actions.' : undefined}
+    accessibilityActions={hasActions ? [
+      ...(canEdit ? [{ name: 'edit', label: 'Edit event' }] : []),
+      ...(canDelete ? [{ name: 'delete', label: 'Delete event' }] : []),
+    ] : undefined}
+    onAccessibilityAction={({ nativeEvent }) => {
+      if (nativeEvent.actionName === 'edit') edit();
+      if (nativeEvent.actionName === 'delete') confirmDelete();
+    }}
+    onLongPress={hasActions && Platform.OS !== 'ios' ? showMenu : undefined}
+  />;
   const href = {
     pathname: '/(leader-tabs)/attendance/[eventId]',
     params: { eventId: event._id },
@@ -33,7 +91,11 @@ export function AttendanceEventCard({
 
   return (
     <Link href={href} asChild>
-      {zoom ? <Link.AppleZoom>{content}</Link.AppleZoom> : content}
+      <Link.Trigger>{zoom ? <Link.AppleZoom>{content}</Link.AppleZoom> : content}</Link.Trigger>
+      {hasActions && Platform.OS === 'ios' ? <Link.Menu>
+        {canEdit ? <Link.MenuAction icon="pencil" disabled={deleting} onPress={edit}>Edit</Link.MenuAction> : null}
+        {canDelete ? <Link.MenuAction icon="trash" destructive disabled={deleting} onPress={confirmDelete}>Delete</Link.MenuAction> : null}
+      </Link.Menu> : null}
     </Link>
   );
 }
@@ -44,13 +106,14 @@ export function AttendanceEventCardContent({
   status,
   onPress,
   tail = 'right',
+  ...pressableProps
 }: {
   event: Doc<'events'>;
   kind: AttendanceEventKind;
   status: string;
   onPress?: () => void;
   tail?: 'right' | 'down';
-}) {
+} & Omit<PressableProps, 'children' | 'style'>) {
   const t = useAppTheme();
   const date = formatDateParts(event.startAt);
   const dark = useColorScheme() === 'dark';
@@ -62,6 +125,7 @@ export function AttendanceEventCardContent({
       accessibilityRole="button"
       accessibilityLabel={`${event.title}, ${status}`}
       onPress={onPress}
+      {...pressableProps}
       style={({ pressed }) => [
         styles.card,
         surfaceShadow(t),
