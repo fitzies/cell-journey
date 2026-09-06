@@ -161,19 +161,22 @@ function NoAccess({ reason, email }: { reason: string; email: string | null }) {
 function AdminDashboard() {
   const { signOut } = useAuthActions();
   const [tab, setTab] = useState("attendance");
-  const [period, setPeriod] = useState<Period>("90");
+  // The query window must survive renders, including React Compiler optimizations.
+  const [{ period, to }, setWindow] = useState(() => ({ period: "90" as Period, to: Date.now() }));
   const [attendanceSearch, setAttendanceSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
-  const range = useMemo(() => {
-    const to = Date.now();
-    return { from: to - Number(period) * DAY, to };
-  }, [period]);
+  const range = { from: to - Number(period) * DAY, to };
 
   const {
     results: attendance,
     status: attendanceStatus,
     loadMore: loadMoreAttendance,
   } = usePaginatedQuery(api.admin.listGroupAttendance, range, { initialNumItems: 10 });
+  // Overview totals need every page, including groups created after archived ones.
+  useEffect(() => {
+    if (attendanceStatus === "CanLoadMore") loadMoreAttendance(10);
+  }, [attendanceStatus, loadMoreAttendance]);
+  const totalsLoading = attendanceStatus !== "Exhausted";
   const needsManagementData = tab === "groups" || tab === "people";
   const users = useQuery(api.admin.listUsers, needsManagementData ? { limit: 250 } : "skip");
   const groups = useQuery(api.admin.listGroups, needsManagementData ? { limit: 200 } : "skip");
@@ -238,7 +241,7 @@ function AdminDashboard() {
             <p className="text-sm text-muted-foreground">Overview</p>
             <h1 className="mt-1 text-3xl font-semibold tracking-[-0.04em]">Attendance dashboard</h1>
           </div>
-          <Select value={period} onValueChange={(value) => setPeriod(value as Period)}>
+          <Select value={period} onValueChange={(value) => setWindow({ period: value as Period, to: Date.now() })}>
             <SelectTrigger className="w-36" aria-label="Attendance period">
               <SelectValue />
             </SelectTrigger>
@@ -251,10 +254,10 @@ function AdminDashboard() {
         </section>
 
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard label="Attendance" value={formatPercent(totals.rate)} detail={`${totals.present} of ${totals.expected} expected`} />
-          <MetricCard label="Groups shown" value={attendance.filter((row) => row.group.isActive).length} detail="active groups loaded" />
-          <MetricCard label="Events" value={totals.events} detail={`last ${period} days`} />
-          <MetricCard label="Below 70%" value={totals.needsAttention} detail="groups to review" />
+          <MetricCard loading={totalsLoading} label="Attendance" value={formatPercent(totals.rate)} detail={`${totals.present} of ${totals.expected} expected`} />
+          <MetricCard loading={totalsLoading} label="Active groups" value={attendance.filter((row) => row.group.isActive).length} detail="across all groups" />
+          <MetricCard loading={totalsLoading} label="Events" value={totals.events} detail={`last ${period} days`} />
+          <MetricCard loading={totalsLoading} label="Below 70%" value={totals.needsAttention} detail="groups to review" />
         </section>
 
         <Tabs value={tab} onValueChange={setTab}>
@@ -292,9 +295,7 @@ function AdminDashboard() {
             <AttendancePanel
               rows={attendanceRows}
               loading={attendanceStatus === "LoadingFirstPage"}
-              loadingMore={attendanceStatus === "LoadingMore"}
-              canLoadMore={attendanceStatus === "CanLoadMore"}
-              loadMore={() => loadMoreAttendance(10)}
+              loadingMore={attendanceStatus === "LoadingMore" || attendanceStatus === "CanLoadMore"}
               search={attendanceSearch}
               setSearch={setAttendanceSearch}
             />
@@ -323,13 +324,13 @@ function AdminDashboard() {
   );
 }
 
-function MetricCard({ label, value, detail }: { label: string; value: string | number; detail: string }) {
+function MetricCard({ label, value, detail, loading }: { label: string; value: string | number; detail: string; loading: boolean }) {
   return (
     <Card>
       <CardContent className="p-5">
         <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] tabular-nums">{value}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+        <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] tabular-nums">{loading ? "—" : value}</p>
+        <p className="mt-1 text-xs text-muted-foreground" role={loading ? "status" : undefined}>{loading ? "Loading all groups…" : detail}</p>
       </CardContent>
     </Card>
   );
@@ -339,31 +340,15 @@ function AttendancePanel({
   rows,
   loading,
   loadingMore,
-  canLoadMore,
-  loadMore,
   search,
   setSearch,
 }: {
   rows: AttendanceRow[];
   loading: boolean;
   loadingMore: boolean;
-  canLoadMore: boolean;
-  loadMore: () => void;
   search: string;
   setSearch: (value: string) => void;
 }) {
-  const [showEmptyState, setShowEmptyState] = useState(false);
-
-  useEffect(() => {
-    if (!loading) {
-      setShowEmptyState(false);
-      return;
-    }
-
-    const timeout = window.setTimeout(() => setShowEmptyState(true), 1500);
-    return () => window.clearTimeout(timeout);
-  }, [loading]);
-
   const columns = useMemo<ColumnDef<AttendanceRow>[]>(() => [
     {
       accessorFn: (row) => row.group.name,
@@ -440,28 +425,23 @@ function AttendancePanel({
         <SearchInput value={search} onChange={setSearch} placeholder="Search groups" />
       </CardHeader>
       <CardContent className="space-y-4">
-        {loading && !showEmptyState ? (
+        {loading ? (
           <PanelLoading />
         ) : (
           <DataTable
             columns={columns}
             data={rows}
             getRowId={(row) => row.group._id}
-            emptyMessage="No attendance data yet. It will appear after the first completed event."
+            emptyMessage={search.trim() ? "No groups match your search." : "No groups yet."}
           />
         )}
-        {loading && showEmptyState ? (
-          <p className="text-xs text-muted-foreground">Still checking for updates…</p>
-        ) : null}
         {rows.some((row) => !row.isComplete) ? (
           <p className="text-xs text-muted-foreground">Some high-volume groups reached the analytics safety limit. Their figures may be partial.</p>
         ) : null}
-        {canLoadMore || loadingMore ? (
-          <div className="flex justify-center">
-            <Button variant="outline" size="sm" onClick={loadMore} disabled={loadingMore}>
-              {loadingMore ? <><Spinner />Loading…</> : "Load more groups"}
-            </Button>
-          </div>
+        {loadingMore ? (
+          <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground" role="status">
+            <Spinner />Loading remaining groups…
+          </p>
         ) : null}
       </CardContent>
     </Card>
