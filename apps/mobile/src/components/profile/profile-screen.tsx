@@ -29,6 +29,9 @@ export function ProfileScreen({ mode }: { mode: AppMode }) {
   const profile = useQuery(api.profiles.current, {});
   const services = useQuery(api.groups.listServices, {});
   const groups = useGroups();
+  const leader = mode === 'leader';
+  const selected = leader ? groups.selectedLeaderGroup : groups.selectedMemberGroup?.group;
+  const details = useQuery(api.groups.getMyProfileDetails, { groupId: selected?._id });
   const leaveGroup = useMutation(api.groups.leaveGroup);
   const updateProfile = useMutation(api.profiles.updateProfileField);
   const [editing, setEditing] = useState<ProfileField | null>(null);
@@ -36,10 +39,8 @@ export function ProfileScreen({ mode }: { mode: AppMode }) {
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
 
-  if (profile === undefined || services === undefined || groups.context === undefined) return <LoadingState />;
+  if (profile === undefined || services === undefined || groups.context === undefined || details === undefined) return <LoadingState />;
 
-  const leader = mode === 'leader';
-  const selected = leader ? groups.selectedLeaderGroup : groups.selectedMemberGroup?.group;
   const entries = leader
     ? groups.ledGroups.map((group) => ({ id: group._id, name: group.name, role: leaderAccessLabel(group.accessRole) }))
     : groups.memberGroups.map(({ group }) => ({ id: group._id, name: group.name, role: 'Member' }));
@@ -120,6 +121,8 @@ export function ProfileScreen({ mode }: { mode: AppMode }) {
         mode={mode}
         displayName={getProfileDisplayName(profile, leader ? 'Leader' : 'Member')}
         fullName={profile?.fullName}
+        email={details.email}
+        groupSummary={details.groupSummary}
         photoUrl={photoUrl}
         uploadingPhoto={uploadingPhoto}
         onPhoto={() => { void changePhoto(); }}

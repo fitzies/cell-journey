@@ -53,14 +53,16 @@ async function findMembershipForEvent(
   return eligible[0] ?? null;
 }
 
-function isOptionalInactiveMembershipForEvent(
+// Outside active periods, a current relationship remains optional even after
+// reactivation or visitor classification. This keeps past attendance correctable.
+function isOptionalConnectedMembershipForEvent(
   membership: Membership | null | undefined,
   event: Doc<"events">,
 ) {
   return Boolean(
     membership &&
       membership.groupId === event.groupId &&
-      membership.status === "inactive" &&
+      (membership.status === "active" || membership.status === "inactive") &&
       membership.joinedAt <= event.startAt,
   );
 }
@@ -110,7 +112,7 @@ async function rosterForEvent(
   const optionalMemberships = activity.memberships
     .filter(
       (membership) =>
-        isOptionalInactiveMembershipForEvent(membership, event) &&
+        isOptionalConnectedMembershipForEvent(membership, event) &&
         !requiredByProfile.has(membership.profileId),
     )
     .sort(compareMemberships);
@@ -237,13 +239,13 @@ export const markForMember = mutation({
     );
     const optionalMembership =
       !requiredMembership &&
-      isOptionalInactiveMembershipForEvent(connectedMembership, event)
+      isOptionalConnectedMembershipForEvent(connectedMembership, event)
         ? connectedMembership
         : null;
     const membership = requiredMembership ?? optionalMembership;
     if (!membership) throw new Error("Member is not eligible for this event");
     if (optionalMembership && args.status === "absent") {
-      throw new Error("Inactive optional members can only be marked present");
+      throw new Error("Optional attendance can only be marked present");
     }
 
     const existing = await ctx.db
@@ -300,9 +302,9 @@ export const clearOptionalForMember = mutation({
     );
     if (
       requiredMembership ||
-      !isOptionalInactiveMembershipForEvent(connectedMembership, event)
+      !isOptionalConnectedMembershipForEvent(connectedMembership, event)
     ) {
-      throw new Error("Only optional inactive attendance can be cleared");
+      throw new Error("Only optional attendance can be cleared");
     }
 
     const existing = await ctx.db
@@ -482,7 +484,8 @@ export const listForEvent = query({
   },
 });
 
-async function getHistoryForGroup(
+// The calling query must authorize access to the target profile and group.
+export async function getHistoryForGroup(
   ctx: QueryCtx,
   profileId: Id<"userProfiles">,
   groupId: Id<"groups">,
@@ -550,7 +553,7 @@ async function getHistoryForGroup(
     const status = effectiveStatus(attendance);
     totalPastEvents += 1;
     if (status === "present") presentEvents += 1;
-    rows.push({ event, attendance, status: status ?? "absent" });
+    if (limit > 0) rows.push({ event, attendance, status: status ?? "absent" });
   }
 
   rows.sort((a, b) => b.event.startAt - a.event.startAt);

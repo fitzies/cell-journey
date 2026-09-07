@@ -4,6 +4,7 @@ import { SymbolView } from 'expo-symbols';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ActionSheetIOS, Alert, AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { leaderAccessLabel, useGroups } from '@/components/group-context';
+import { AttendanceHeatmap } from '@/components/leader/attendance-heatmap';
 import { EmptyState, LeaderScreen } from '@/components/leader/ui';
 import { LeaderConnectionNotice, LeaderLoadError, LeaderLoadingState } from '@/components/leader/query-state';
 import { fonts, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
@@ -114,6 +115,12 @@ export default function LeaderHomeScreen() {
           <EmptyEventCard onPress={() => router.push('/(leader-tabs)/attendance')} />
         )}
       </HomeSection>
+
+      {group.capabilities.readAttendance ? (
+        <HomeSection title="Group attendance">
+          <AttendanceHeatmap groupId={group._id} />
+        </HomeSection>
+      ) : null}
 
       {canManageJoinRequests && pendingRows.length ? (
         <HomeSection title="Needs your attention">

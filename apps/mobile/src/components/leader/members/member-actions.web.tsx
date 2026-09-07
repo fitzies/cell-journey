@@ -3,7 +3,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
 import type { MemberActionsProps } from './member-actions.types';
 
-export function MemberActions({ name, children, width, height, inactive, disabled, onChangeStatus, onRemove }: MemberActionsProps) {
+export function MemberActions({ name, children, width, height, status, disabled, onViewProfile, onChangeStatus, onRemove }: MemberActionsProps) {
   const t = useAppTheme();
   const [open, setOpen] = useState(false);
   return <>
@@ -15,9 +15,12 @@ export function MemberActions({ name, children, width, height, inactive, disable
         <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="Close member actions" accessibilityRole="button" onPress={() => setOpen(false)} />
         <View accessibilityViewIsModal style={[styles.menu, surfaceShadow(t), { backgroundColor: t.surface }]}>
           <Text style={[textStyles.section, { color: t.text }]}>{name}</Text>
-          <Pressable accessibilityRole="button" onPress={() => { setOpen(false); onChangeStatus(); }} style={styles.action}>
-            <Text style={[textStyles.button, { color: t.text }]}>{inactive ? 'Reactivate' : 'Mark inactive'}</Text>
+          <Pressable accessibilityRole="button" onPress={() => { setOpen(false); onViewProfile(); }} style={styles.action}>
+            <Text style={[textStyles.button, { color: t.text }]}>View profile</Text>
           </Pressable>
+          {(['active', 'inactive', 'visitor'] as const).filter((value) => value !== status).map((value) => <Pressable key={value} accessibilityRole="button" onPress={() => { setOpen(false); onChangeStatus(value); }} style={styles.action}>
+            <Text style={[textStyles.button, { color: t.text }]}>{value === 'visitor' ? 'Mark as visitor' : `Mark ${value}`}</Text>
+          </Pressable>)}
           <View style={{ height: 1, backgroundColor: t.track, marginTop: 8 }} />
           <Pressable accessibilityRole="button" onPress={() => { setOpen(false); onRemove(); }} style={styles.action}>
             <Text style={[textStyles.button, { color: t.danger }]}>Remove from group</Text>

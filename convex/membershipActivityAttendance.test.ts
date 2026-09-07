@@ -161,7 +161,7 @@ describe("membership activity, optional attendance, and worklists", () => {
     expect(corrected.rows[0].effectiveStatus).toBeNull();
   });
 
-  test("optional inactive attendance requires a current post-join relationship", async () => {
+  test("optional attendance requires a current post-join relationship", async () => {
     const t = makeTest();
     const now = Date.now();
     const owner = await seedProfile(t, "Owner");
@@ -214,7 +214,7 @@ describe("membership activity, optional attendance, and worklists", () => {
           eventId,
           profileId,
         }),
-      ).rejects.toThrow("Only optional inactive attendance can be cleared");
+      ).rejects.toThrow("Only optional attendance can be cleared");
     }
   });
 

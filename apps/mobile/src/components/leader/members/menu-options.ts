@@ -14,6 +14,7 @@ export function memberMenuSections(options: MembersOptions) {
       items: [
         { label: 'Active', selected: options.status === 'active', onPress: () => options.onStatus('active') },
         { label: 'Inactive', selected: options.status === 'inactive', onPress: () => options.onStatus('inactive') },
+        { label: 'Visitors', selected: options.status === 'visitor', onPress: () => options.onStatus('visitor') },
         { label: 'All', selected: options.status === 'all', onPress: () => options.onStatus('all') },
       ],
     },

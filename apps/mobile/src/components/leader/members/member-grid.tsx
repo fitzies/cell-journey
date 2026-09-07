@@ -1,15 +1,15 @@
 import { ProfileAvatar } from '@/components/profile-avatar';
 import type { ReactNode } from 'react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef } from 'react';
 import { AccessibilityInfo, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedRef, useReducedMotion } from 'react-native-reanimated';
 import Sortable, { type SortableGridDragEndParams, type SortableGridRenderItem } from 'react-native-sortables';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
 import { getProfileDisplayName } from '@/lib/name';
 import { MemberActions } from './member-actions';
-import type { MemberRow, MemberView } from './types';
+import { memberStatus, type MemberRow, type MemberStatus, type MemberView } from './types';
 
-export function MemberGrid({ rows, view, showStatus, header, emptyState, disabled, canReorder, onReorder, onChangeStatus, onRemove, onDraggingChange }: {
+export function MemberGrid({ rows, view, showStatus, header, emptyState, disabled, canReorder, onReorder, onChangeStatus, onRemove, onViewProfile, onDraggingChange, revision, dragging }: {
   rows: MemberRow[];
   view: MemberView;
   showStatus: boolean;
@@ -18,16 +18,19 @@ export function MemberGrid({ rows, view, showStatus, header, emptyState, disable
   disabled: boolean;
   canReorder: boolean;
   onReorder: (rows: MemberRow[]) => Promise<void>;
-  onChangeStatus: (row: MemberRow) => void;
+  onChangeStatus: (row: MemberRow, status: MemberStatus) => void;
   onRemove: (row: MemberRow) => void;
+  onViewProfile: (row: MemberRow) => void;
+  revision: number;
+  dragging: boolean;
   onDraggingChange: (dragging: boolean) => void;
 }) {
   const t = useAppTheme();
   const { fontScale, width } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
-  const [dragging, setDragging] = useState(false);
   const dragStarted = useRef(false);
+  useLayoutEffect(() => { dragStarted.current = false; }, [revision]);
   const isList = view === 'list';
   const avatarSize = isList ? 44 : 64;
   const columns = isList || fontScale > 1.4 || width < 340 ? 1 : 2;
@@ -36,7 +39,6 @@ export function MemberGrid({ rows, view, showStatus, header, emptyState, disable
   const nameHeight = Math.max(44, (showStatus ? 64 : 44) * fontScale);
 
   const finishDrag = useCallback(({ data }: SortableGridDragEndParams<MemberRow>) => {
-    setDragging(false);
     onDraggingChange(false);
     if (!dragStarted.current) return;
     dragStarted.current = false;
@@ -77,22 +79,25 @@ export function MemberGrid({ rows, view, showStatus, header, emptyState, disable
         name={name}
         width={nameWidth}
         height={nameHeight}
-        inactive={item.membership.status === 'inactive'}
+        status={memberStatus(item)}
         disabled={disabled || dragging}
-        onChangeStatus={() => onChangeStatus(item)}
+        onChangeStatus={(status) => onChangeStatus(item, status)}
         onRemove={() => onRemove(item)}
+        onViewProfile={() => onViewProfile(item)}
       >
         <View style={[styles.nameButton, isList && styles.rowName, { width: nameWidth, height: nameHeight }]}>
           <Text numberOfLines={2} style={[styles.name, isList && styles.rowText, { color: t.text }]}>{name}</Text>
-          {showStatus ? <Text style={[styles.status, { color: t.muted }]}>{item.membership.status === 'inactive' ? 'Inactive' : 'Active'}</Text> : null}
+          {showStatus ? <Text style={[styles.status, { color: t.muted }]}>{memberStatus(item) === 'visitor' ? 'Visitor' : memberStatus(item) === 'inactive' ? 'Inactive' : 'Active'}</Text> : null}
         </View>
       </MemberActions>
     </View>;
-  }, [canReorder, disabled, dragging, onChangeStatus, onReorder, onRemove, rows, t, isList, avatarSize, nameWidth, nameHeight, showStatus]);
+  }, [canReorder, disabled, dragging, onChangeStatus, onReorder, onRemove, onViewProfile, rows, t, isList, avatarSize, nameWidth, nameHeight, showStatus]);
 
   return <Animated.ScrollView ref={scrollRef} contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
     {header}
     {rows.length ? <Sortable.Grid
+      // Reattach drag handlers on focus without remounting the ScrollView.
+      key={revision}
       data={rows}
       renderItem={renderItem}
       keyExtractor={(row) => row.membership._id}
@@ -115,7 +120,6 @@ export function MemberGrid({ rows, view, showStatus, header, emptyState, disable
       dropAnimationDuration={reducedMotion ? 0 : 180}
       onDragStart={() => {
         dragStarted.current = true;
-        setDragging(true);
         onDraggingChange(true);
         AccessibilityInfo.announceForAccessibility('Member picked up. Drag to rearrange.');
       }}

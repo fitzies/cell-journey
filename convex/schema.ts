@@ -170,6 +170,8 @@ export default defineSchema({
     profileId: v.id("userProfiles"),
     groupId: v.id("groups"),
     status: membershipStatus,
+    // Visitor is a roster class; the underlying relationship stays active.
+    memberClass: v.optional(v.literal("visitor")),
     joinedAt: v.number(),
     // Optional during the widen/backfill phase; reads fall back to joinedAt deterministically.
     sortOrder: v.optional(v.number()),

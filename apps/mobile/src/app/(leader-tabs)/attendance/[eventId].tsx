@@ -3,11 +3,11 @@ import { useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
 import { Link, router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { type PropsWithChildren, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useGroups } from '@/components/group-context';
 import { AttendanceEventCardContent, type AttendanceEventKind } from '@/components/leader/attendance-event-card';
-import { ActionButton, EmptyState, LeaderScreen } from '@/components/leader/ui';
+import { ActionButton, EmptyState } from '@/components/leader/ui';
 import { LoadingState } from '@/components/onboarding/ui';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
 import { api, type Id } from '@/lib/api';
@@ -17,6 +17,10 @@ type AttendanceRow = AttendanceDetail['rows'][number];
 type AttendanceStatus = 'present' | 'absent' | null;
 type AttendanceFilter = 'all' | 'review' | 'marked';
 const MAX_BOUNDARY_TIMER_MS = 2_147_000_000;
+
+function closeAttendance() {
+  router.dismissTo('/(leader-tabs)/attendance');
+}
 
 export default function AttendanceEventScreen() {
   const t = useAppTheme();
@@ -31,6 +35,12 @@ export default function AttendanceEventScreen() {
   const [draft, setDraft] = useState<Record<string, AttendanceStatus>>({});
   const [saving, setSaving] = useState(false);
   const [now, setNow] = useState(Date.now);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -55,22 +65,27 @@ export default function AttendanceEventScreen() {
     const markedRequiredCount = rows.filter((row) => row.eligibility === 'required' && valueFor(row) !== null).length;
     const reviewCount = rows.filter((row) => row.eligibility === 'required' && !isFinalized(row)).length;
     const markedCount = rows.filter(isFinalized).length;
+    const presentCount = rows.filter((row) => valueFor(row) === 'present').length;
     const filtered = rows.filter((row) => {
       if (filter === 'review') return row.eligibility === 'required' && !isFinalized(row);
       if (filter === 'marked') return isFinalized(row);
       return true;
     });
-    return { rows, filtered, markedRequiredCount, reviewCount, markedCount };
+    return {
+      rows, filtered, markedRequiredCount, reviewCount, markedCount, presentCount,
+      members: filtered.filter((row) => row.membership.memberClass !== 'visitor'),
+      visitors: filtered.filter((row) => row.membership.memberClass === 'visitor'),
+    };
   }, [detail, draft, filter]);
 
   if (context === undefined || (eventId && detail === undefined)) return <LoadingState />;
 
   if (!eventId || !detail) {
     return (
-      <LeaderScreen title="" headerShown={false} contentStyle={styles.pageContent}>
+      <AttendanceScreenContent>
         <View style={styles.empty}><EmptyState title="Gathering unavailable." body="Return to Events and choose another gathering." /></View>
-        <ActionButton label="Back to Events" onPress={() => router.canGoBack() ? router.back() : router.replace('/(leader-tabs)/attendance')} />
-      </LeaderScreen>
+        <ActionButton label="Back to Events" onPress={closeAttendance} />
+      </AttendanceScreenContent>
     );
   }
 
@@ -82,7 +97,7 @@ export default function AttendanceEventScreen() {
         ? 'complete'
         : 'needs';
   const readOnly = detail.event.startAt > now || !detail.capabilities.markAttendance;
-  const status = statusFor(kind, derived.markedRequiredCount, detail.requiredCount);
+  const status = statusFor(kind, derived.presentCount, derived.rows.length);
   const remaining = Math.max(detail.requiredCount - derived.markedRequiredCount, 0);
   const progress = detail.requiredCount ? derived.markedRequiredCount / detail.requiredCount : 1;
 
@@ -107,8 +122,12 @@ export default function AttendanceEventScreen() {
         }
         saved.push(row.profile._id);
       }
-      setDraft({});
+      if (mounted.current) {
+        setDraft({});
+        closeAttendance();
+      }
     } catch (error) {
+      if (!mounted.current) return;
       setDraft((current) => {
         const next = { ...current };
         saved.forEach((id) => delete next[id]);
@@ -116,12 +135,12 @@ export default function AttendanceEventScreen() {
       });
       Alert.alert('Some attendance was not saved', error instanceof Error ? error.message : 'Please try again.');
     } finally {
-      setSaving(false);
+      if (mounted.current) setSaving(false);
     }
   };
 
   return (
-    <LeaderScreen title="" headerShown={false} contentStyle={styles.pageContent}>
+    <AttendanceScreenContent>
       <View>
         <Link.AppleZoomTarget>
           <AttendanceEventCardContent
@@ -129,7 +148,7 @@ export default function AttendanceEventScreen() {
             kind={kind}
             status={status}
             tail="down"
-            onPress={() => router.back()}
+            onPress={saving ? undefined : closeAttendance}
           />
         </Link.AppleZoomTarget>
       </View>
@@ -138,7 +157,7 @@ export default function AttendanceEventScreen() {
 
       <View style={styles.progressBlock}>
         <View style={styles.progressCopy}>
-          <Text style={[styles.progressTitle, { color: t.ink }]}>{derived.markedRequiredCount} of {detail.requiredCount} marked</Text>
+          <Text style={[styles.progressTitle, { color: t.ink }]}>{derived.presentCount} of {derived.rows.length} present</Text>
           <Text style={[styles.progressMeta, { color: t.muted }]}>{remaining} remaining</Text>
         </View>
         <View style={[styles.progressTrack, { backgroundColor: t.soft }]}>
@@ -153,17 +172,27 @@ export default function AttendanceEventScreen() {
       </View>
 
       {derived.filtered.length ? (
-        <View style={[styles.memberList, { borderTopColor: t.line }]}>
-          {derived.filtered.map((row) => (
-            <MemberRow
-              key={row.membership._id}
-              row={row}
-              value={Object.prototype.hasOwnProperty.call(draft, row.profile._id) ? draft[row.profile._id] : row.effectiveStatus}
-              touched={Object.prototype.hasOwnProperty.call(draft, row.profile._id)}
-              disabled={readOnly || saving}
-              onChoose={(value) => choose(row, value)}
-            />
-          ))}
+        <View>
+          {([
+            { title: 'Members', rows: derived.members },
+            { title: 'Visitors', rows: derived.visitors },
+          ]).map((section) => section.rows.length ? (
+            <View key={section.title}>
+              {derived.visitors.length > 0 ? <Text accessibilityRole="header" style={[styles.sectionTitle, { color: t.ink }]}>{section.title} · {section.rows.length}</Text> : null}
+              <View style={[styles.memberList, { borderTopColor: t.line }]}>
+                {section.rows.map((row) => (
+                  <MemberRow
+                    key={row.membership._id}
+                    row={row}
+                    value={Object.prototype.hasOwnProperty.call(draft, row.profile._id) ? draft[row.profile._id] : row.effectiveStatus}
+                    touched={Object.prototype.hasOwnProperty.call(draft, row.profile._id)}
+                    disabled={readOnly || saving}
+                    onChoose={(value) => choose(row, value)}
+                  />
+                ))}
+              </View>
+            </View>
+          ) : null)}
         </View>
       ) : (
         <Text style={[styles.noMatches, { color: t.muted }]}>No members in this view.</Text>
@@ -187,15 +216,22 @@ export default function AttendanceEventScreen() {
           <Text style={[styles.saveText, { color: t.accentInk }]}>{saving ? 'Saving…' : 'Save attendance'}</Text>
         </Pressable>
       ) : null}
-    </LeaderScreen>
+    </AttendanceScreenContent>
   );
 }
 
-function statusFor(kind: AttendanceEventKind, marked: number, required: number) {
+function AttendanceScreenContent({ children }: PropsWithChildren) {
+  const t = useAppTheme();
+  return <ScrollView style={{ flex: 1, backgroundColor: t.background }} contentInsetAdjustmentBehavior="automatic" showsVerticalScrollIndicator={false} contentContainerStyle={styles.pageContent}>
+    {children}
+  </ScrollView>;
+}
+
+function statusFor(kind: AttendanceEventKind, present: number, total: number) {
   if (kind === 'upcoming') return 'Upcoming';
-  if (kind === 'open') return `Check-in open · ${marked}/${required} marked`;
-  if (kind === 'complete') return `Complete · ${marked}/${required} marked`;
-  return `Needs attendance · ${marked}/${required} marked`;
+  if (kind === 'open') return `Check-in open · ${present}/${total} present`;
+  if (kind === 'complete') return `Complete · ${present}/${total} present`;
+  return `Needs attendance · ${present}/${total} present`;
 }
 
 function contextFor(kind: AttendanceEventKind, readOnly: boolean) {
@@ -286,7 +322,8 @@ function StatusButton({ label, icon, selected, outlined = false, disabled, onPre
 }
 
 const styles = StyleSheet.create({
-  pageContent: { paddingHorizontal: 20 },
+  pageContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 108 },
+  sectionTitle: { marginTop: 24, fontFamily: fonts.bodySemiBold, fontSize: 17 },
   context: { marginTop: 13, marginHorizontal: 2, fontFamily: fonts.body, fontSize: 12, lineHeight: 18 },
   progressBlock: { marginTop: 25 },
   progressCopy: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 16 },
