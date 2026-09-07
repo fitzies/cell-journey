@@ -53,9 +53,6 @@ export function AttendanceHeatmapChart({ data }: { data: HeatmapData }) {
   const month = (day: HeatmapDay) => new Intl.DateTimeFormat('en-SG', { timeZone: 'Asia/Singapore', month: 'short' }).format(day.startAt);
   return <View style={[styles.card, { backgroundColor: t.surface, ...surfaceShadow(t) }]} onLayout={event => setWidth(event.nativeEvent.layout.width - 32)}>
     <View style={{ gap: 3, alignSelf: 'center' }}>
-      <View accessible={false} style={{ flexDirection: 'row', gap: 3, paddingLeft: 42 }}>
-        {['M', 'T', 'W', 'T', 'F', 'S', 'S', 'M', 'T', 'W', 'T', 'F', 'S', 'S'].map((label, i) => <Text key={i} style={[styles.weekday, { width: cell, textAlign: 'center', color: t.muted }]}>{label}</Text>)}
-      </View>
       {rows.map((row, i) => {
         const first = row.find(Boolean);
         const previous = rows[i - 1]?.find(Boolean);
@@ -99,7 +96,6 @@ function ChartError({ retry }: { retry: () => void }) {
 const styles = StyleSheet.create({
   card: { padding: 16, borderRadius: radius.xl },
   caption: { fontFamily: fonts.body, fontSize: 12, lineHeight: 18 },
-  weekday: { fontFamily: fonts.bodyMedium, fontSize: 10 },
   month: { height: 19, width: 36, fontFamily: fonts.bodyMedium, fontSize: 10 },
   legend: { marginTop: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, flexWrap: 'wrap' },
   swatch: { width: 10, height: 10, borderRadius: 2 },
