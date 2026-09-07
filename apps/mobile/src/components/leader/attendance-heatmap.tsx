@@ -46,22 +46,23 @@ export function AttendanceHeatmapChart({ data }: { data: HeatmapData }) {
   const greens = t === palettes.dark ? scale.dark : scale.light;
   const [width, setWidth] = useState(0);
   const offset = (new Date(data.days[0].startAt + 8 * 3_600_000).getUTCDay() + 6) % 7;
-  const columns = Math.ceil((offset + data.days.length) / 7);
-  const cell = Math.max(18, Math.min(26, Math.floor((width - 42 - 6 * 3) / 7)));
-  const weeks = Array.from({ length: columns }, (_, week) => Array.from({ length: 7 }, (_, weekday) => data.days[week * 7 + weekday - offset]));
+  const daysPerRow = 14;
+  const rowCount = Math.ceil((offset + data.days.length) / daysPerRow);
+  const cell = Math.max(1, Math.min(26, Math.floor((width - 42 - (daysPerRow - 1) * 3) / daysPerRow)));
+  const rows = Array.from({ length: rowCount }, (_, row) => Array.from({ length: daysPerRow }, (_, day) => data.days[row * daysPerRow + day - offset]));
   const month = (day: HeatmapDay) => new Intl.DateTimeFormat('en-SG', { timeZone: 'Asia/Singapore', month: 'short' }).format(day.startAt);
   return <View style={[styles.card, { backgroundColor: t.surface, ...surfaceShadow(t) }]} onLayout={event => setWidth(event.nativeEvent.layout.width - 32)}>
     <View style={{ gap: 3, alignSelf: 'center' }}>
       <View accessible={false} style={{ flexDirection: 'row', gap: 3, paddingLeft: 42 }}>
-        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((label, i) => <Text key={i} style={[styles.weekday, { width: cell, textAlign: 'center', color: t.muted }]}>{label}</Text>)}
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S', 'M', 'T', 'W', 'T', 'F', 'S', 'S'].map((label, i) => <Text key={i} style={[styles.weekday, { width: cell, textAlign: 'center', color: t.muted }]}>{label}</Text>)}
       </View>
-      {weeks.map((week, i) => {
-        const first = week.find(Boolean);
-        const previous = weeks[i - 1]?.find(Boolean);
+      {rows.map((row, i) => {
+        const first = row.find(Boolean);
+        const previous = rows[i - 1]?.find(Boolean);
         const label = first && (!previous || month(first) !== month(previous)) ? month(first) : '';
         return <View key={i} style={{ flexDirection: 'row', gap: 3, alignItems: 'center' }}>
           <Text style={[styles.month, { color: t.muted, width: 39 }]}>{label.replace('Sept', 'Sep')}</Text>
-          {week.map((day, j) => {
+          {row.map((day, j) => {
             const hasEvents = Boolean(day?.events.length);
             const pending = hasEvents && day.events.some(event => !event.complete);
             const fill = day?.rate === null || !day ? t.soft : greens[Math.min(4, Math.floor(day.rate * 5))];
