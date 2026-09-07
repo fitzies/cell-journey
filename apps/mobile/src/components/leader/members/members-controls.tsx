@@ -22,10 +22,12 @@ export function MembersToolbar({ groupName, sort, visibleCount, totalCount, sear
       clearButtonMode="while-editing"
       style={[styles.search, textStyles.body, { backgroundColor: t.soft, color: t.text }]}
     />
-    <Text accessibilityLiveRegion="polite" style={[textStyles.body, { color: t.muted }]}>
+    <View style={styles.summary}>
+    <Text accessibilityLiveRegion="polite" style={[textStyles.body, styles.count, { color: t.muted }]}>
       All members · {search.trim() ? `${visibleCount} of ${totalCount}` : totalCount}{sort === 'name' ? ' · Name A–Z' : ''}
     </Text>
     <Text accessibilityLiveRegion="polite" style={[styles.hint, { color: t.muted }]}>{offline ? 'Reconnect to make changes' : busy ? 'Saving…' : dragging ? 'Release to place' : search.trim() ? 'Clear search to rearrange' : sort === 'name' ? 'Choose Saved order to rearrange' : visibleCount > 1 ? 'Hold an avatar to rearrange' : 'Tap a name for member actions'}</Text>
+    </View>
     {error ? <View accessibilityRole="alert" style={styles.error}>
       <Text style={[textStyles.body, { color: t.danger, flex: 1 }]}>{error}</Text>
       <Pressable accessibilityRole="button" onPress={onDismissError} style={styles.dismiss}><Text style={[textStyles.button, { color: t.text }]}>Dismiss</Text></Pressable>
@@ -36,7 +38,9 @@ export function MembersToolbar({ groupName, sort, visibleCount, totalCount, sear
 const styles = StyleSheet.create({
   header: { gap: 14, marginBottom: 8 },
   search: { minHeight: 44, paddingHorizontal: 14, paddingVertical: 12, borderRadius: radius.md },
-  hint: { fontFamily: fonts.body, fontSize: 12.5, lineHeight: 18, textAlign: 'right' },
+  summary: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 },
+  count: { flexShrink: 1 },
+  hint: { flexShrink: 1, fontFamily: fonts.body, fontSize: 12.5, lineHeight: 18, textAlign: 'right' },
   error: { flexDirection: 'row', gap: 12, alignItems: 'center' },
   dismiss: { minHeight: 44, minWidth: 44, paddingHorizontal: 8, justifyContent: 'center', alignItems: 'center' },
 });
