@@ -69,7 +69,6 @@ function ContextToolbar({ mode, eventActions, membersOptions }: Pick<AppHeaderPr
         accessibilityLabel="Switch group or mode"
         icon={switcherIcon}
         iconRenderingMode="template"
-        title="Switch group or mode"
       >
         {groups.memberGroups.length ? (
           <Stack.Toolbar.Menu inline title="Member">

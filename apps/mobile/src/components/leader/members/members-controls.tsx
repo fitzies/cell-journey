@@ -1,9 +1,9 @@
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { fonts, radius, textStyles, useAppTheme } from '@/constants/tokens';
-import type { MemberFilter, MemberSort } from './types';
+import type { MemberSort } from './types';
 
-export function MembersToolbar({ groupName, status, sort, visibleCount, totalCount, search, disabled, busy, offline = false, dragging, error, onDismissError, onSearch }: {
-  groupName: string; status: MemberFilter; sort: MemberSort; visibleCount: number; totalCount: number;
+export function MembersToolbar({ groupName, sort, visibleCount, totalCount, search, disabled, busy, offline = false, dragging, error, onDismissError, onSearch }: {
+  groupName: string; sort: MemberSort; visibleCount: number; totalCount: number;
   search: string; disabled: boolean; busy: boolean; offline?: boolean; dragging: boolean; error: string | null;
   onDismissError: () => void; onSearch: (value: string) => void;
 }) {
@@ -23,9 +23,9 @@ export function MembersToolbar({ groupName, status, sort, visibleCount, totalCou
       style={[styles.search, textStyles.body, { backgroundColor: t.soft, color: t.text }]}
     />
     <Text accessibilityLiveRegion="polite" style={[textStyles.body, { color: t.muted }]}>
-      {status === 'visitor' ? 'Visitors' : status === 'all' ? 'All members' : status === 'active' ? 'Active members' : 'Inactive members'} · {search.trim() ? `${visibleCount} of ${totalCount}` : totalCount}{sort === 'name' ? ' · Name A–Z' : ''}
+      All members · {search.trim() ? `${visibleCount} of ${totalCount}` : totalCount}{sort === 'name' ? ' · Name A–Z' : ''}
     </Text>
-    <Text accessibilityLiveRegion="polite" style={[styles.hint, { color: t.muted }]}>{offline ? 'Reconnect to make changes' : busy ? 'Saving…' : dragging ? 'Release to place' : search.trim() ? 'Clear search to rearrange' : sort === 'name' ? 'Choose Saved order to rearrange' : status === 'all' ? 'Choose a member status to rearrange' : visibleCount > 1 ? 'Hold an avatar to rearrange' : 'Tap a name for member actions'}</Text>
+    <Text accessibilityLiveRegion="polite" style={[styles.hint, { color: t.muted }]}>{offline ? 'Reconnect to make changes' : busy ? 'Saving…' : dragging ? 'Release to place' : search.trim() ? 'Clear search to rearrange' : sort === 'name' ? 'Choose Saved order to rearrange' : visibleCount > 1 ? 'Hold an avatar to rearrange' : 'Tap a name for member actions'}</Text>
     {error ? <View accessibilityRole="alert" style={styles.error}>
       <Text style={[textStyles.body, { color: t.danger, flex: 1 }]}>{error}</Text>
       <Pressable accessibilityRole="button" onPress={onDismissError} style={styles.dismiss}><Text style={[textStyles.button, { color: t.text }]}>Dismiss</Text></Pressable>

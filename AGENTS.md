@@ -47,7 +47,7 @@ cell-journey/
 - Groups are created manually by the owner/developer in Convex for MVP.
 - Leader assignment is manually configured in Convex for MVP.
 - Historical records must remain intact when users leave or are removed from groups.
-- Leaders can classify a connected person as Active, Inactive, or Visitor. Visitors retain active membership access and attendance eligibility, appear in their own markable event section, and have a Members filter. The optional `memberships.memberClass` field stores `visitor`; membership lifecycle status and activity periods retain their existing meaning.
+- Leaders can classify a connected person as Active, Inactive, or Visitor. Visitors retain active membership access and attendance eligibility, appear in their own markable event section, and appear in the Visitors section of Members. The optional `memberships.memberClass` field stores `visitor`; membership lifecycle status and activity periods retain their existing meaning.
 
 ## Authentication
 
@@ -211,7 +211,7 @@ On iOS, keep tabs and top-right profile controls platform-native:
 - Creating an event opens a native full-screen modal with a native back chevron and Done checkmark in its header. There is no bottom submit button.
 - Do not replace these controls with React Native views that imitate Apple glass styling.
 
-Leader Members defaults to List, with Grid available in the native header filter menu. Tapping a member's name opens actions with View profile first. View profile opens a native full-screen modal with a close button, an empty centered header title, shared Profile styling, and read-only name, email, services, postal district, and selected-group status. Both profile views show the existing account/invitation email with a mail-app action, plus joined date and attendance rate when the person has a membership in the selected group. Attendance uses the same calculation as the Attendance tab; no past events displays a message rather than 0%. Closing preserves the roster's filters, layout, and scroll position. Profile access is checked against the selected group in Convex.
+Leader Members always shows Active, Visitors, then Inactive sections. It defaults to List, with Grid and sorting available in the native header menu. Search covers all sections, and saved order is managed within each section. Tapping a member's name opens actions with View profile first. View profile opens a native full-screen modal with a close button, an empty centered header title, shared Profile styling, and read-only name, email, services, postal district, and selected-group status. Both profile views show the existing account/invitation email with a mail-app action, plus joined date and attendance rate when the person has a membership in the selected group. Attendance uses the same calculation as the Attendance tab; no past events displays a message rather than 0%. Closing preserves the roster's search, layout, and scroll position. Profile access is checked against the selected group in Convex.
 
 Users select one group at a time within each mode. The selected group is UI state, not canonical membership data.
 

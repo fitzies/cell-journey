@@ -47,11 +47,11 @@ export function AttendanceHeatmapChart({ data }: { data: HeatmapData }) {
   const [width, setWidth] = useState(0);
   const offset = (new Date(data.days[0].startAt + 8 * 3_600_000).getUTCDay() + 6) % 7;
   const columns = Math.ceil((offset + data.days.length) / 7);
-  const cell = Math.max(18, Math.min(40, Math.floor((width - 42 - 6 * 3) / 7)));
+  const cell = Math.max(18, Math.min(26, Math.floor((width - 42 - 6 * 3) / 7)));
   const weeks = Array.from({ length: columns }, (_, week) => Array.from({ length: 7 }, (_, weekday) => data.days[week * 7 + weekday - offset]));
   const month = (day: HeatmapDay) => new Intl.DateTimeFormat('en-SG', { timeZone: 'Asia/Singapore', month: 'short' }).format(day.startAt);
   return <View style={[styles.card, { backgroundColor: t.surface, ...surfaceShadow(t) }]} onLayout={event => setWidth(event.nativeEvent.layout.width - 32)}>
-    <View style={{ gap: 3 }}>
+    <View style={{ gap: 3, alignSelf: 'center' }}>
       <View accessible={false} style={{ flexDirection: 'row', gap: 3, paddingLeft: 42 }}>
         {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((label, i) => <Text key={i} style={[styles.weekday, { width: cell, textAlign: 'center', color: t.muted }]}>{label}</Text>)}
       </View>
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
   caption: { fontFamily: fonts.body, fontSize: 12, lineHeight: 18 },
   weekday: { fontFamily: fonts.bodyMedium, fontSize: 10 },
   month: { height: 19, width: 36, fontFamily: fonts.bodyMedium, fontSize: 10 },
-  legend: { marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
+  legend: { marginTop: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, flexWrap: 'wrap' },
   swatch: { width: 10, height: 10, borderRadius: 2 },
   detailsLink: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', marginTop: 6 },
 });

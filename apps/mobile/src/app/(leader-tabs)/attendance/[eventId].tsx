@@ -15,7 +15,6 @@ import { api, type Id } from '@/lib/api';
 type AttendanceDetail = FunctionReturnType<typeof api.attendance.eventDetail>;
 type AttendanceRow = AttendanceDetail['rows'][number];
 type AttendanceStatus = 'present' | 'absent' | null;
-type AttendanceFilter = 'all' | 'review' | 'marked';
 const MAX_BOUNDARY_TIMER_MS = 2_147_000_000;
 
 function closeAttendance() {
@@ -31,7 +30,6 @@ export default function AttendanceEventScreen() {
   const detail = useQuery(api.attendance.eventDetail, eventId ? { eventId } : 'skip');
   const mark = useMutation(api.attendance.markForMember);
   const clearOptional = useMutation(api.attendance.clearOptionalForMember);
-  const [filter, setFilter] = useState<AttendanceFilter>('all');
   const [draft, setDraft] = useState<Record<string, AttendanceStatus>>({});
   const [saving, setSaving] = useState(false);
   const [now, setNow] = useState(Date.now);
@@ -61,22 +59,14 @@ export default function AttendanceEventScreen() {
     const rows = detail?.rows ?? [];
     const hasDraft = (row: AttendanceRow) => Object.prototype.hasOwnProperty.call(draft, row.profile._id);
     const valueFor = (row: AttendanceRow) => hasDraft(row) ? draft[row.profile._id] : row.effectiveStatus;
-    const isFinalized = (row: AttendanceRow) => Boolean(row.attendance?.finalStatus || hasDraft(row));
     const markedRequiredCount = rows.filter((row) => row.eligibility === 'required' && valueFor(row) !== null).length;
-    const reviewCount = rows.filter((row) => row.eligibility === 'required' && !isFinalized(row)).length;
-    const markedCount = rows.filter(isFinalized).length;
     const presentCount = rows.filter((row) => valueFor(row) === 'present').length;
-    const filtered = rows.filter((row) => {
-      if (filter === 'review') return row.eligibility === 'required' && !isFinalized(row);
-      if (filter === 'marked') return isFinalized(row);
-      return true;
-    });
     return {
-      rows, filtered, markedRequiredCount, reviewCount, markedCount, presentCount,
-      members: filtered.filter((row) => row.membership.memberClass !== 'visitor'),
-      visitors: filtered.filter((row) => row.membership.memberClass === 'visitor'),
+      rows, markedRequiredCount, presentCount,
+      members: rows.filter((row) => row.membership.memberClass !== 'visitor'),
+      visitors: rows.filter((row) => row.membership.memberClass === 'visitor'),
     };
-  }, [detail, draft, filter]);
+  }, [detail, draft]);
 
   if (context === undefined || (eventId && detail === undefined)) return <LoadingState />;
 
@@ -165,13 +155,7 @@ export default function AttendanceEventScreen() {
         </View>
       </View>
 
-      <View style={[styles.filters, { backgroundColor: t.soft }]}>
-        <FilterButton label={`All ${derived.rows.length}`} value="all" selected={filter === 'all'} onPress={setFilter} />
-        <FilterButton label={`To review ${derived.reviewCount}`} value="review" selected={filter === 'review'} onPress={setFilter} />
-        <FilterButton label={`Marked ${derived.markedCount}`} value="marked" selected={filter === 'marked'} onPress={setFilter} />
-      </View>
-
-      {derived.filtered.length ? (
+      {derived.rows.length ? (
         <View>
           {([
             { title: 'Members', rows: derived.members },
@@ -195,7 +179,7 @@ export default function AttendanceEventScreen() {
           ) : null)}
         </View>
       ) : (
-        <Text style={[styles.noMatches, { color: t.muted }]}>No members in this view.</Text>
+        <Text style={[styles.noMatches, { color: t.muted }]}>No members for this gathering.</Text>
       )}
 
       {!readOnly && derived.rows.length ? (
@@ -240,20 +224,6 @@ function contextFor(kind: AttendanceEventKind, readOnly: boolean) {
   if (kind === 'open') return 'Check-in is open now. Review self-marked attendance or mark the remaining members.';
   if (kind === 'complete') return 'Attendance is complete. You can still make a correction if something changed.';
   return 'This gathering still needs attendance. Mark the remaining members, then save.';
-}
-
-function FilterButton({ label, value, selected, onPress }: { label: string; value: AttendanceFilter; selected: boolean; onPress: (value: AttendanceFilter) => void }) {
-  const t = useAppTheme();
-  return (
-    <Pressable
-      accessibilityRole="tab"
-      accessibilityState={{ selected }}
-      onPress={() => onPress(value)}
-      style={[styles.filterButton, selected && { backgroundColor: t.surface, borderColor: t.line }]}
-    >
-      <Text numberOfLines={1} style={[styles.filterText, { color: selected ? t.ink : t.muted }]}>{label}</Text>
-    </Pressable>
-  );
 }
 
 function MemberRow({ row, value, touched, disabled, onChoose }: { row: AttendanceRow; value: AttendanceStatus; touched: boolean; disabled: boolean; onChoose: (value: AttendanceStatus) => void }) {
@@ -331,9 +301,6 @@ const styles = StyleSheet.create({
   progressMeta: { fontFamily: fonts.bodyMedium, fontSize: 12 },
   progressTrack: { height: 5, marginTop: 10, overflow: 'hidden', borderRadius: radius.pill },
   progressFill: { height: '100%', borderRadius: radius.pill },
-  filters: { marginTop: 24, padding: 4, borderRadius: 15, flexDirection: 'row', gap: 4 },
-  filterButton: { flex: 1, minHeight: 36, paddingHorizontal: 5, borderRadius: 11, borderWidth: StyleSheet.hairlineWidth, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
-  filterText: { fontFamily: fonts.bodySemiBold, fontSize: 12 },
   memberList: { marginTop: 14, borderTopWidth: StyleSheet.hairlineWidth },
   memberRow: { minHeight: 72, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
