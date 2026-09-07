@@ -2,12 +2,13 @@ import { router, Stack } from 'expo-router';
 import { Platform } from 'react-native';
 import { leaderAccessLabel, useGroups } from '@/components/group-context';
 import { useAppTheme } from '@/constants/tokens';
+import { memberMenuSections } from './leader/members/menu-options';
 import type { AppHeaderProps } from './app-header.types';
 export type { AppHeaderProps, AppMode } from './app-header.types';
 
 const switcherIcon = require('@/assets/images/toolbar/transfer-horizontal-linear.png');
 
-export function AppHeader({ title, mode, profile = false, eventActions }: AppHeaderProps) {
+export function AppHeader({ title, mode, profile = false, eventActions, membersOptions }: AppHeaderProps) {
   const t = useAppTheme();
 
   return (
@@ -18,18 +19,18 @@ export function AppHeader({ title, mode, profile = false, eventActions }: AppHea
       />
       <Stack.Title style={{ color: t.ink, fontSize: 22, fontWeight: '600', textAlign: 'left' }}>{title}</Stack.Title>
       {profile ? <Stack.Screen.BackButton displayMode="minimal" /> : null}
-      <ContextToolbar mode={mode} eventActions={eventActions} />
+      <ContextToolbar mode={mode} eventActions={eventActions} membersOptions={membersOptions} />
     </>
   );
 }
 
-function ContextToolbar({ mode, eventActions }: Pick<AppHeaderProps, 'mode' | 'eventActions'>) {
+function ContextToolbar({ mode, eventActions, membersOptions }: Pick<AppHeaderProps, 'mode' | 'eventActions' | 'membersOptions'>) {
   const groups = useGroups();
   const t = useAppTheme();
   const canSwitch = groups.memberGroups.length + groups.ledGroups.length > 1;
 
   const hasEventActions = Boolean(eventActions?.onCreate || eventActions?.onImport);
-  if (!canSwitch && !hasEventActions) return null;
+  if (!canSwitch && !hasEventActions && !membersOptions) return null;
 
   return (
     <Stack.Toolbar placement="right" tintColor={t.ink}>
@@ -43,6 +44,25 @@ function ContextToolbar({ mode, eventActions }: Pick<AppHeaderProps, 'mode' | 'e
         >
           {eventActions.onCreate ? <Stack.Toolbar.MenuAction onPress={eventActions.onCreate}>Create event</Stack.Toolbar.MenuAction> : null}
           {eventActions.onImport ? <Stack.Toolbar.MenuAction onPress={eventActions.onImport}>Import CSV / XLSX</Stack.Toolbar.MenuAction> : null}
+        </Stack.Toolbar.Menu>
+      ) : null}
+      {membersOptions ? (
+        <Stack.Toolbar.Menu
+          accessibilityLabel="Member view and filters"
+          title="Member view and filters"
+          icon={require('@/assets/images/toolbar/filter.png')}
+          iconRenderingMode="template"
+          disabled={membersOptions.disabled}
+        >
+          {memberMenuSections(membersOptions).map((section) => (
+            <Stack.Toolbar.Menu key={section.title} inline title={section.title}>
+              {section.items.map((item) => (
+                <Stack.Toolbar.MenuAction key={item.label} isOn={item.selected} onPress={item.onPress}>
+                  {item.label}
+                </Stack.Toolbar.MenuAction>
+              ))}
+            </Stack.Toolbar.Menu>
+          ))}
         </Stack.Toolbar.Menu>
       ) : null}
       {canSwitch ? <Stack.Toolbar.Menu

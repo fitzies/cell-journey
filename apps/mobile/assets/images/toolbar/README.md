@@ -9,3 +9,5 @@
 The PNG variants are rasterized at 24, 48, and 72 pixels for native toolbars. Template rendering applies the current theme tint to both arrows. The web header uses the same SVG in `solar-tab-icon.tsx`.
 
 `close.png` and its scale variants are a simple locally drawn X for the Android create-event toolbar. iOS uses the native `xmark` symbol.
+
+`filter.svg` is a locally drawn filter icon with three decreasing horizontal lines. Its PNG variants at 24, 48, and 72 pixels are used by the Android Members toolbar. iOS uses the native `line.3.horizontal.decrease` SF Symbol.

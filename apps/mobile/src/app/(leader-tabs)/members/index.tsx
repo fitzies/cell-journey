@@ -7,7 +7,7 @@ import { AppHeader } from '@/components/app-header';
 import { useGroups } from '@/components/group-context';
 import { MemberGrid } from '@/components/leader/members/member-grid';
 import { MembersToolbar } from '@/components/leader/members/members-controls';
-import type { MemberRow, MemberStatus } from '@/components/leader/members/types';
+import type { MemberFilter, MemberRow, MemberSort, MemberView } from '@/components/leader/members/types';
 import { ActionButton, EmptyState, LeaderScreen } from '@/components/leader/ui';
 import { LeaderLoadingState } from '@/components/leader/query-state';
 import { useAppTheme } from '@/constants/tokens';
@@ -30,7 +30,9 @@ function GroupMembers({ groupId, groupName }: { groupId: Id<'groups'>; groupName
   const reactivate = useMutation(api.groups.reactivateMember);
   const reorder = useMutation(api.groups.reorderMembers);
   const removeMember = useMutation(api.groups.removeMemberFromGroupById);
-  const [status, setStatus] = useState<MemberStatus>('active');
+  const [status, setStatus] = useState<MemberFilter>('active');
+  const [view, setView] = useState<MemberView>('grid');
+  const [sort, setSort] = useState<MemberSort>('saved');
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -128,7 +130,7 @@ function GroupMembers({ groupId, groupName }: { groupId: Id<'groups'>; groupName
   };
 
   const persistOrder = async (rows: MemberRow[]) => {
-    if (!focused.current || !mounted.current || operationPending.current || search.trim()) return;
+    if (!focused.current || !mounted.current || operationPending.current || search.trim() || status === 'all' || sort !== 'saved') return;
     if (!connected.current) {
       setGridRevision((value) => value + 1);
       setError('Reconnect to save member order.');
@@ -162,23 +164,37 @@ function GroupMembers({ groupId, groupName }: { groupId: Id<'groups'>; groupName
 
   if (members === undefined) return <LeaderLoadingState title="Members" label="Loading members…" />;
   const query = search.trim().toLocaleLowerCase();
-  const section = pendingOrder ?? members.filter((row) => row.membership.status === status);
+  const section = pendingOrder ?? members.filter((row) => status === 'all' || row.membership.status === status);
   const rows = query ? section.filter((row) => getProfileDisplayName(row.profile, 'Unnamed member').toLocaleLowerCase().includes(query)) : section;
+  const displayedRows = sort === 'name'
+    ? [...rows].sort((a, b) => getProfileDisplayName(a.profile, 'Unnamed member').localeCompare(getProfileDisplayName(b.profile, 'Unnamed member'), 'en', { sensitivity: 'base', numeric: true }))
+    : rows;
+  const changeOptions = (change: () => void) => {
+    if (operationPending.current || dragging || !focused.current || !mounted.current) return;
+    change();
+  };
 
   return <SafeAreaView edges={[]} style={[styles.root, { backgroundColor: t.background }]}>
-    <AppHeader title="Members" mode="leader" />
+    <AppHeader title="Members" mode="leader" membersOptions={{
+      view, status, sort, disabled: busy || dragging,
+      onView: (value) => changeOptions(() => setView(value)),
+      onStatus: (value) => changeOptions(() => setStatus(value)),
+      onSort: (value) => changeOptions(() => setSort(value)),
+    }} />
     <MemberGrid
-      key={`${status}:${gridRevision}`}
-      rows={rows}
+      key={`${status}:${view}:${sort}:${gridRevision}`}
+      view={view}
+      showStatus={status === 'all'}
+      rows={displayedRows}
       emptyState={<View style={styles.empty}>
         <EmptyState
-          title={query ? 'No matching members' : status === 'active' ? 'No active members yet' : 'No inactive members'}
-          body={query ? `No ${status} members match “${search.trim()}”. Try another name or clear your search.` : status === 'active' ? 'Approved members appear here. Review join requests from Home, or check Inactive for members you can reactivate.' : 'Members you mark inactive will appear here. You can reactivate them at any time.'}
+          title={query ? 'No matching members' : status === 'all' ? 'No members yet' : status === 'active' ? 'No active members yet' : 'No inactive members'}
+          body={query ? `No ${status === 'all' ? '' : `${status} `}members match “${search.trim()}”. Try another name or clear your search.` : status === 'all' ? 'Approved members appear here. Review join requests from Home.' : status === 'active' ? 'Approved members appear here. Review join requests from Home, or check Inactive for members you can reactivate.' : 'Members you mark inactive will appear here. You can reactivate them at any time.'}
         />
-        <View style={styles.retry}><ActionButton label={query ? 'Clear search' : status === 'active' ? 'View inactive members' : 'View active members'} onPress={() => query ? setSearch('') : setStatus(status === 'active' ? 'inactive' : 'active')} /></View>
+        {query || status !== 'all' ? <View style={styles.retry}><ActionButton label={query ? 'Clear search' : status === 'active' ? 'View inactive members' : 'View active members'} onPress={() => query ? setSearch('') : setStatus(status === 'active' ? 'inactive' : 'active')} /></View> : null}
       </View>}
       disabled={busy || !online}
-      canReorder={!query && rows.length > 1}
+      canReorder={!query && status !== 'all' && sort === 'saved' && rows.length > 1}
       onReorder={persistOrder}
       onChangeStatus={requestStatusChange}
       onRemove={requestRemoval}
@@ -186,8 +202,9 @@ function GroupMembers({ groupId, groupName }: { groupId: Id<'groups'>; groupName
       header={<MembersToolbar
         groupName={groupName}
         status={status}
-        activeCount={members.filter((row) => row.membership.status === 'active').length}
-        inactiveCount={members.filter((row) => row.membership.status === 'inactive').length}
+        sort={sort}
+        visibleCount={rows.length}
+        totalCount={section.length}
         search={search}
         disabled={busy || dragging}
         busy={busy}
@@ -196,7 +213,6 @@ function GroupMembers({ groupId, groupName }: { groupId: Id<'groups'>; groupName
         error={error}
         onDismissError={() => setError(null)}
         onSearch={setSearch}
-        onStatus={setStatus}
       />}
     />
   </SafeAreaView>;

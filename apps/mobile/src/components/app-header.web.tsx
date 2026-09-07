@@ -5,10 +5,12 @@ import { leaderAccessLabel, useGroups } from '@/components/group-context';
 import { SolarIcon } from '@/components/solar-tab-icon';
 import { fonts, radius, surfaceShadow, useAppTheme } from '@/constants/tokens';
 import type { Id } from '@/lib/api';
+import { memberMenuSections } from './leader/members/menu-options';
+import type { MembersOptions } from './leader/members/types';
 import type { AppHeaderProps, AppMode } from './app-header.types';
 export type { AppHeaderProps, AppMode } from './app-header.types';
 
-export function AppHeader({ title, mode, eventActions }: AppHeaderProps) {
+export function AppHeader({ title, mode, eventActions, membersOptions }: AppHeaderProps) {
   const t = useAppTheme();
 
   return (
@@ -25,11 +27,52 @@ export function AppHeader({ title, mode, eventActions }: AppHeaderProps) {
         headerRight: () => (
           <View style={styles.actions}>
             {eventActions?.onCreate || eventActions?.onImport ? <EventMenuButton actions={eventActions} /> : null}
+            {membersOptions ? <MembersMenuButton options={membersOptions} /> : null}
             <ContextMenuButton mode={mode} />
           </View>
         ),
       }}
     />
+  );
+}
+
+function MembersMenuButton({ options }: { options: MembersOptions }) {
+  const t = useAppTheme();
+  return (
+    <details
+      style={{ position: 'relative', fontFamily: 'system-ui', fontSize: 14 }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.currentTarget.open = false;
+          event.currentTarget.querySelector('summary')?.focus();
+        }
+      }}
+    >
+      <summary
+        aria-label="Member view and filters"
+        aria-disabled={options.disabled}
+        onClick={(event) => { if (options.disabled) event.preventDefault(); }}
+        style={{ listStyle: 'none', cursor: options.disabled ? 'default' : 'pointer', width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: options.disabled ? 0.45 : 1 }}
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={t.ink} strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="M3 6h18M6 12h12M9 18h6" /></svg>
+      </summary>
+      <div style={{ position: 'absolute', top: 44, right: 0, width: 240, maxHeight: '70vh', overflowY: 'auto', borderRadius: 12, padding: 8, background: t.surface, boxShadow: '0 6px 24px #0002' }}>
+        {memberMenuSections(options).map((section) => (
+          <fieldset key={section.title} disabled={options.disabled} style={{ border: 0, margin: 0, padding: '8px 0' }}>
+            <legend style={{ color: t.muted, fontSize: 12, padding: '0 10px' }}>{section.title}</legend>
+            {section.items.map((item) => (
+              <label key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, padding: '0 10px', color: t.ink, cursor: 'pointer' }}>
+                <input type="radio" name={`member-${section.title}`} checked={item.selected} onChange={(event) => {
+                  event.currentTarget.closest('details')?.removeAttribute('open');
+                  item.onPress();
+                }} style={{ accentColor: t.ink }} />
+                {item.label}
+              </label>
+            ))}
+          </fieldset>
+        ))}
+      </div>
+    </details>
   );
 }
 

@@ -4,11 +4,11 @@
     "slug": "cell-journey",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/cell-journey-icon.png",
     "scheme": "cell-journey",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/cell-journey-icon.png",
       "bundleIdentifier": "com.ojf.celljourney",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -16,13 +16,8 @@
     },
     "android": {
       "package": "com.ojf.celljourney",
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "icon": "./assets/images/cell-journey-icon.png"
     },
     "web": {
       "output": "static",

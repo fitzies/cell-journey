@@ -7,10 +7,12 @@ import Sortable, { type SortableGridDragEndParams, type SortableGridRenderItem }
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
 import { getProfileDisplayName } from '@/lib/name';
 import { MemberActions } from './member-actions';
-import type { MemberRow } from './types';
+import type { MemberRow, MemberView } from './types';
 
-export function MemberGrid({ rows, header, emptyState, disabled, canReorder, onReorder, onChangeStatus, onRemove, onDraggingChange }: {
+export function MemberGrid({ rows, view, showStatus, header, emptyState, disabled, canReorder, onReorder, onChangeStatus, onRemove, onDraggingChange }: {
   rows: MemberRow[];
+  view: MemberView;
+  showStatus: boolean;
   header: ReactNode;
   emptyState: ReactNode;
   disabled: boolean;
@@ -26,9 +28,12 @@ export function MemberGrid({ rows, header, emptyState, disabled, canReorder, onR
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const [dragging, setDragging] = useState(false);
   const dragStarted = useRef(false);
-  const columns = fontScale > 1.4 || width < 340 ? 1 : 2;
+  const isList = view === 'list';
+  const avatarSize = isList ? 44 : 64;
+  const columns = isList || fontScale > 1.4 || width < 340 ? 1 : 2;
   const itemWidth = (width - 40 - (columns - 1) * 12) / columns;
-  const nameHeight = Math.max(44, 44 * fontScale);
+  const nameWidth = isList ? itemWidth - avatarSize - 12 : itemWidth;
+  const nameHeight = Math.max(44, (showStatus ? 64 : 44) * fontScale);
 
   const finishDrag = useCallback(({ data }: SortableGridDragEndParams<MemberRow>) => {
     setDragging(false);
@@ -49,10 +54,10 @@ export function MemberGrid({ rows, header, emptyState, disabled, canReorder, onR
       next.splice(nextIndex, 0, item);
       void onReorder(next);
     };
-    return <View style={[styles.tile, { backgroundColor: t.background }]}>
-      <Sortable.Handle style={styles.avatarHandle}>
+    return <View style={[isList ? styles.row : styles.tile, { backgroundColor: t.background }, isList && { borderBottomColor: t.soft }]}>
+      <Sortable.Handle style={{ width: avatarSize, height: avatarSize }}>
         <View
-          accessible
+          accessible={canReorder && !disabled}
           accessibilityLabel={`Reorder ${name}`}
           accessibilityHint="Hold and drag the avatar to rearrange. Tap the name for member actions."
           accessibilityRole="adjustable"
@@ -65,24 +70,25 @@ export function MemberGrid({ rows, header, emptyState, disabled, canReorder, onR
             if (nativeEvent.actionName === 'decrement') move(-1);
             if (nativeEvent.actionName === 'increment') move(1);
           }}
-          style={[styles.avatar, { backgroundColor: t.soft }]}
-        ><ProfileAvatar photoUrl={item.profile?.photoUrl} name={name} size={64} /></View>
+          style={[styles.avatar, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2, backgroundColor: t.soft }]}
+        ><ProfileAvatar photoUrl={item.profile?.photoUrl} name={name} size={avatarSize} /></View>
       </Sortable.Handle>
       <MemberActions
         name={name}
-        width={itemWidth}
+        width={nameWidth}
         height={nameHeight}
         inactive={item.membership.status === 'inactive'}
         disabled={disabled || dragging}
         onChangeStatus={() => onChangeStatus(item)}
         onRemove={() => onRemove(item)}
       >
-        <View style={[styles.nameButton, { width: itemWidth, height: nameHeight }]}>
-          <Text numberOfLines={2} style={[styles.name, { color: t.text }]}>{name}</Text>
+        <View style={[styles.nameButton, isList && styles.rowName, { width: nameWidth, height: nameHeight }]}>
+          <Text numberOfLines={2} style={[styles.name, isList && styles.rowText, { color: t.text }]}>{name}</Text>
+          {showStatus ? <Text style={[styles.status, { color: t.muted }]}>{item.membership.status === 'inactive' ? 'Inactive' : 'Active'}</Text> : null}
         </View>
       </MemberActions>
     </View>;
-  }, [canReorder, disabled, dragging, onChangeStatus, onReorder, onRemove, rows, t, itemWidth, nameHeight]);
+  }, [canReorder, disabled, dragging, onChangeStatus, onReorder, onRemove, rows, t, isList, avatarSize, nameWidth, nameHeight, showStatus]);
 
   return <Animated.ScrollView ref={scrollRef} contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
     {header}
@@ -91,7 +97,7 @@ export function MemberGrid({ rows, header, emptyState, disabled, canReorder, onR
       renderItem={renderItem}
       keyExtractor={(row) => row.membership._id}
       columns={columns}
-      rowGap={16}
+      rowGap={isList ? 0 : 16}
       columnGap={12}
       customHandle
       sortEnabled={canReorder && !disabled}
@@ -121,10 +127,11 @@ export function MemberGrid({ rows, header, emptyState, disabled, canReorder, onR
 const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 110 },
   tile: { minHeight: 148, alignItems: 'center', borderRadius: radius.lg, paddingTop: 16, paddingBottom: 12 },
-  avatarHandle: { width: 64, height: 64 },
-  avatar: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
-  initials: { fontFamily: fonts.bodySemiBold, fontSize: 22, letterSpacing: -0.7 },
+  row: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  avatar: { alignItems: 'center', justifyContent: 'center' },
   nameButton: { minHeight: 44, width: '100%', alignItems: 'center', justifyContent: 'center', paddingTop: 4 },
+  rowName: { alignItems: 'flex-start', paddingTop: 0 },
+  rowText: { textAlign: 'left', paddingHorizontal: 0 },
+  status: { fontFamily: fonts.body, fontSize: 12.5, lineHeight: 18, marginTop: 2 },
   name: { fontFamily: fonts.body, fontSize: 14.5, lineHeight: 20, letterSpacing: 0.3, textAlign: 'center', paddingHorizontal: 10 },
-  empty: { paddingVertical: 40, textAlign: 'center', fontFamily: fonts.body, fontSize: 14.5, lineHeight: 20 },
 });

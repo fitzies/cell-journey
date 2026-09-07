@@ -3,12 +3,13 @@ import { Platform, StyleSheet, Text } from 'react-native';
 import { leaderAccessLabel, useGroups } from '@/components/group-context';
 import { useAppTheme } from '@/constants/tokens';
 
+import { memberMenuSections } from './leader/members/menu-options';
 import type { AppHeaderProps } from './app-header.types';
 export type { AppHeaderProps, AppMode } from './app-header.types';
 
 const supportsScrollEdgeEffects = Number.parseInt(String(Platform.Version), 10) >= 26;
 
-export function AppHeader({ title, mode, profile = false, eventActions }: AppHeaderProps) {
+export function AppHeader({ title, mode, profile = false, eventActions, membersOptions }: AppHeaderProps) {
   const t = useAppTheme();
   const isTabTitle = !profile && ['Home', 'Attendance', 'Events', 'Members', 'Profile'].includes(title);
 
@@ -29,7 +30,7 @@ export function AppHeader({ title, mode, profile = false, eventActions }: AppHea
         </Stack.Toolbar>
       ) : null}
       {profile ? <Stack.Screen.BackButton displayMode="minimal" /> : null}
-      <ContextToolbar mode={mode} eventActions={eventActions} />
+      <ContextToolbar mode={mode} eventActions={eventActions} membersOptions={membersOptions} />
     </>
   );
 }
@@ -39,13 +40,13 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, lineHeight: 28, fontWeight: '600', letterSpacing: -0.7 },
 });
 
-function ContextToolbar({ mode, eventActions }: Pick<AppHeaderProps, 'mode' | 'eventActions'>) {
+function ContextToolbar({ mode, eventActions, membersOptions }: Pick<AppHeaderProps, 'mode' | 'eventActions' | 'membersOptions'>) {
   const groups = useGroups();
   const t = useAppTheme();
   const canSwitch = groups.memberGroups.length + groups.ledGroups.length > 1;
 
   const hasEventActions = Boolean(eventActions?.onCreate || eventActions?.onImport);
-  if (!canSwitch && !hasEventActions) return null;
+  if (!canSwitch && !hasEventActions && !membersOptions) return null;
 
   return (
     <Stack.Toolbar placement="right" tintColor={t.ink}>
@@ -59,6 +60,25 @@ function ContextToolbar({ mode, eventActions }: Pick<AppHeaderProps, 'mode' | 'e
         >
           {eventActions.onCreate ? <Stack.Toolbar.MenuAction onPress={eventActions.onCreate}>Create event</Stack.Toolbar.MenuAction> : null}
           {eventActions.onImport ? <Stack.Toolbar.MenuAction onPress={eventActions.onImport}>Import CSV / XLSX</Stack.Toolbar.MenuAction> : null}
+        </Stack.Toolbar.Menu>
+      ) : null}
+      {membersOptions ? (
+        <Stack.Toolbar.Menu
+          accessibilityLabel="Member view and filters"
+          title="Member view and filters"
+          icon="line.3.horizontal.decrease"
+          separateBackground
+          disabled={membersOptions.disabled}
+        >
+          {memberMenuSections(membersOptions).map((section) => (
+            <Stack.Toolbar.Menu key={section.title} inline title={section.title}>
+              {section.items.map((item) => (
+                <Stack.Toolbar.MenuAction key={item.label} isOn={item.selected} onPress={item.onPress}>
+                  {item.label}
+                </Stack.Toolbar.MenuAction>
+              ))}
+            </Stack.Toolbar.Menu>
+          ))}
         </Stack.Toolbar.Menu>
       ) : null}
       {canSwitch ? <Stack.Toolbar.Menu
