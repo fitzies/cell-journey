@@ -120,7 +120,7 @@ export default function LeaderHomeScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Review ${pendingRows.length} join ${pendingRows.length === 1 ? 'request' : 'requests'}`}
-            onPress={() => router.push('./requests')}
+            onPress={() => router.push('/(leader-tabs)/home/requests')}
             style={({ pressed }) => [
               styles.attentionRow,
               { backgroundColor: t.surface, ...surfaceShadow(t), opacity: pressed ? 0.68 : 1 },
