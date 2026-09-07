@@ -151,7 +151,7 @@ describe("membership activity, optional attendance, and worklists", () => {
     });
     await expect(
       asUser(t, inactive.userId).mutation(api.attendance.selfSubmit, { eventId }),
-    ).rejects.toThrow("Inactive members cannot self-check in");
+    ).rejects.toThrow("Member check-in is disabled");
 
     await ownerClient.mutation(api.attendance.clearOptionalForMember, {
       eventId,

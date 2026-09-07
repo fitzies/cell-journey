@@ -1,8 +1,7 @@
-import { useMutation, useQuery } from 'convex/react';
+import { useQuery } from 'convex/react';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SymbolView } from 'expo-symbols';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MemberChevron, MemberEmptyState, MemberEventCard, MemberHistoryRow, MemberScreen, MemberSection } from '@/components/member/ui';
 import { useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
@@ -24,11 +23,6 @@ function nowMinusWindow() {
   return Date.now() - ONE_HOUR;
 }
 
-function isAttendanceOpen(event: EventRow | undefined, now: number) {
-  if (!event) return false;
-  return now >= event.startAt - ONE_HOUR && now <= event.endAt + ONE_HOUR;
-}
-
 export default function MemberHomeScreen() {
   const t = useAppTheme();
   const [queryFrom] = useState(() => nowMinusWindow());
@@ -37,59 +31,17 @@ export default function MemberHomeScreen() {
   const group = selectedMemberGroup?.group ?? null;
   const events = useQuery(api.events.listForGroup, group ? { groupId: group._id, from: queryFrom, limit: 5 } : 'skip');
   const attendance = useQuery(api.attendance.historyForGroup, group ? { groupId: group._id, limit: 3 } : 'skip');
-  const selfSubmit = useMutation(api.attendance.selfSubmit);
-  const [busy, setBusy] = useState(false);
 
   if (context === undefined || !group || events === undefined || attendance === undefined) return <LoadingState />;
 
   const eventRows = events as EventRow[];
   const next = eventRows.find((event) => event.endAt + ONE_HOUR >= renderNow);
-  const checkInOpen = isAttendanceOpen(next, renderNow);
   const rate = attendance.attendanceRate === null ? '—' : `${Math.round(attendance.attendanceRate * 100)}%`;
-
-  const checkIn = async () => {
-    if (!next || !checkInOpen) return;
-    setBusy(true);
-    try {
-      await selfSubmit({ eventId: next._id as never });
-      Alert.alert('You’re checked in', 'Your attendance has been submitted for this event.');
-    } catch (err) {
-      Alert.alert('Check-in failed', err instanceof Error ? err.message : 'Please try again.');
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
     <MemberScreen title="Home">
       <Text style={[styles.groupName, { color: t.text }]}>{group.name}</Text>
       <Text style={[styles.groupMeta, { color: t.muted }]}>Your group</Text>
-
-      {next ? (
-        <>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !checkInOpen || busy, busy }}
-            onPress={checkIn}
-            disabled={!checkInOpen || busy}
-            style={({ pressed }) => [styles.checkButton, {
-              backgroundColor: checkInOpen ? t.accent : t.surface,
-              ...surfaceShadow(t, checkInOpen ? 'buttonFilled' : 'button'),
-              opacity: busy ? 0.6 : 1,
-              transform: [{ scale: pressed ? 0.985 : 1 }],
-            }]}
-          >
-            {busy ? <ActivityIndicator size="small" color={t.accentInk} /> : <SymbolView
-              name={checkInOpen ? { ios: 'checkmark', android: 'check', web: 'check' } : { ios: 'clock', android: 'schedule', web: 'schedule' }}
-              size={20} tintColor={checkInOpen ? t.accentInk : t.muted} weight="semibold"
-            />}
-            <Text style={[styles.checkText, { color: checkInOpen ? t.accentInk : t.muted }]}>
-              {busy ? 'Checking in…' : checkInOpen ? 'Check in now' : 'Check-in opens near event time'}
-            </Text>
-          </Pressable>
-          {!checkInOpen ? <Text style={[styles.checkHint, { color: t.muted }]}>Available from 1 hour before the gathering.</Text> : null}
-        </>
-      ) : null}
 
       <MemberSection title="Next gathering" action={
         <Pressable accessibilityRole="button" hitSlop={8} onPress={() => router.push('/(member-tabs)/schedule')}>
@@ -127,9 +79,6 @@ export default function MemberHomeScreen() {
 const styles = StyleSheet.create({
   groupName: { marginTop: 16, fontFamily: fonts.bodySemiBold, fontSize: 16, letterSpacing: -0.3 },
   groupMeta: { ...textStyles.body, marginTop: 5 },
-  checkButton: { minHeight: 46, marginTop: 20, paddingHorizontal: 18, paddingVertical: 12, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  checkText: { ...textStyles.button, flexShrink: 1, textAlign: 'center' },
-  checkHint: { ...textStyles.body, marginTop: 10, textAlign: 'center' },
   sectionAction: { fontFamily: fonts.bodySemiBold, fontSize: 13 },
   attendanceSummary: { minHeight: 82, borderRadius: radius.lg, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
   summaryCopy: { flex: 1, minWidth: 0 },

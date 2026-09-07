@@ -193,7 +193,7 @@ describe("multi-group relationships", () => {
     expect(context.memberGroups.map((row) => row.group._id)).toEqual([groups.second]);
   });
 
-  test("a leader can self-submit attendance through a separate membership", async () => {
+  test.each(["member", "leader"] as const)("%s cannot self-submit attendance while member check-in is disabled", async (role) => {
     const t = makeTest();
     const person = await seedProfile(t, "Leader Member");
     const eventId = await t.run(async (ctx) => {
@@ -208,7 +208,7 @@ describe("multi-group relationships", () => {
       await ctx.db.insert("groups", {
         name: "Led Group",
         code: "LEADER",
-        leaderProfileId: person.profileId,
+        leaderProfileId: role === "leader" ? person.profileId : undefined,
         isActive: true,
         createdAt: now,
         updatedAt: now,
@@ -220,7 +220,7 @@ describe("multi-group relationships", () => {
         joinedAt: now - 60_000,
       });
       await ctx.db.patch(person.profileId, {
-        role: "leader",
+        role,
         currentGroupId: memberGroupId,
         activeMembershipId: membershipId,
       });
@@ -236,8 +236,31 @@ describe("multi-group relationships", () => {
       });
     });
 
-    const attendance = await asUser(t, person.userId).mutation(api.attendance.selfSubmit, { eventId });
-    expect(attendance?.memberSubmittedStatus).toBe("present");
+    const client = asUser(t, person.userId);
+    await expect(client.mutation(api.attendance.selfSubmit, { eventId }))
+      .rejects.toThrow("Member check-in is disabled");
+    expect(await t.run((ctx) => ctx.db.query("attendance").collect())).toEqual([]);
+
+    // Older submissions remain intact, including when an old client retries.
+    const previous = await t.run(async (ctx) => {
+      const event = (await ctx.db.get(eventId))!;
+      const membership = (await ctx.db.query("memberships").first())!;
+      const id = await ctx.db.insert("attendance", {
+        eventId,
+        groupId: event.groupId,
+        profileId: person.profileId,
+        membershipId: membership._id,
+        memberSubmittedStatus: "present",
+        memberSubmittedAt: event.startAt,
+        memberSubmittedByProfileId: person.profileId,
+        createdAt: event.startAt,
+        updatedAt: event.startAt,
+      });
+      return (await ctx.db.get(id))!;
+    });
+    await expect(client.mutation(api.attendance.selfSubmit, { eventId }))
+      .rejects.toThrow("Member check-in is disabled");
+    expect(await t.run((ctx) => ctx.db.get(previous._id))).toEqual(previous);
   });
 
   test("attendance rates are isolated by selected group", async () => {

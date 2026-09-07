@@ -1,6 +1,6 @@
 import { withProfilePhoto } from "./lib/profilePhoto";
 import { paginationOptsValidator } from "convex/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
@@ -19,6 +19,8 @@ import {
 import { compareMemberships } from "./membershipOrdering";
 
 const attendanceStatus = v.union(v.literal("present"), v.literal("absent"));
+// Attendance is leader-managed for now. Restore the member UI before enabling.
+const MEMBER_SELF_CHECK_IN_ENABLED: boolean = false;
 const ONE_HOUR = 60 * 60 * 1000;
 const MAX_WORKLIST_PAGE_SIZE = 20;
 const MAX_RECENT_COMPLETED_EVENTS = 20;
@@ -151,6 +153,9 @@ export const selfSubmit = mutation({
   args: { eventId: v.id("events") },
   handler: async (ctx, args) => {
     const profile = await requireCurrentProfile(ctx);
+    if (!MEMBER_SELF_CHECK_IN_ENABLED) {
+      throw new ConvexError("Member check-in is disabled. Your leader will record attendance.");
+    }
     const event = await ctx.db.get(args.eventId);
     if (!event || event.cancelledAt) throw new Error("Event not found");
 

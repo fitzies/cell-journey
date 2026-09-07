@@ -131,7 +131,9 @@ Permissions:
 
 Attendance must be attached to a scheduled event.
 
-Members can self-submit attendance only during this window:
+Member self-check-in is currently disabled. Leaders record attendance; members can only view their history and rate. `MEMBER_SELF_CHECK_IN_ENABLED` in `convex/attendance.ts` controls backend acceptance and defaults to `false`. The member Home check-in UI has been removed. Restore the UI and verify the full flow before re-enabling. Keep existing self-submitted records intact.
+
+If member self-check-in is re-enabled, allow it only during this window:
 
 - From **1 hour before event start**
 - Until **1 hour after event end**
@@ -178,7 +180,7 @@ Member mobile app must support:
 - Join multiple groups by code
 - See and manage multiple pending approval states
 - Switch between group schedules/events
-- Self-submit attendance during the allowed event window
+- View attendance recorded by leaders; member self-submission is currently disabled
 - View per-group personal attendance rate/history
 - Edit own profile fields except relationship assignments
 - Leave one selected group without affecting other memberships
