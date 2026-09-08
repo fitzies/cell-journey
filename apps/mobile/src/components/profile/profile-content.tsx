@@ -93,13 +93,11 @@ type ProfileGroupSummaryData = {
   totalPastEvents: number;
 };
 
-export function ProfileGroupSummary({ groupName, summary }: { groupName: string; summary: ProfileGroupSummaryData }) {
-  const t = useAppTheme();
+export function ProfileGroupSummary({ summary }: { summary: ProfileGroupSummaryData }) {
   const joined = new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Singapore' }).format(summary.joinedAt);
   const attendance = summary.attendanceRate === null ? 'No past events yet'
     : `${Math.round(summary.attendanceRate * 100)}% · ${summary.presentEvents} of ${summary.totalPastEvents} past events`;
   return <View style={styles.membershipSummary}>
-    <Text accessibilityRole="header" style={[textStyles.section, { color: t.text }]}>{groupName}</Text>
     <ProfileRow icon={{ ios: 'calendar.badge.plus', android: 'event', web: 'event' }} title="Joined group" detail={joined} />
     <ProfileRow icon={{ ios: 'chart.bar', android: 'bar_chart', web: 'bar_chart' }} title="Attendance rate" detail={attendance} divider={false} />
   </View>;
@@ -156,7 +154,7 @@ export function ProfileContent({
         <ProfileRow icon={icons.services} title="Services" detail={serviceNames.join(', ') || 'Not set'} disabled={editDisabled} onPress={() => onEdit('services')} />
       </ProfileServicesMenu>
       <ProfileRow icon={icons.location} title="Postal district" detail={`${locationSubtitle} · ${locationTitle}`} disabled={editDisabled} onPress={() => onEdit('postal')} divider={false} />
-      {groupName && groupSummary ? <ProfileGroupSummary groupName={groupName} summary={groupSummary} /> : null}
+      {groupName && groupSummary ? <ProfileGroupSummary summary={groupSummary} /> : null}
       <View style={styles.signOut}><ProfileRow icon={icons.signOut} title="Sign out" disabled={busy} onPress={onSignOut} divider={false} /></View>
       <ProfileRow icon={icons.deleteAccount} title="Delete account" disabled={busy} onPress={onDeleteAccount} divider={false} destructive />
     </View> : <View style={styles.groupSection}>

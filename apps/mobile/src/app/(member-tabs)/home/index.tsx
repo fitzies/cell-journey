@@ -40,10 +40,7 @@ export default function MemberHomeScreen() {
 
   return (
     <MemberScreen title="Home">
-      <Text style={[styles.groupName, { color: t.text }]}>{group.name}</Text>
-      <Text style={[styles.groupMeta, { color: t.muted }]}>Your group</Text>
-
-      <MemberSection title="Next gathering" action={
+      <MemberSection first title="Next gathering" action={
         <Pressable accessibilityRole="button" hitSlop={8} onPress={() => router.push('/(member-tabs)/schedule')}>
           <Text style={[styles.sectionAction, { color: t.text }]}>See events</Text>
         </Pressable>
@@ -77,8 +74,6 @@ export default function MemberHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  groupName: { marginTop: 16, fontFamily: fonts.bodySemiBold, fontSize: 16, letterSpacing: -0.3 },
-  groupMeta: { ...textStyles.body, marginTop: 5 },
   sectionAction: { fontFamily: fonts.bodySemiBold, fontSize: 13 },
   attendanceSummary: { minHeight: 82, borderRadius: radius.lg, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
   summaryCopy: { flex: 1, minWidth: 0 },

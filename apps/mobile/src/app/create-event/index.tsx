@@ -103,7 +103,7 @@ export default function CreateEventScreen() {
     ) : (
       <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={headerHeight}>
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[styles.content, { paddingBottom: Math.max(24, insets.bottom + 16) }]}>
-          <EventCanvas earliestStartAt={earliestStartAt} groupName={group.name} form={form} saving={saving || saved} onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} />
+          <EventCanvas earliestStartAt={earliestStartAt} form={form} saving={saving || saved} onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} />
           {saving ? <View accessibilityRole="progressbar" accessibilityLabel="Saving event" style={styles.saving}>
             <ActivityIndicator color={t.ink} />
             <Text style={[textStyles.body, { color: t.muted }]}>Saving event…</Text>

@@ -2,7 +2,7 @@ import { useQuery } from 'convex/react';
 import { router, type ErrorBoundaryProps } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useState, type ReactNode } from 'react';
-import { ActionSheetIOS, Alert, AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { leaderAccessLabel, useGroups } from '@/components/group-context';
 import { AttendanceHeatmap } from '@/components/leader/attendance-heatmap';
 import { EmptyState, LeaderScreen } from '@/components/leader/ui';
@@ -66,40 +66,9 @@ export default function LeaderHomeScreen() {
     ? `${activeMemberCount} ${activeMemberCount === 1 ? 'member' : 'members'}${canManageJoinRequests ? ` · ${pendingRows.length} ${pendingRows.length === 1 ? 'request' : 'requests'}` : ''}`
     : leaderAccessLabel(group.accessRole);
 
-  const chooseGroup = () => {
-    if (groups.ledGroups.length < 2) return;
-    const labels = groups.ledGroups.map((row) => row.name);
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: [...labels, 'Cancel'], cancelButtonIndex: labels.length, title: 'Choose a group' },
-        (index) => {
-          const selected = groups.ledGroups[index];
-          if (selected) groups.selectLeaderGroup(selected._id);
-        },
-      );
-      return;
-    }
-    Alert.alert('Choose a group', undefined, [
-      ...groups.ledGroups.map((row) => ({ text: row.name, onPress: () => groups.selectLeaderGroup(row._id) })),
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
   return (
     <LeaderScreen title="Home" contentStyle={styles.pageContent}>
       <LeaderConnectionNotice />
-      <Pressable
-        accessibilityRole={groups.ledGroups.length > 1 ? 'button' : 'text'}
-        accessibilityLabel={groups.ledGroups.length > 1 ? `Switch group. Current group: ${group.name}` : group.name}
-        disabled={groups.ledGroups.length < 2}
-        onPress={chooseGroup}
-        style={({ pressed }) => [styles.groupButton, { opacity: pressed ? 0.55 : 1 }]}
-      >
-        <Text style={[styles.groupName, { color: t.ink }]} numberOfLines={1}>{group.name}</Text>
-        {groups.ledGroups.length > 1 ? (
-          <SymbolView name={{ ios: 'chevron.down', android: 'keyboard_arrow_down', web: 'keyboard_arrow_down' }} size={14} tintColor={t.muted} weight="semibold" />
-        ) : null}
-      </Pressable>
       <Text style={[styles.groupMeta, { color: t.muted }]}>{groupMeta}</Text>
 
       <PrimaryAction
@@ -262,9 +231,7 @@ function Chevron() {
 
 const styles = StyleSheet.create({
   pageContent: { paddingHorizontal: 20 },
-  groupButton: { alignSelf: 'flex-start', minHeight: 44, marginTop: 6, marginLeft: -10, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  groupName: { flexShrink: 1, fontFamily: fonts.bodySemiBold, fontSize: 16, letterSpacing: -0.3 },
-  groupMeta: { ...textStyles.body, marginTop: -2 },
+  groupMeta: { ...textStyles.body },
   primaryAction: { minHeight: 46, marginTop: 20, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 20 },
   primaryLabel: { fontFamily: fonts.bodySemiBold, fontSize: 17, letterSpacing: -0.3 },
   section: { marginTop: 30 },

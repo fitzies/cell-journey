@@ -9,6 +9,8 @@ import { formatDateParts } from '@/lib/date';
 import { api, type Doc } from '@/lib/api';
 import { useGroups } from '@/components/group-context';
 
+type FeedSummary = { progressFraction?: number; action?: string };
+
 export type AttendanceEventKind = 'open' | 'upcoming' | 'complete' | 'needs';
 
 function attendanceStatusColor(kind: AttendanceEventKind, dark: boolean) {
@@ -23,11 +25,13 @@ export function AttendanceEventCard({
   kind,
   status,
   zoom = true,
+  feedSummary,
 }: {
   event: Doc<'events'>;
   kind: AttendanceEventKind;
   status: string;
   zoom?: boolean;
+  feedSummary?: FeedSummary;
 }) {
   const { ledGroups } = useGroups();
   const group = ledGroups.find((candidate) => candidate._id === event.groupId);
@@ -72,6 +76,7 @@ export function AttendanceEventCard({
   const hasActions = canEdit || canDelete;
   const content = <AttendanceEventCardContent
     event={event} kind={kind} status={deleting ? 'Deleting…' : status}
+    feedSummary={feedSummary ? { ...feedSummary, action: group?.capabilities.markAttendance ? feedSummary.action : undefined } : undefined}
     disabled={deleting}
     accessibilityHint={hasActions ? 'Touch and hold for event actions.' : undefined}
     accessibilityActions={hasActions ? [
@@ -106,6 +111,7 @@ export function AttendanceEventCardContent({
   status,
   onPress,
   tail = 'right',
+  feedSummary,
   ...pressableProps
 }: {
   event: Doc<'events'>;
@@ -113,6 +119,7 @@ export function AttendanceEventCardContent({
   status: string;
   onPress?: () => void;
   tail?: 'right' | 'down';
+  feedSummary?: FeedSummary;
 } & Omit<PressableProps, 'children' | 'style'>) {
   const t = useAppTheme();
   const date = formatDateParts(event.startAt);
@@ -123,11 +130,12 @@ export function AttendanceEventCardContent({
     <Pressable
       collapsable={false}
       accessibilityRole="button"
-      accessibilityLabel={`${event.title}, ${status}`}
+      accessibilityLabel={`${event.title}, ${status}${feedSummary?.action ? `, ${feedSummary.action} attendance` : ''}`}
       onPress={onPress}
       {...pressableProps}
       style={({ pressed }) => [
         styles.card,
+        feedSummary && styles.feedCard,
         surfaceShadow(t),
         {
           backgroundColor: t.surface,
@@ -135,6 +143,39 @@ export function AttendanceEventCardContent({
         },
       ]}
     >
+      {feedSummary ? <>
+        <View style={styles.feedTop}>
+          <View style={[styles.date, { backgroundColor: t.soft }]}>
+            <Text style={[styles.month, { color: t.muted }]}>{date.month}</Text>
+            <Text style={[styles.day, { color: t.ink }]}>{date.day}</Text>
+          </View>
+          <View style={styles.copy}>
+            <Text style={[styles.title, { color: t.ink }]}>{event.title}</Text>
+            <Text style={[styles.feedMeta, { color: t.muted }]}>{new Intl.DateTimeFormat('en-SG', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(event.startAt)} · {time}</Text>
+            <Text style={[styles.feedMeta, { color: t.muted }]}>{place}</Text>
+            {kind === 'open' ? <Text style={[styles.status, { color: attendanceStatusColor('open', dark) }]}>Happening now</Text> : null}
+          </View>
+        </View>
+        <View style={[styles.feedFooter, { borderTopColor: t.line }, kind !== 'open' && kind !== 'needs' && styles.quietFooter]}>
+          <View style={styles.copy}>
+            <Text style={[styles.feedStatus, { color: kind === 'needs' || kind === 'open' ? t.muted : attendanceStatusColor(kind, dark) }]}>{kind === 'complete' ? '✓ ' : ''}{status}</Text>
+
+          </View>
+          {feedSummary.action ? <View testID="attendance-progress-action" style={[styles.feedAction, { backgroundColor: t.soft }]}>
+            {feedSummary.progressFraction !== undefined ? <View
+              pointerEvents="none"
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+              aria-hidden
+              style={[styles.actionProgress, {
+                width: `${feedSummary.progressFraction * 100}%`,
+                backgroundColor: dark ? '#51432B' : '#E9D6AD',
+              }]}
+            /> : null}
+            <Text style={[styles.feedActionText, { color: t.ink }]}>{feedSummary.action} →</Text>
+          </View> : <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={14} tintColor={t.muted} />}
+        </View>
+      </> : <>
       <View style={[styles.date, { backgroundColor: t.soft }]}>
         <Text style={[styles.month, { color: t.muted }]}>{date.month}</Text>
         <Text style={[styles.day, { color: t.ink }]}>{date.day}</Text>
@@ -152,11 +193,22 @@ export function AttendanceEventCardContent({
         tintColor={t.strong}
         weight="semibold"
       />
+      </>}
+
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  feedCard: { flexDirection: 'column', alignItems: 'stretch', padding: 15, gap: 0 },
+  feedTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  feedMeta: { fontFamily: fonts.body, fontSize: 12, lineHeight: 17, marginTop: 3 },
+  feedFooter: { marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  quietFooter: { borderTopWidth: 0, paddingTop: 0, marginLeft: 66 },
+  feedStatus: { fontFamily: fonts.bodySemiBold, fontSize: 13, lineHeight: 18 },
+  actionProgress: { position: 'absolute', left: 0, top: 0, bottom: 0 },
+  feedAction: { minHeight: 44, minWidth: 112, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 14, borderRadius: 10, overflow: 'hidden' },
+  feedActionText: { fontFamily: fonts.bodySemiBold, fontSize: 13, lineHeight: 18 },
   card: { minHeight: 96, paddingVertical: 13, paddingLeft: 15, paddingRight: 13, borderRadius: radius.lg, borderCurve: 'continuous', flexDirection: 'row', alignItems: 'center', gap: 13 },
   date: { width: 54, height: 60, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   month: { fontFamily: fonts.bodyBold, fontSize: 9, letterSpacing: 0.75 },

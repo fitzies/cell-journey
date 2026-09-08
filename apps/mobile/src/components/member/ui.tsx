@@ -18,10 +18,10 @@ export function MemberScreen({ title, children }: PropsWithChildren<{ title: str
   );
 }
 
-export function MemberSection({ title, action, children }: PropsWithChildren<{ title: string; action?: ReactNode }>) {
+export function MemberSection({ title, action, first = false, children }: PropsWithChildren<{ title: string; action?: ReactNode; first?: boolean }>) {
   const t = useAppTheme();
   return (
-    <View style={styles.section}>
+    <View style={[styles.section, first && styles.firstSection]}>
       <View style={styles.sectionHeading}>
         <Text accessibilityRole="header" style={[textStyles.section, { color: t.text }]}>{title}</Text>
         {action}
@@ -134,6 +134,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 108 },
   section: { marginTop: 30 },
+  firstSection: { marginTop: 0 },
   sectionHeading: { marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
   card: { padding: 15, borderRadius: radius.lg, borderCurve: 'continuous' },
   eventRow: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: 13 },

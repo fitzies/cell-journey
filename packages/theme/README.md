@@ -13,6 +13,7 @@ export const ACTIVE_THEME = 'invincible-theme';
 
 Available themes live in `packages/theme/themes/`:
 
+- `cosbt-01` — [COSBT_01 on tweakcn](https://tweakcn.com/themes/cmtpieb6u000004l7gzjv7h8e)
 - `invincible-theme`
 - `dark-forge`
 - `dane-creativity-lab`
@@ -31,7 +32,7 @@ This generates:
 
 Do not edit generated files directly.
 
-The web admin also has a runtime testing select next to the light/dark toggle. It sets `html[data-cj-theme]` and only affects the web preview. Mobile still follows `ACTIVE_THEME` after `pnpm theme:sync`.
+The web admin also has a runtime testing select next to the light/dark toggle. It sets `html[data-cj-theme]` and only affects the web preview. Expo uses its original monochrome palette by default. To preview a preset, set `PREVIEW_SHARED_THEME = true` in `apps/mobile/src/constants/theme-preview.ts`, choose `ACTIVE_THEME`, and run `pnpm theme:sync`. Set the preview switch back to `false` to restore the original palette. Production always uses the original palette. Reload the app after switching to refresh all navigation styles.
 
 ## Mobile color contract
 

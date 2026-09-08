@@ -215,6 +215,18 @@ Leader Members always shows Active, Visitors, then Inactive sections. It default
 
 Users select one group at a time within each mode. The selected group is UI state, not canonical membership data.
 
+### Development theme previews
+
+Expo uses its original monochrome theme by default. Keep `PREVIEW_SHARED_THEME` in `apps/mobile/src/constants/theme-preview.ts` set to `false` unless a theme preview is requested.
+
+To preview a shared/tweakcn color palette:
+
+1. Set `PREVIEW_SHARED_THEME` to `true`.
+2. Choose `ACTIVE_THEME` in `packages/theme/active-theme.mjs`. Presets live in `packages/theme/themes/`.
+3. Run `pnpm theme:sync` and reload Expo to refresh all navigation styles.
+
+Set `PREVIEW_SHARED_THEME` back to `false` and reload to restore the original theme. The switch is development-only; production always uses the original palette. This previews colors only, retaining the mobile app's typography, spacing, radii, shadows, and native controls. Do not edit generated theme files directly.
+
 ## Notifications
 
 Push notifications are in MVP:

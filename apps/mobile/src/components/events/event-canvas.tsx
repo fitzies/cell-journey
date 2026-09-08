@@ -16,9 +16,8 @@ function CanvasIcon({ name, size = 19 }: { name: SymbolViewProps['name']; size?:
   return <SymbolView name={name} size={size} tintColor={t.muted} />;
 }
 
-export function EventCanvas({ groupName, form, saving, onChange, earliestStartAt }: {
+export function EventCanvas({ form, saving, onChange, earliestStartAt }: {
   earliestStartAt?: number;
-  groupName: string;
   form: EventForm;
   saving: boolean;
   onChange: (patch: Partial<EventForm>) => void;
@@ -32,10 +31,6 @@ export function EventCanvas({ groupName, form, saving, onChange, earliestStartAt
     setEditing(field);
   };
   return <View style={saving && styles.disabled}>
-    <View style={styles.context}>
-      <CanvasIcon name={{ ios: 'person.2', android: 'group', web: 'group' }} size={14} />
-      <Text style={[styles.caption, styles.flex, { color: t.muted }]}>For {groupName}</Text>
-    </View>
     <View style={styles.titleWrap}>
       <Text accessible={false} aria-hidden importantForAccessibility="no-hide-descendants" style={[styles.title, styles.titleMeasure]}>{form.title || 'Name your gathering'}{'\u200b'}</Text>
       <TextInput
@@ -118,7 +113,6 @@ export function EventCanvas({ groupName, form, saving, onChange, earliestStartAt
 const styles = StyleSheet.create({
   disabled: { opacity: 0.58 },
   flex: { flex: 1, minWidth: 0 },
-  context: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 22 },
   caption: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, letterSpacing: 0.1 },
   title: { fontFamily: fonts.bodySemiBold, fontSize: 34, lineHeight: 40, letterSpacing: -1.1, padding: 0, paddingBottom: 5, minHeight: 45 },
   titleWrap: { minHeight: 45 },

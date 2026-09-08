@@ -12,6 +12,16 @@ html.dark[data-cj-theme] {
   --cj-font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
+/* Preserve the imported COSBT_01 typography and geometry in the preview. */
+:root:not([data-cj-theme]),
+html[data-cj-theme="cosbt-01"],
+html.dark[data-cj-theme="cosbt-01"] {
+  --radius: 0.75rem;
+  --cj-font-sans: var(--font-inter), sans-serif;
+  --cj-font-serif: var(--font-source-serif), serif;
+  --cj-font-mono: var(--font-roboto-mono), ui-monospace, monospace;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

@@ -73,7 +73,6 @@ export default function LeaderJoinRequestsScreen() {
   return (
     <LeaderScreen title="" contentStyle={styles.pageContent}>
       <Text style={[styles.title, { color: t.ink }]}>Join requests</Text>
-      <Text style={[styles.subtitle, { color: t.muted }]}>{group?.name ?? 'No group selected'}</Text>
       <LeaderConnectionNotice />
       {error ? <View accessibilityRole="alert" style={styles.error}>
         <Text style={[styles.detail, { color: t.danger }]}>{error}</Text>
@@ -108,7 +107,6 @@ export default function LeaderJoinRequestsScreen() {
 const styles = StyleSheet.create({
   pageContent: { paddingHorizontal: 20 },
   title: { fontFamily: fonts.bodySemiBold, fontSize: 38, lineHeight: 42, letterSpacing: -1.5 },
-  subtitle: { marginTop: 5, fontFamily: fonts.bodyMedium, fontSize: 14 },
   list: { marginTop: 26, gap: 10 },
   actions: { marginTop: 12, flexDirection: 'row', gap: 8 },
   error: { marginTop: 16, gap: 12 },

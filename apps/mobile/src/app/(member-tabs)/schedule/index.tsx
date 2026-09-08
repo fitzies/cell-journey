@@ -20,7 +20,6 @@ export default function MemberScheduleScreen() {
 
   return (
     <MemberScreen title="Events">
-      <Text style={[styles.group, { color: t.muted }]}>{group.name}</Text>
       {next ? (
         <>
           <View style={styles.overview}>
@@ -38,7 +37,7 @@ export default function MemberScheduleScreen() {
           ) : null}
         </>
       ) : (
-        <View style={styles.empty}>
+        <View>
           <MemberEmptyState title="No gatherings scheduled" body="When your leader adds the next cell event, it will appear here." />
         </View>
       )}
@@ -47,11 +46,9 @@ export default function MemberScheduleScreen() {
 }
 
 const styles = StyleSheet.create({
-  group: { ...textStyles.body, marginTop: 6 },
-  overview: { marginTop: 27, marginBottom: 24, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 16 },
+  overview: { marginBottom: 24, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 16 },
   overviewCount: { fontFamily: fonts.bodySemiBold, fontSize: 16, letterSpacing: -0.3 },
   sorted: { fontFamily: fonts.bodyMedium, fontSize: 12 },
   nextHeading: { ...textStyles.section, marginBottom: 12 },
   list: { gap: 10 },
-  empty: { marginTop: 28 },
 });

@@ -3,9 +3,13 @@
  * Do not edit directly. Change the active theme or theme files, then run `pnpm theme:sync`.
  */
 
-export const activeWebTheme = "dark-forge";
+export const activeWebTheme = "cosbt-01";
 
 export const webThemePresets = [
+  {
+    value: "cosbt-01",
+    label: "Cosbt 01"
+  },
   {
     value: "dane-creativity-lab",
     label: "Dane Creativity Lab"

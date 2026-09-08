@@ -20,7 +20,6 @@ export default function MemberAttendanceScreen() {
 
   return (
     <MemberScreen title="Attendance">
-      <Text style={[styles.group, { color: t.muted }]}>{group.name}</Text>
       <View style={[styles.statCard, { backgroundColor: t.surface, ...surfaceShadow(t) }]}>
         <View style={styles.statTopRow}>
           <View style={styles.statCopy}>
@@ -54,8 +53,7 @@ export default function MemberAttendanceScreen() {
 }
 
 const styles = StyleSheet.create({
-  group: { ...textStyles.body, marginTop: 6 },
-  statCard: { marginTop: 27, borderRadius: radius.lg, borderCurve: 'continuous', padding: 18 },
+  statCard: { borderRadius: radius.lg, borderCurve: 'continuous', padding: 18 },
   statTopRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   statCopy: { flex: 1, minWidth: 0 },
   statLabel: { ...textStyles.body, fontFamily: fonts.bodySemiBold, letterSpacing: -0.3 },

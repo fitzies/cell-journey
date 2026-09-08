@@ -15,6 +15,7 @@ import type * as attendanceHeatmap from "../attendanceHeatmap.js";
 import type * as auth from "../auth.js";
 import type * as authProfiles from "../authProfiles.js";
 import type * as devAccountProvisioning from "../devAccountProvisioning.js";
+import type * as devEventSamples from "../devEventSamples.js";
 import type * as emailOtp from "../emailOtp.js";
 import type * as emailOtpRateLimit from "../emailOtpRateLimit.js";
 import type * as events from "../events.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   authProfiles: typeof authProfiles;
   devAccountProvisioning: typeof devAccountProvisioning;
+  devEventSamples: typeof devEventSamples;
   emailOtp: typeof emailOtp;
   emailOtpRateLimit: typeof emailOtpRateLimit;
   events: typeof events;

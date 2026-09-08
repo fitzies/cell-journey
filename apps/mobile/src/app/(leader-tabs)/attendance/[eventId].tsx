@@ -213,7 +213,7 @@ function AttendanceScreenContent({ children }: PropsWithChildren) {
 
 function statusFor(kind: AttendanceEventKind, present: number, total: number) {
   if (kind === 'upcoming') return 'Upcoming';
-  if (kind === 'open') return `Check-in open · ${present}/${total} present`;
+  if (kind === 'open') return `Happening now · ${present}/${total} present`;
   if (kind === 'complete') return `Complete · ${present}/${total} present`;
   return `Needs attendance · ${present}/${total} present`;
 }

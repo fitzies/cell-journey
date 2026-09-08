@@ -210,7 +210,6 @@ function GroupMembers({ groupId, groupName }: { groupId: Id<'groups'>; groupName
       onViewProfile={viewProfile}
       onDraggingChange={setDragging}
       header={<MembersToolbar
-        groupName={groupName}
         sort={sort}
         visibleCount={visibleCount}
         totalCount={members.length}

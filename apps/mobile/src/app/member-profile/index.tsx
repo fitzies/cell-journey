@@ -51,7 +51,7 @@ export default function MemberProfileScreen() {
       <Text style={[textStyles.body, { color: t.muted }]}>This member may have left the group, or your access may have changed.</Text>
     </View> : <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.content, { paddingBottom: Math.max(24, insets.bottom + 16) }]}>
       <ProfileIdentity displayName={getProfileDisplayName(member.profile, 'Member')} photoUrl={member.profile.photoUrl}
-        subtitle={`${member.groupName} · ${member.status === 'visitor' ? 'Visitor' : member.status === 'active' ? 'Active' : 'Inactive'}`} />
+        subtitle={member.status === 'visitor' ? 'Visitor' : member.status === 'active' ? 'Active' : 'Inactive'} />
       <View style={[styles.details, { borderTopColor: t.track }]}>
         <ProfileRow icon={{ ios: 'person', android: 'person_outline', web: 'person_outline' }} title="Full name" detail={getProfileFullName(member.profile, 'Not set')} />
         <ProfileEmailRow email={member.email} />
@@ -59,7 +59,7 @@ export default function MemberProfileScreen() {
         <ProfileRow icon={{ ios: 'mappin.and.ellipse', android: 'location_on', web: 'location_on' }} title="Postal district"
           detail={district ? `District ${district.number} · ${district.area}` : getProfileLocationLabel(member.profile)} divider={false} />
       </View>
-      <ProfileGroupSummary groupName={member.groupName} summary={member.groupSummary} />
+      <ProfileGroupSummary summary={member.groupSummary} />
     </ScrollView>}
   </>;
 }

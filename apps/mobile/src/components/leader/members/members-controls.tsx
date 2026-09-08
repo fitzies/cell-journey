@@ -2,14 +2,13 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { fonts, radius, textStyles, useAppTheme } from '@/constants/tokens';
 import type { MemberSort } from './types';
 
-export function MembersToolbar({ groupName, sort, visibleCount, totalCount, search, disabled, busy, offline = false, dragging, error, onDismissError, onSearch }: {
-  groupName: string; sort: MemberSort; visibleCount: number; totalCount: number;
+export function MembersToolbar({ sort, visibleCount, totalCount, search, disabled, busy, offline = false, dragging, error, onDismissError, onSearch }: {
+  sort: MemberSort; visibleCount: number; totalCount: number;
   search: string; disabled: boolean; busy: boolean; offline?: boolean; dragging: boolean; error: string | null;
   onDismissError: () => void; onSearch: (value: string) => void;
 }) {
   const t = useAppTheme();
   return <View style={styles.header}>
-    <Text style={[textStyles.body, { color: t.muted }]}>{groupName}</Text>
     <TextInput
       accessibilityLabel="Search members"
       placeholder="Search members"

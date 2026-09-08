@@ -1,4 +1,5 @@
-import { mobileThemeFonts } from '@cell-journey/theme/mobile';
+import { PREVIEW_SHARED_THEME } from './theme-preview';
+import { mobileTheme, mobileThemeFonts } from '@cell-journey/theme/mobile';
 import { Platform, StyleSheet, useColorScheme, type ViewStyle } from 'react-native';
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const;
@@ -47,9 +48,7 @@ export const textStyles = StyleSheet.create({
   button: { fontFamily: fonts.bodySemiBold, fontSize: typography.body, lineHeight: 18, letterSpacing: 0.1 },
 });
 
-// The mobile app intentionally keeps its palette local. The shared theme also
-// feeds the future web app, while this product uses a restrained monochrome UI.
-export const palettes = {
+const originalPalettes = {
   light: {
     name: 'Cell Journey Light',
     background: '#F7F7F5',
@@ -85,6 +84,27 @@ export const palettes = {
     selected: '#30302F',
   },
 } as const;
+
+// Preview the active tweakcn palette through the existing native color roles.
+// Keep success semantic: the source theme's chart colors are not status colors.
+const previewPalettes = {
+  light: {
+    ...mobileTheme.light,
+    text: mobileTheme.light.ink,
+    strong: mobileTheme.light.ink,
+    track: mobileTheme.light.line,
+    success: '#137333',
+  },
+  dark: {
+    ...mobileTheme.dark,
+    text: mobileTheme.dark.ink,
+    strong: mobileTheme.dark.ink,
+    track: mobileTheme.dark.line,
+    success: '#58C884',
+  },
+} as const;
+
+export const palettes = __DEV__ && PREVIEW_SHARED_THEME ? previewPalettes : originalPalettes;
 
 export function useAppTheme() {
   return palettes[useColorScheme() === 'dark' ? 'dark' : 'light'];
