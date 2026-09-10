@@ -1,3 +1,4 @@
+import { anonymizeProfile, deleteUserAccount } from "./accountDeletion";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
@@ -186,7 +187,7 @@ export const listUsers = query({
     const limit = Math.min(args.limit ?? MAX_ROWS, MAX_ROWS);
     const search = args.search?.trim().toLowerCase() ?? "";
 
-    const profiles = await ctx.db.query("userProfiles").order("desc").take(limit);
+    const profiles = await ctx.db.query("userProfiles").withIndex("by_deletedAt", (q) => q.eq("deletedAt", undefined)).order("desc").take(limit);
     const rows = [];
 
     for (const profile of profiles) {
@@ -455,7 +456,7 @@ export const assignCoLeader = mutation({
     const group = await ctx.db.get(args.groupId);
     const profile = await ctx.db.get(args.profileId);
     if (!group) throw new Error("Group not found");
-    if (!profile) throw new Error("Profile not found");
+    if (!profile || profile.deletedAt !== undefined) throw new Error("Profile not found");
     if (group.leaderProfileId === profile._id) {
       throw new Error("The group owner cannot also be assigned as a co-leader");
     }
@@ -912,7 +913,7 @@ export const setGroupLeader = mutation({
     const previousLeaderId = group.leaderProfileId;
     if (args.profileId) {
       const profile = await ctx.db.get(args.profileId);
-      if (!profile) throw new Error("Profile not found");
+      if (!profile || profile.deletedAt !== undefined) throw new Error("Profile not found");
     }
 
     const now = Date.now();
@@ -989,7 +990,7 @@ export const assignMemberToGroup = mutation({
     await requireAdmin(ctx);
     const profile = await ctx.db.get(args.profileId);
     const group = await ctx.db.get(args.groupId);
-    if (!profile) throw new Error("Profile not found");
+    if (!profile || profile.deletedAt !== undefined) throw new Error("Profile not found");
     if (!group || !group.isActive) throw new Error("Active group not found");
 
     const existing = await getConnectedMembershipForGroup(
@@ -1085,6 +1086,24 @@ export const removeMemberFromGroup = mutation({
       endReason: "removedByAdmin",
     });
     await syncCompatibilityRole(ctx, args.profileId);
+    return null;
+  },
+});
+
+/** Deletes an account or an unclaimed invitation while retaining group history. */
+export const deleteUser = mutation({
+  args: { profileId: v.id("userProfiles") },
+  returns: v.null(),
+  handler: async (ctx, { profileId }) => {
+    const admin = await requireAdmin(ctx);
+    const profile = await ctx.db.get(profileId);
+    if (!profile) throw new Error("Profile not found");
+    if (profile.deletedAt !== undefined) return null;
+    if (profile.userId === admin.userId) {
+      throw new Error("You cannot delete your own account from the admin dashboard.");
+    }
+    if (profile.userId) await deleteUserAccount(ctx, profile.userId);
+    else await anonymizeProfile(ctx, profile, Date.now());
     return null;
   },
 });

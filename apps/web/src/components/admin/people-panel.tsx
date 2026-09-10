@@ -12,6 +12,7 @@ import { api } from "@/lib/api";
 import { ProfileAvatar } from "./profile-avatar";
 import { PanelLoading, SearchInput } from "./panel-ui";
 import { PeopleManagementControls } from "./people-management-controls";
+import { DeleteUserDialog } from "./delete-user-dialog";
 import { profileDisplayName } from "./profile-display-name";
 import type { GroupRow, UserRow } from "./types";
 
@@ -89,7 +90,10 @@ export function PeoplePanel({
     {
       id: "actions",
       header: () => <span className="sr-only">Actions</span>,
-      cell: ({ row }) => <PeopleManagementControls person={row.original} groups={groups ?? []} />,
+      cell: ({ row }) => <div className="flex justify-end gap-2">
+        <PeopleManagementControls person={row.original} groups={groups ?? []} />
+        <DeleteUserDialog person={row.original} />
+      </div>,
     },
   ], [groups]);
 

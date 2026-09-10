@@ -39,7 +39,7 @@ describe("account deletion", () => {
     const otherBefore = await t.run((ctx) => ctx.db.get(other.profileId));
     await asUser(t, owner.userId).mutation(api.accountDeletion.deleteCurrentAccount, {});
     const profile = await t.run((ctx) => ctx.db.get(owner.profileId));
-    expect(profile).toEqual({ _id: owner.profileId, _creationTime: expect.any(Number), role: "member", onboardingStatus: "profileIncomplete", fullName: "Deleted member", serviceIds: [], createdAt: expect.any(Number), updatedAt: expect.any(Number) });
+    expect(profile).toEqual({ _id: owner.profileId, _creationTime: expect.any(Number), role: "member", onboardingStatus: "profileIncomplete", fullName: "Deleted member", serviceIds: [], deletedAt: expect.any(Number), createdAt: expect.any(Number), updatedAt: expect.any(Number) });
     expect(await t.run((ctx) => ctx.db.get(owner.userId))).toBeNull();
     expect(await asUser(t, owner.userId).query(api.profiles.currentOrNull, {})).toBeNull();
     await expect(asUser(t, owner.userId).mutation(api.profiles.getOrCreateCurrent, {})).rejects.toThrow("Authenticated user not found");

@@ -56,7 +56,7 @@ export function formatReadableTime(value: string) {
 export function defaultEventForm(): EventForm {
   const startAt = nextFridayEvening();
   return {
-    title: 'Cell Group',
+    title: '',
     venue: '',
     word: '',
     worship: '',

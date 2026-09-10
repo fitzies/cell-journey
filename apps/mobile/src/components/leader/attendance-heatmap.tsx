@@ -41,6 +41,16 @@ const scale = {
   dark: ['#203C2B', '#28583C', '#327B4D', '#40A367', '#58C884'],
 };
 
+const weekdayLabels = [
+  { short: 'M', full: 'Monday' },
+  { short: 'T', full: 'Tuesday' },
+  { short: 'W', full: 'Wednesday' },
+  { short: 'T', full: 'Thursday' },
+  { short: 'F', full: 'Friday' },
+  { short: 'S', full: 'Saturday' },
+  { short: 'S', full: 'Sunday' },
+];
+
 export function AttendanceHeatmapChart({ data }: { data: HeatmapData }) {
   const t = useAppTheme();
   const greens = t === palettes.dark ? scale.dark : scale.light;
@@ -53,6 +63,14 @@ export function AttendanceHeatmapChart({ data }: { data: HeatmapData }) {
   const month = (day: HeatmapDay) => new Intl.DateTimeFormat('en-SG', { timeZone: 'Asia/Singapore', month: 'short' }).format(day.startAt);
   return <View style={[styles.card, { backgroundColor: t.surface, ...surfaceShadow(t) }]} onLayout={event => setWidth(event.nativeEvent.layout.width - 32)}>
     <View style={{ gap: 3, alignSelf: 'center' }}>
+      <View style={{ flexDirection: 'row', gap: 3, alignItems: 'center' }}>
+        <View style={{ width: 39 }} />
+        {Array.from({ length: daysPerRow }, (_, column) => {
+          const label = column % 2 === 0 ? weekdayLabels[column % 7] : null;
+          return <Text key={column} accessible={!!label} accessibilityLabel={label?.full}
+            style={[styles.weekday, { color: t.muted, width: cell }]}>{label?.short ?? ''}</Text>;
+        })}
+      </View>
       {rows.map((row, i) => {
         const first = row.find(Boolean);
         const previous = rows[i - 1]?.find(Boolean);
@@ -97,6 +115,7 @@ const styles = StyleSheet.create({
   card: { padding: 16, borderRadius: radius.xl },
   caption: { fontFamily: fonts.body, fontSize: 12, lineHeight: 18 },
   month: { height: 19, width: 36, fontFamily: fonts.bodyMedium, fontSize: 10 },
+  weekday: { fontFamily: fonts.bodyMedium, fontSize: 10, lineHeight: 16, textAlign: 'center' },
   legend: { marginTop: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, flexWrap: 'wrap' },
   swatch: { width: 10, height: 10, borderRadius: 2 },
   detailsLink: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', marginTop: 6 },

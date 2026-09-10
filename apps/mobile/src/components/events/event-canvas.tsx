@@ -16,7 +16,8 @@ function CanvasIcon({ name, size = 19 }: { name: SymbolViewProps['name']; size?:
   return <SymbolView name={name} size={size} tintColor={t.muted} />;
 }
 
-export function EventCanvas({ form, saving, onChange, earliestStartAt }: {
+export function EventCanvas({ form, saving, onChange, earliestStartAt, autoFocusTitle = false }: {
+  autoFocusTitle?: boolean;
   earliestStartAt?: number;
   form: EventForm;
   saving: boolean;
@@ -34,6 +35,7 @@ export function EventCanvas({ form, saving, onChange, earliestStartAt }: {
     <View style={styles.titleWrap}>
       <Text accessible={false} aria-hidden importantForAccessibility="no-hide-descendants" style={[styles.title, styles.titleMeasure]}>{form.title || 'Name your gathering'}{'\u200b'}</Text>
       <TextInput
+        autoFocus={autoFocusTitle}
         accessibilityLabel="Event title"
         value={form.title}
         onChangeText={(title) => onChange({ title })}

@@ -158,10 +158,8 @@ export function ProfileContent({
       <View style={styles.signOut}><ProfileRow icon={icons.signOut} title="Sign out" disabled={busy} onPress={onSignOut} divider={false} /></View>
       <ProfileRow icon={icons.deleteAccount} title="Delete account" disabled={busy} onPress={onDeleteAccount} divider={false} destructive />
     </View> : <View style={styles.groupSection}>
-      <ProfileGroupMenu {...groupMenu} disabled={busy}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`${groupName ?? 'No active group'}, ${groupCountLabel}. View groups`}
-        accessibilityState={{ disabled: busy }} aria-disabled={busy} disabled={busy} onPress={onGroups}
-        style={({ pressed }) => [styles.groupCard, { backgroundColor: pressed ? t.soft : t.surface, ...surfaceShadow(t) }]}>
+      <View accessible accessibilityLabel={`${groupName ?? 'No active group'}, ${groupRoleLabel}, ${groupCountLabel}`}
+        style={[styles.groupCard, { backgroundColor: t.surface, ...surfaceShadow(t) }]}>
         <View style={styles.groupTop}>
           <ProfileIcon name={icons.groups} />
           <Text style={[textStyles.body, styles.flex, { color: t.muted }]}>{mode === 'leader' ? 'Leading' : 'Selected group'}</Text>
@@ -170,10 +168,8 @@ export function ProfileContent({
         <Text style={[textStyles.section, { color: t.text }]}>{groupName ?? 'No active group'}</Text>
         <View style={styles.groupBottom}>
           <Text style={[textStyles.body, styles.flex, { color: t.muted }]}>{groupCountLabel}</Text>
-          <ProfileIcon name={icons.chevron} size={12} />
         </View>
-      </Pressable>
-      </ProfileGroupMenu>
+      </View>
       <ProfileGroupMenu {...groupMenu} disabled={busy}>
         <ProfileRow icon={icons.groups} title="Switch group or mode" disabled={busy} onPress={onGroups} />
       </ProfileGroupMenu>

@@ -67,6 +67,7 @@ export default defineSchema({
     .index("by_expiresAt", ["expiresAt"]),
 
   userProfiles: defineTable({
+    deletedAt: v.optional(v.number()),
     // Links product profile data to the Convex Auth managed users table.
     // Optional so admins can pre-provision a profile before its owner signs in.
     userId: v.optional(v.id("users")),
@@ -102,6 +103,7 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .index("by_deletedAt", ["deletedAt"])
     .index("by_userId", ["userId"])
     .index("by_invitedEmail", ["invitedEmail"])
     .index("by_identityEmailNormalized", ["identityEmailNormalized"])

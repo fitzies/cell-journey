@@ -3,7 +3,8 @@ import { hmac } from "@oslojs/crypto/hmac";
 import { SHA256 } from "@oslojs/crypto/sha2";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { internalMutation, mutation } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+import { internalMutation, mutation, type MutationCtx } from "./_generated/server";
 
 const BATCH_SIZE = 50;
 
@@ -14,53 +15,61 @@ export const deleteCurrentAccount = mutation({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
-    const user = await ctx.db.get(userId);
-    if (!user) {
-      // A second device or a retried response can still present the old JWT.
-      // The first transaction already erased identity and queued profile cleanup.
-      await ctx.scheduler.runAfter(0, internal.accountDeletion.cleanupAuth, { userId });
-      return null;
-    }
-    const profiles = await ctx.db.query("userProfiles")
-      .withIndex("by_userId", (q) => q.eq("userId", userId)).take(2);
-    if (profiles.length > 1) throw new Error("Multiple profiles are linked to this account");
-    const deletedAt = Date.now();
-    const profile = profiles[0];
-    if (profile) {
-      if (profile.avatarStorageId) await ctx.storage.delete(profile.avatarStorageId);
-      // Keep the foreign-key target for shared group history, never the identity.
-      // Replacing rather than patching also removes future optional personal fields.
-      await ctx.db.replace(profile._id, {
-        role: "member",
-        onboardingStatus: "profileIncomplete",
-        fullName: "Deleted member",
-        serviceIds: [],
-        createdAt: deletedAt,
-        updatedAt: deletedAt,
-      });
-      await ctx.scheduler.runAfter(0, internal.accountDeletion.cleanupProfile, {
-        profileId: profile._id, deletedAt, stage: "groups", cursor: null,
-      });
-    }
-    const email = user.email?.trim().toLowerCase();
-    if (email) {
-      const rate = await ctx.db.query("authRateLimits")
-        .withIndex("identifier", (q) => q.eq("identifier", email)).unique();
-      if (rate) await ctx.db.delete(rate._id);
-      const secret = process.env.AUTH_OTP_SECRET;
-      if (secret) {
-        const encoder = new TextEncoder();
-        const emailHash = Array.from(hmac(SHA256, encoder.encode(secret), encoder.encode(`email:${email}`)),
-          (byte) => byte.toString(16).padStart(2, "0")).join("");
-        await ctx.scheduler.runAfter(0, internal.accountDeletion.cleanupOtp, { emailHash, deletedAt });
-      }
-    }
-    // Existing JWTs cannot resolve a profile; refresh cannot restore a deleted user.
-    await ctx.db.delete(userId);
-    await ctx.scheduler.runAfter(0, internal.accountDeletion.cleanupAuth, { userId });
-    return null;
+    return deleteUserAccount(ctx, userId);
   },
 });
+
+// Shared implementation; callers must authenticate and authorize the target first.
+export async function deleteUserAccount(ctx: MutationCtx, userId: Id<"users">) {
+  const user = await ctx.db.get(userId);
+  if (!user) {
+    // A second device or a retried response can still present the old JWT.
+    // The first transaction already erased identity and queued profile cleanup.
+    await ctx.scheduler.runAfter(0, internal.accountDeletion.cleanupAuth, { userId });
+    return null;
+  }
+  const profiles = await ctx.db.query("userProfiles")
+    .withIndex("by_userId", (q) => q.eq("userId", userId)).take(2);
+  if (profiles.length > 1) throw new Error("Multiple profiles are linked to this account");
+  const deletedAt = Date.now();
+  const profile = profiles[0];
+  if (profile) await anonymizeProfile(ctx, profile, deletedAt);
+  const email = user.email?.trim().toLowerCase();
+  if (email) {
+    const rate = await ctx.db.query("authRateLimits")
+      .withIndex("identifier", (q) => q.eq("identifier", email)).unique();
+    if (rate) await ctx.db.delete(rate._id);
+    const secret = process.env.AUTH_OTP_SECRET;
+    if (secret) {
+      const encoder = new TextEncoder();
+      const emailHash = Array.from(hmac(SHA256, encoder.encode(secret), encoder.encode(`email:${email}`)),
+        (byte) => byte.toString(16).padStart(2, "0")).join("");
+      await ctx.scheduler.runAfter(0, internal.accountDeletion.cleanupOtp, { emailHash, deletedAt });
+    }
+  }
+  // Existing JWTs cannot resolve a profile; refresh cannot restore a deleted user.
+  await ctx.db.delete(userId);
+  await ctx.scheduler.runAfter(0, internal.accountDeletion.cleanupAuth, { userId });
+  return null;
+}
+
+export async function anonymizeProfile(ctx: MutationCtx, profile: Doc<"userProfiles">, deletedAt: number) {
+  if (profile.avatarStorageId) await ctx.storage.delete(profile.avatarStorageId);
+  // Keep the foreign-key target for shared group history, never the identity.
+  // Replacing rather than patching also removes future optional personal fields.
+  await ctx.db.replace(profile._id, {
+    role: "member",
+    onboardingStatus: "profileIncomplete",
+    fullName: "Deleted member",
+    serviceIds: [],
+    createdAt: deletedAt,
+    updatedAt: deletedAt,
+    deletedAt,
+  });
+  await ctx.scheduler.runAfter(0, internal.accountDeletion.cleanupProfile, {
+    profileId: profile._id, deletedAt, stage: "groups", cursor: null,
+  });
+}
 
 const stages = ["groups", "coLeaders", "memberships", "periods", "attendance", "requests", "push"] as const;
 const profileStage = v.union(...stages.map((stage) => v.literal(stage)));
