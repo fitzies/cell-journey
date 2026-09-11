@@ -4,6 +4,7 @@ import { SymbolView } from 'expo-symbols';
 import { useEffect, useState, type ReactNode } from 'react';
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { leaderAccessLabel, useGroups } from '@/components/group-context';
+import { useLeaderEventsLayout } from '@/components/leader-navigation-context';
 import { AttendanceHeatmap } from '@/components/leader/attendance-heatmap';
 import { EmptyState, LeaderScreen } from '@/components/leader/ui';
 import { LeaderConnectionNotice, LeaderLoadError, LeaderLoadingState } from '@/components/leader/query-state';
@@ -27,6 +28,8 @@ export default function LeaderHomeScreen() {
   const t = useAppTheme();
   const [now, setNow] = useState(Date.now);
   const groups = useGroups();
+  const layout = useLeaderEventsLayout();
+  const eventsRoute = layout === 'split' ? '/(leader-tabs)/schedule' : '/(leader-tabs)/attendance';
   const { context, selectedLeaderGroup: group } = groups;
   const canManageJoinRequests = group?.capabilities.manageJoinRequests === true;
   const canManageMembers = group?.capabilities.manageMembers === true;
@@ -74,14 +77,14 @@ export default function LeaderHomeScreen() {
       <PrimaryAction
         label={next ? (canMarkAttendance ? 'Take attendance' : 'View attendance') : (canCreateEvents ? 'Create an event' : 'View events')}
         icon={next ? 'checkmark' : canCreateEvents ? 'plus' : 'calendar'}
-        onPress={() => router.push(!next && canCreateEvents ? { pathname: '/create-event', params: { groupId: group._id } } : '/(leader-tabs)/attendance')}
+        onPress={() => router.push(!next && canCreateEvents ? { pathname: '/create-event', params: { groupId: group._id } } : next ? '/(leader-tabs)/attendance' : eventsRoute)}
       />
 
       <HomeSection title="Next gathering">
         {next ? (
-          <NextEventCard event={next} onPress={() => router.push('/(leader-tabs)/attendance')} />
+          <NextEventCard event={next} onPress={() => router.push(eventsRoute)} />
         ) : (
-          <EmptyEventCard onPress={() => router.push('/(leader-tabs)/attendance')} />
+          <EmptyEventCard onPress={() => router.push(eventsRoute)} />
         )}
       </HomeSection>
 
@@ -120,10 +123,10 @@ export default function LeaderHomeScreen() {
       {later.length ? (
         <HomeSection
           title="Upcoming"
-          action={<Pressable accessibilityRole="button" onPress={() => router.push('/(leader-tabs)/attendance')} hitSlop={8}><Text style={[styles.sectionAction, { color: t.ink }]}>See events</Text></Pressable>}
+          action={<Pressable accessibilityRole="button" onPress={() => router.push(eventsRoute)} hitSlop={8}><Text style={[styles.sectionAction, { color: t.ink }]}>See events</Text></Pressable>}
         >
           <View style={[styles.upcomingList, { borderTopColor: t.track }]}>
-            {later.map((event) => <UpcomingRow key={event._id} event={event} onPress={() => router.push('/(leader-tabs)/attendance')} />)}
+            {later.map((event) => <UpcomingRow key={event._id} event={event} onPress={() => router.push(eventsRoute)} />)}
           </View>
         </HomeSection>
       ) : null}

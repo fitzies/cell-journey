@@ -30,3 +30,4 @@ export const postalDistrictCodeValidator = v.union(
   v.literal("D27"),
   v.literal("D28"),
 );
+export const leaderEventsLayoutValidator = v.union(v.literal("split"), v.literal("combined"));

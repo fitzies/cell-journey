@@ -199,15 +199,17 @@ Use Expo with:
 Initial approved-user tabs:
 
 - Member: Home, Events, Attendance, Profile
-- Leader: Home, Events, Members, Profile
-- Profile is the fourth native tab. The leader Events tab reuses the attendance feed and its zooming event detail pages. The old leader schedule page is hidden. Leaders long-press event cards for native Edit and Delete actions. Editing reuses the event creation modal with existing values; deleting requires confirmation and preserves historical attendance records.
+- Leader defaults to: Home, Events, Attendance, Members, Profile. Existing capability rules may hide Members for co-leaders.
+- Leader navigation is controlled by the Convex `appConfig` record with `key: "mobile"` and `leaderEventsLayout: "split" | "combined"`. Missing config defaults to `split`. Run the internal `appConfig:setLeaderEventsLayout` mutation from the Convex dashboard/CLI to change it. The app reads the setting once per fresh JS/app session, preventing mid-edit navigation changes. Member navigation is unaffected.
+- In split mode, the existing Upcoming event cards and create/import menu live under Events (`schedule` route). Attendance (`attendance` route) lists ongoing and past events newest first, including completed attendance, with only date, name, and a right-aligned action. The exact split is `startAt > now` versus `startAt <= now`. Both lists paginate and omit cancelled events. Split-mode Events cards hide the Upcoming heading/count, vertically center their date/details, do not open on tap, and omit attendance status/footer text; long-press Edit/Delete remains available where permitted. Attendance opens the existing detail screen. The retained schedule detail route also reuses that screen for existing deep links. Combined-mode cards retain their original status text, navigation, and zoom behavior.
+- In combined mode, Profile is the fourth native tab and the existing Events attendance feed returns, with `schedule` hidden. Leaders long-press event cards for native Edit and Delete actions. Editing reuses the event creation modal with existing values; deleting requires confirmation and preserves historical attendance records.
 
 On iOS, keep tabs and top-right profile controls platform-native:
 
 - Use Expo Router native tabs so iOS owns the tab bar and its Liquid Glass appearance.
 - Put the group/mode switcher in the native stack header as the right-side system menu. Switching groups within the same mode preserves the current tab.
-- On the main tabs, place matching 22/28 semibold SF Pro titles in the left native toolbar: Home, Events, Members, and Profile, plus Attendance in member mode. Keep the centered header title empty and native action menus on the right.
-- Leader Events uses a native plus menu immediately before the group/mode switcher for create and CSV/XLSX import actions.
+- On the main tabs, place matching 22/28 semibold SF Pro titles in the left native toolbar, including Events and Attendance in split leader mode. Keep the centered header title empty and native action menus on the right.
+- Leader Events (or Events in combined mode) uses a native plus menu immediately before the group/mode switcher for create and CSV/XLSX import actions.
 - Creating an event opens a native full-screen modal with a native back chevron and Done checkmark in its header. There is no bottom submit button.
 - Do not replace these controls with React Native views that imitate Apple glass styling.
 

@@ -1,17 +1,15 @@
-import { useQuery } from 'convex/react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useGroups } from '@/components/group-context';
 import { MemberEmptyState, MemberEventCard, MemberScreen, MemberSection } from '@/components/member/ui';
 import { LoadingState } from '@/components/onboarding/ui';
 import { fonts, textStyles, useAppTheme } from '@/constants/tokens';
-import { api } from '@/lib/api';
-import { startOfToday } from '@/lib/date';
+import { useMemberUpcomingEvents } from '@/components/member/use-upcoming-events';
 
 export default function MemberScheduleScreen() {
   const t = useAppTheme();
   const { context, selectedMemberGroup } = useGroups();
   const group = selectedMemberGroup?.group ?? null;
-  const events = useQuery(api.events.listForGroup, group ? { groupId: group._id, from: startOfToday(), limit: 30 } : 'skip');
+  const events = useMemberUpcomingEvents(group?._id);
 
   if (context === undefined || !group || events === undefined) return <LoadingState />;
 

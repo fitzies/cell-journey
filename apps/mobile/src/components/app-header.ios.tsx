@@ -11,7 +11,7 @@ const supportsScrollEdgeEffects = Number.parseInt(String(Platform.Version), 10) 
 
 export function AppHeader({ title, mode, profile = false, eventActions, membersOptions }: AppHeaderProps) {
   const t = useAppTheme();
-  const isTabTitle = !profile && ['Home', 'Attendance', 'Events', 'Members', 'Profile'].includes(title);
+  const isTabTitle = !profile && ['Home', 'Attendance', 'Events', 'Planned Events', 'Mark Attendance', 'Members', 'Profile'].includes(title);
 
   return (
     <>

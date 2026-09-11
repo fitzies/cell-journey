@@ -3,7 +3,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File as ExpoFile } from 'expo-file-system';
 import { router } from 'expo-router';
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import type { AppHeaderProps } from '@/components/app-header.types';
 import { useGroups } from '@/components/group-context';
 import { api, type Id } from '@/lib/api';
@@ -35,7 +35,13 @@ export function useEventActions(group: EventActionGroup) {
     busyRef.current = true;
     setPickingFile(true);
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true, multiple: false });
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        // Android grants access to the selected content URI, which File reads below.
+        // SDK 57's cache copy sits outside Expo Go's scoped file-system directory.
+        copyToCacheDirectory: Platform.OS !== 'android',
+        multiple: false,
+      });
       if (result.canceled) return;
       const asset = result.assets[0];
       if (!asset) throw new Error('No file was selected.');

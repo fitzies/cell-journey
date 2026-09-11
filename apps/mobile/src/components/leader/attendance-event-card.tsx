@@ -26,12 +26,14 @@ export function AttendanceEventCard({
   status,
   zoom = true,
   feedSummary,
+  detailTab = 'attendance',
 }: {
   event: Doc<'events'>;
   kind: AttendanceEventKind;
   status: string;
   zoom?: boolean;
   feedSummary?: FeedSummary;
+  detailTab?: 'attendance' | 'schedule';
 }) {
   const { ledGroups } = useGroups();
   const group = ledGroups.find((candidate) => candidate._id === event.groupId);
@@ -74,8 +76,10 @@ export function AttendanceEventCard({
     ]);
   };
   const hasActions = canEdit || canDelete;
+  const plannedOnly = detailTab === 'schedule';
   const content = <AttendanceEventCardContent
     event={event} kind={kind} status={deleting ? 'Deleting…' : status}
+    plannedOnly={plannedOnly}
     feedSummary={feedSummary ? { ...feedSummary, action: group?.capabilities.markAttendance ? feedSummary.action : undefined } : undefined}
     disabled={deleting}
     accessibilityHint={hasActions ? 'Touch and hold for event actions.' : undefined}
@@ -89,14 +93,17 @@ export function AttendanceEventCard({
     }}
     onLongPress={hasActions && Platform.OS !== 'ios' ? showMenu : undefined}
   />;
+  // Planned cards only expose management actions. Keep the native iOS context
+  // menu, but do not navigate on a tap or attach a zoom transition.
+  if (plannedOnly && (Platform.OS !== 'ios' || !hasActions)) return content;
   const href = {
-    pathname: '/(leader-tabs)/attendance/[eventId]',
+    pathname: detailTab === 'schedule' ? '/(leader-tabs)/schedule/[eventId]' : '/(leader-tabs)/attendance/[eventId]',
     params: { eventId: event._id },
   } as const;
 
   return (
-    <Link href={href} asChild>
-      <Link.Trigger>{zoom ? <Link.AppleZoom>{content}</Link.AppleZoom> : content}</Link.Trigger>
+    <Link href={href} asChild onPress={plannedOnly ? (event) => event.preventDefault() : undefined}>
+      <Link.Trigger>{zoom && !plannedOnly ? <Link.AppleZoom>{content}</Link.AppleZoom> : content}</Link.Trigger>
       {hasActions && Platform.OS === 'ios' ? <Link.Menu>
         {canEdit ? <Link.MenuAction icon="pencil" disabled={deleting} onPress={edit}>Edit</Link.MenuAction> : null}
         {canDelete ? <Link.MenuAction icon="trash" destructive disabled={deleting} onPress={confirmDelete}>Delete</Link.MenuAction> : null}
@@ -112,6 +119,7 @@ export function AttendanceEventCardContent({
   onPress,
   tail = 'right',
   feedSummary,
+  plannedOnly = false,
   ...pressableProps
 }: {
   event: Doc<'events'>;
@@ -120,6 +128,7 @@ export function AttendanceEventCardContent({
   onPress?: () => void;
   tail?: 'right' | 'down';
   feedSummary?: FeedSummary;
+  plannedOnly?: boolean;
 } & Omit<PressableProps, 'children' | 'style'>) {
   const t = useAppTheme();
   const date = formatDateParts(event.startAt);
@@ -129,22 +138,24 @@ export function AttendanceEventCardContent({
   return (
     <Pressable
       collapsable={false}
-      accessibilityRole="button"
-      accessibilityLabel={`${event.title}, ${status}${feedSummary?.action ? `, ${feedSummary.action} attendance` : ''}`}
+      accessibilityLabel={plannedOnly ? `${event.title}, ${date.day} ${date.month}, ${time}, ${place}` : `${event.title}, ${status}${feedSummary?.action ? `, ${feedSummary.action} attendance` : ''}`}
       onPress={onPress}
       {...pressableProps}
+      role={plannedOnly ? undefined : pressableProps.role}
+      accessibilityRole={plannedOnly ? 'none' : (pressableProps.accessibilityRole ?? 'button')}
       style={({ pressed }) => [
         styles.card,
         feedSummary && styles.feedCard,
+        plannedOnly && styles.plannedCard,
         surfaceShadow(t),
         {
           backgroundColor: t.surface,
-          transform: [{ scale: pressed ? 0.985 : 1 }],
+          transform: [{ scale: pressed && !plannedOnly ? 0.985 : 1 }],
         },
       ]}
     >
       {feedSummary ? <>
-        <View style={styles.feedTop}>
+        <View style={[styles.feedTop, plannedOnly && styles.plannedRow]}>
           <View style={[styles.date, { backgroundColor: t.soft }]}>
             <Text style={[styles.month, { color: t.muted }]}>{date.month}</Text>
             <Text style={[styles.day, { color: t.ink }]}>{date.day}</Text>
@@ -156,7 +167,7 @@ export function AttendanceEventCardContent({
             {kind === 'open' ? <Text style={[styles.status, { color: attendanceStatusColor('open', dark) }]}>Happening now</Text> : null}
           </View>
         </View>
-        <View style={[styles.feedFooter, { borderTopColor: t.line }, kind !== 'open' && kind !== 'needs' && styles.quietFooter]}>
+        {!plannedOnly ? <View style={[styles.feedFooter, { borderTopColor: t.line }, kind !== 'open' && kind !== 'needs' && styles.quietFooter]}>
           <View style={styles.copy}>
             <Text style={[styles.feedStatus, { color: kind === 'needs' || kind === 'open' ? t.muted : attendanceStatusColor(kind, dark) }]}>{kind === 'complete' ? '✓ ' : ''}{status}</Text>
 
@@ -174,7 +185,7 @@ export function AttendanceEventCardContent({
             /> : null}
             <Text style={[styles.feedActionText, { color: t.ink }]}>{feedSummary.action} →</Text>
           </View> : <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={14} tintColor={t.muted} />}
-        </View>
+        </View> : null}
       </> : <>
       <View style={[styles.date, { backgroundColor: t.soft }]}>
         <Text style={[styles.month, { color: t.muted }]}>{date.month}</Text>
@@ -202,6 +213,8 @@ export function AttendanceEventCardContent({
 const styles = StyleSheet.create({
   feedCard: { flexDirection: 'column', alignItems: 'stretch', padding: 15, gap: 0 },
   feedTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  plannedCard: { justifyContent: 'center' },
+  plannedRow: { alignItems: 'center' },
   feedMeta: { fontFamily: fonts.body, fontSize: 12, lineHeight: 17, marginTop: 3 },
   feedFooter: { marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center', gap: 12 },
   quietFooter: { borderTopWidth: 0, paddingTop: 0, marginLeft: 66 },

@@ -78,17 +78,7 @@ async function attendanceForEvent(ctx: DbCtx, eventId: Id<"events">) {
     .take(600);
 }
 
-async function rosterForEvent(
-  ctx: QueryCtx,
-  event: Doc<"events">,
-  activity: GroupActivity,
-  profileCache?: Map<Id<"userProfiles">, Doc<"userProfiles">>,
-) {
-  const attendanceRows = await attendanceForEvent(ctx, event._id);
-  const attendanceByProfile = new Map(
-    attendanceRows.map((row) => [row.profileId, row]),
-  );
-
+function requiredMembershipsForEvent(event: Doc<"events">, activity: GroupActivity) {
   const requiredMemberships = activity.memberships
     .filter((membership) =>
       isMembershipActiveAtFromRows(
@@ -108,6 +98,46 @@ async function rosterForEvent(
       requiredByProfile.set(membership.profileId, membership);
     }
   }
+
+  return requiredByProfile;
+}
+
+// Shares eligibility and effective-status rules with the detail screen without
+// loading profile photos or optional roster rows for every event in a list.
+export async function completionForEvents(
+  ctx: QueryCtx,
+  groupId: Id<"groups">,
+  events: Doc<"events">[],
+) {
+  const complete = new Map<Id<"events">, boolean>();
+  if (!events.length) return complete;
+  const activity = await loadGroupMembershipActivity(ctx, groupId);
+  const existingProfiles = new Set<Id<"userProfiles">>();
+  for (const profileId of new Set(activity.memberships.map((membership) => membership.profileId))) {
+    if (await ctx.db.get(profileId)) existingProfiles.add(profileId);
+  }
+  for (const event of events) {
+    const required = [...requiredMembershipsForEvent(event, activity).keys()]
+      .filter((profileId) => existingProfiles.has(profileId));
+    const attendance = await attendanceForEvent(ctx, event._id);
+    const byProfile = new Map(attendance.map((row) => [row.profileId, row]));
+    complete.set(event._id, required.every((profileId) => effectiveStatus(byProfile.get(profileId)) !== null));
+  }
+  return complete;
+}
+
+async function rosterForEvent(
+  ctx: QueryCtx,
+  event: Doc<"events">,
+  activity: GroupActivity,
+  profileCache?: Map<Id<"userProfiles">, Doc<"userProfiles">>,
+) {
+  const attendanceRows = await attendanceForEvent(ctx, event._id);
+  const attendanceByProfile = new Map(
+    attendanceRows.map((row) => [row.profileId, row]),
+  );
+
+  const requiredByProfile = requiredMembershipsForEvent(event, activity);
 
   const optionalMemberships = activity.memberships
     .filter(

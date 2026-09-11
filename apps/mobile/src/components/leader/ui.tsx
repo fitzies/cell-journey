@@ -51,7 +51,7 @@ export function EmptyState({ title, body }: { title: string; body: string }) {
   );
 }
 
-export function ActionButton({ label, onPress, danger, disabled, filled }: { label: string; onPress?: () => void; danger?: boolean; disabled?: boolean; filled?: boolean }) {
+export function ActionButton({ label, onPress, danger, disabled, filled, muted }: { label: string; onPress?: () => void; danger?: boolean; disabled?: boolean; filled?: boolean; muted?: boolean }) {
   const t = useAppTheme();
   return (
     <Pressable
@@ -61,15 +61,15 @@ export function ActionButton({ label, onPress, danger, disabled, filled }: { lab
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        surfaceShadow(t, filled ? 'buttonFilled' : 'button'),
+        !muted && surfaceShadow(t, filled ? 'buttonFilled' : 'button'),
         {
-          backgroundColor: filled ? t.accent : t.surface,
+          backgroundColor: muted ? t.soft : filled ? t.accent : t.surface,
           opacity: disabled ? 0.45 : 1,
           transform: [{ scale: pressed && !disabled ? 0.985 : 1 }],
         },
       ]}
     >
-      <Text style={[styles.buttonText, { color: filled ? t.accentInk : danger ? t.danger : t.ink }]}>{label}</Text>
+      <Text style={[styles.buttonText, { color: muted ? t.muted : filled ? t.accentInk : danger ? t.danger : t.ink }]}>{label}</Text>
     </Pressable>
   );
 }

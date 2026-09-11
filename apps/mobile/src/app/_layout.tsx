@@ -1,6 +1,6 @@
 import { ConvexAuthProvider } from '@convex-dev/auth/react';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
-import { Platform, Text, useColorScheme, View } from 'react-native';
+import { Platform, StatusBar, Text, useColorScheme, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SecureStore from 'expo-secure-store';
 import { useFonts } from 'expo-font';
@@ -10,6 +10,7 @@ import { InterTight_500Medium } from '@expo-google-fonts/inter-tight/500Medium';
 import { InterTight_600SemiBold } from '@expo-google-fonts/inter-tight/600SemiBold';
 import { InterTight_700Bold } from '@expo-google-fonts/inter-tight/700Bold';
 import { GroupContextProvider } from '@/components/group-context';
+import { LeaderNavigationProvider } from '@/components/leader-navigation-context';
 import { AccountActionsProvider } from '@/components/account-actions';
 import { palettes } from '@/constants/tokens';
 import { convex } from '@/lib/convex';
@@ -59,13 +60,21 @@ export default function RootLayout() {
       >
         <AccountActionsProvider>
         <GroupContextProvider>
+          <LeaderNavigationProvider>
           <ThemeProvider value={scheme === 'dark' ? darkNavigationTheme : lightNavigationTheme}>
-            <Stack screenOptions={{ headerShown: false }}>
+            {/* React Native also updates the separate windows used by Android dialogs. */}
+            {Platform.OS === 'android' ? <StatusBar barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'} /> : null}
+            <Stack screenOptions={{
+              headerShown: false,
+              // Native Android screens inherit this, including full-screen event modals.
+              statusBarStyle: Platform.OS === 'android' ? (scheme === 'dark' ? 'light' : 'dark') : undefined,
+            }}>
               <Stack.Screen name="index" />
               <Stack.Screen name="create-event" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false }} />
               <Stack.Screen name="member-profile" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
             </Stack>
           </ThemeProvider>
+          </LeaderNavigationProvider>
         </GroupContextProvider>
         </AccountActionsProvider>
       </ConvexAuthProvider>

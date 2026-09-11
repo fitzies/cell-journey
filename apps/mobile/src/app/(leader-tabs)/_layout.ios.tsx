@@ -3,6 +3,7 @@ import { Redirect } from 'expo-router';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { DynamicColorIOS } from 'react-native';
 import { useGroups } from '@/components/group-context';
+import { useLeaderEventsLayout } from '@/components/leader-navigation-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { api } from '@/lib/api';
 
@@ -13,6 +14,7 @@ const nativeIcons = {
   profile: require('../../../assets/images/solar-tabs/profile.png'),
   home: require('../../../assets/images/solar-tabs/home.png'),
   schedule: require('../../../assets/images/solar-tabs/schedule.png'),
+  attendance: require('../../../assets/images/solar-tabs/attendance.png'),
   members: require('../../../assets/images/solar-tabs/members.png'),
 } as const;
 
@@ -20,6 +22,7 @@ export default function LeaderTabs() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const profile = useQuery(api.profiles.currentOrNull, isAuthenticated ? {} : 'skip');
   const { context } = useGroups();
+  const layout = useLeaderEventsLayout();
 
   if (isLoading || (isAuthenticated && profile === undefined)) return <LoadingState />;
   if (!isAuthenticated) return <Redirect href="/(auth)" />;
@@ -29,6 +32,8 @@ export default function LeaderTabs() {
     return <Redirect href={context.memberGroups.length > 0 ? '/(member-tabs)/home' : '/(onboarding)'} />;
   }
   const canManageAnyMembers = context.ledGroups.some((group) => group.capabilities.manageMembers);
+  if (layout === null) return <LoadingState />;
+  const split = layout === 'split';
 
   return (
     <NativeTabs
@@ -41,8 +46,12 @@ export default function LeaderTabs() {
         <NativeTabs.Trigger.Icon src={nativeIcons.home} renderingMode="template" />
         <NativeTabs.Trigger.Label hidden />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="attendance" accessibilityLabel="Events">
+      <NativeTabs.Trigger name="schedule" accessibilityLabel="Events" hidden={!split}>
         <NativeTabs.Trigger.Icon src={nativeIcons.schedule} renderingMode="template" />
+        <NativeTabs.Trigger.Label hidden />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="attendance" accessibilityLabel={split ? 'Attendance' : 'Events'}>
+        <NativeTabs.Trigger.Icon src={split ? nativeIcons.attendance : nativeIcons.schedule} renderingMode="template" />
         <NativeTabs.Trigger.Label hidden />
       </NativeTabs.Trigger>
 

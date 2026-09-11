@@ -16,12 +16,13 @@ function CanvasIcon({ name, size = 19 }: { name: SymbolViewProps['name']; size?:
   return <SymbolView name={name} size={size} tintColor={t.muted} />;
 }
 
-export function EventCanvas({ form, saving, onChange, earliestStartAt, autoFocusTitle = false }: {
+export function EventCanvas({ form, saving, onChange, onOpenPlace, earliestStartAt, autoFocusTitle = false }: {
   autoFocusTitle?: boolean;
   earliestStartAt?: number;
   form: EventForm;
   saving: boolean;
   onChange: (patch: Partial<EventForm>) => void;
+  onOpenPlace?: () => void;
 }) {
   const t = useAppTheme();
   const [editing, setEditing] = useState<EventDetail | null>(null);
@@ -29,6 +30,7 @@ export function EventCanvas({ form, saving, onChange, earliestStartAt, autoFocus
   const open = (field: EventDetail) => {
     if (saving) return;
     Keyboard.dismiss();
+    if (field === 'venue' && onOpenPlace) { onOpenPlace(); return; }
     setEditing(field);
   };
   return <View style={saving && styles.disabled}>

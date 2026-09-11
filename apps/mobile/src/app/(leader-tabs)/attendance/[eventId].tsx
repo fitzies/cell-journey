@@ -1,7 +1,7 @@
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
-import { Link, router, useLocalSearchParams } from 'expo-router';
+import { Link, router, useLocalSearchParams, useSegments } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { type PropsWithChildren, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -17,12 +17,10 @@ type AttendanceRow = AttendanceDetail['rows'][number];
 type AttendanceStatus = 'present' | 'absent' | null;
 const MAX_BOUNDARY_TIMER_MS = 2_147_000_000;
 
-function closeAttendance() {
-  router.dismissTo('/(leader-tabs)/attendance');
-}
-
 export default function AttendanceEventScreen() {
   const t = useAppTheme();
+  const segments = useSegments();
+  const closeAttendance = () => router.dismissTo(segments[1] === 'schedule' ? '/(leader-tabs)/schedule' : '/(leader-tabs)/attendance');
   const params = useLocalSearchParams<{ eventId: string | string[] }>();
   const eventIdParam = Array.isArray(params.eventId) ? params.eventId[0] : params.eventId;
   const eventId = eventIdParam as Id<'events'> | undefined;
@@ -221,7 +219,7 @@ function statusFor(kind: AttendanceEventKind, present: number, total: number) {
 function contextFor(kind: AttendanceEventKind, readOnly: boolean) {
   if (kind === 'upcoming') return 'Attendance opens when this gathering begins. You can review the roster now.';
   if (readOnly) return 'You can review this attendance record, but you do not have permission to change it.';
-  if (kind === 'open') return 'Check-in is open now. Review self-marked attendance or mark the remaining members.';
+  if (kind === 'open') return 'Record attendance for this gathering. Mark the remaining members, then save.';
   if (kind === 'complete') return 'Attendance is complete. You can still make a correction if something changed.';
   return 'This gathering still needs attendance. Mark the remaining members, then save.';
 }

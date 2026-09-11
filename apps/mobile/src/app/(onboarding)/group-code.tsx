@@ -5,6 +5,7 @@ import { Alert, Text, View } from 'react-native';
 import { CodeInput, LoadingState, Note, OnboardingShell, OptionPill } from '@/components/onboarding/ui';
 import { useAppTheme } from '@/constants/tokens';
 import { api } from '@/lib/api';
+import { groupJoinError } from '@/lib/email-auth';
 
 export default function GroupCodeScreen() {
   const t = useAppTheme();
@@ -17,18 +18,20 @@ export default function GroupCodeScreen() {
 
   if (context === undefined) return <LoadingState />;
   const hasMembership = context.memberGroups.length > 0;
+  const alreadyJoined = Boolean(matched && context.memberGroups.some(({ group }) => group._id === matched._id));
   const goBack = () => {
     if (router.canGoBack()) router.back();
     else router.replace(hasMembership ? '/profile?mode=member' : '/(onboarding)/profile');
   };
 
   const submit = async () => {
+    if (busy || alreadyJoined) return;
     setBusy(true);
     try {
       await join({ code });
       router.replace(hasMembership ? '/profile?mode=member' : '/(onboarding)/pending');
     } catch (err) {
-      Alert.alert('Could not request to join', err instanceof Error ? err.message : 'Please try again.');
+      Alert.alert('Could not request to join', groupJoinError(err));
     } finally {
       setBusy(false);
     }
@@ -42,11 +45,12 @@ export default function GroupCodeScreen() {
         title="Is this your cell group?"
         hint="Check before sending your request."
         cta={busy ? 'Sending…' : 'Request to join'}
-        ctaDisabled={busy}
+        ctaDisabled={busy || alreadyJoined}
         onBack={() => setStep('code')}
         onCta={submit}
       >
         <Note badge="TE" title={matched.name} body={matched.leaderName ?? 'Leader'} />
+        {alreadyJoined ? <Note badge="✓" title="Already joined" body="You're already a member of this group. Try a different group code." /> : null}
         <View style={{ gap: 9 }}>
           <OptionPill selected label="This is my group" onPress={() => {}} />
           <OptionPill mark="←" label="Try a different code" onPress={() => setStep('code')} />

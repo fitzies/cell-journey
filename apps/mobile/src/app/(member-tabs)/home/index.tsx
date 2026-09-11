@@ -1,41 +1,23 @@
 import { useQuery } from 'convex/react';
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MemberChevron, MemberEmptyState, MemberEventCard, MemberHistoryRow, MemberScreen, MemberSection } from '@/components/member/ui';
 import { useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { fonts, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
 import { api } from '@/lib/api';
-
-type EventRow = {
-  _id: string;
-  title: string;
-  location?: string;
-  venue?: string;
-  startAt: number;
-  endAt: number;
-};
-
-const ONE_HOUR = 60 * 60 * 1000;
-
-function nowMinusWindow() {
-  return Date.now() - ONE_HOUR;
-}
+import { useMemberUpcomingEvents } from '@/components/member/use-upcoming-events';
 
 export default function MemberHomeScreen() {
   const t = useAppTheme();
-  const [queryFrom] = useState(() => nowMinusWindow());
-  const [renderNow] = useState(Date.now);
   const { context, selectedMemberGroup } = useGroups();
   const group = selectedMemberGroup?.group ?? null;
-  const events = useQuery(api.events.listForGroup, group ? { groupId: group._id, from: queryFrom, limit: 5 } : 'skip');
+  const events = useMemberUpcomingEvents(group?._id);
   const attendance = useQuery(api.attendance.historyForGroup, group ? { groupId: group._id, limit: 3 } : 'skip');
 
   if (context === undefined || !group || events === undefined || attendance === undefined) return <LoadingState />;
 
-  const eventRows = events as EventRow[];
-  const next = eventRows.find((event) => event.endAt + ONE_HOUR >= renderNow);
+  const next = events[0];
   const rate = attendance.attendanceRate === null ? '—' : `${Math.round(attendance.attendanceRate * 100)}%`;
 
   return (

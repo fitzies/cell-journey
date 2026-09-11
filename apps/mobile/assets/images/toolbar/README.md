@@ -10,4 +10,6 @@ The PNG variants are rasterized at 24, 48, and 72 pixels for native toolbars. Te
 
 `close.png` and its scale variants are a simple locally drawn X for the Android create-event toolbar. iOS uses the native `xmark` symbol.
 
+`checkmark.svg` is a locally drawn checkmark on the same 24-pixel grid. Its 24, 48, and 72-pixel PNG variants provide Android's create/edit event save action, with template rendering for the theme tint. iOS uses the native `checkmark` symbol.
+
 `filter.svg` is a locally drawn filter icon with three decreasing horizontal lines. Its PNG variants at 24, 48, and 72 pixels are used by the Android Members toolbar. iOS uses the native `line.3.horizontal.decrease` SF Symbol.

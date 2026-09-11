@@ -1,7 +1,7 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { postalDistrictCodeValidator } from "./validators";
+import { leaderEventsLayoutValidator, postalDistrictCodeValidator } from "./validators";
 
 const role = v.union(v.literal("member"), v.literal("leader"));
 const onboardingStatus = v.union(
@@ -47,6 +47,12 @@ const pushPlatform = v.union(
 export default defineSchema({
   ...authTables,
   authVerifiers: authTables.authVerifiers.index("by_sessionId", ["sessionId"]),
+
+  appConfig: defineTable({
+    key: v.literal("mobile"),
+    leaderEventsLayout: leaderEventsLayoutValidator,
+    updatedAt: v.number(),
+  }).index("by_key", ["key"]),
 
   authEmailOtpRequests: defineTable({
     emailHash: v.string(),

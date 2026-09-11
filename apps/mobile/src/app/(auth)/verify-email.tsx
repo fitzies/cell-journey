@@ -1,12 +1,13 @@
 import { useAuthActions } from '@convex-dev/auth/react';
 import { Redirect, router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useEmailOtp } from '@/components/auth/email-otp-context';
 import { OtpCodeInput, OTP_CODE_LENGTH } from '@/components/auth/otp-code-input';
 import { OnboardingShell, PrimaryButton } from '@/components/onboarding/ui';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
-import { codeVerificationError, emailDeliveryError, emailOtpProvider, isOfflineNow } from '@/lib/email-auth';
+import { codeVerificationError, emailDeliveryError, emailOtpProvider } from '@/lib/email-auth';
+import { useAuthConnection } from '@/lib/use-auth-connection';
 
 const RESEND_DELAY_SECONDS = 60;
 
@@ -20,6 +21,8 @@ export default function VerifyEmailScreen() {
   const t = useAppTheme();
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState<'verify' | 'resend' | null>(null);
+  const requestPending = useRef(false);
+  const connection = useAuthConnection(busy !== null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [now, setNow] = useState(0);
@@ -45,14 +48,10 @@ export default function VerifyEmailScreen() {
   };
 
   const verify = async () => {
-    if (code.length !== OTP_CODE_LENGTH || busy) return;
+    if (code.length !== OTP_CODE_LENGTH || requestPending.current || !connection.connected) return;
     setError(null);
     setNotice(null);
-    if (isOfflineNow()) {
-      setError("You're offline. Reconnect, then try again.");
-      return;
-    }
-
+    requestPending.current = true;
     setBusy('verify');
     try {
       const result = await signIn(provider, {
@@ -60,19 +59,22 @@ export default function VerifyEmailScreen() {
         code,
       });
       if (!result.signingIn) {
+        requestPending.current = false;
         setError(codeVerificationError(null, isDevelopmentLogin));
         setBusy(null);
       }
     } catch (err) {
+      requestPending.current = false;
       setError(codeVerificationError(err, isDevelopmentLogin));
       setBusy(null);
     }
   };
 
   const resend = async () => {
-    if (isDevelopmentLogin || resendIn > 0 || busy) return;
+    if (isDevelopmentLogin || resendIn > 0 || requestPending.current || !connection.connected) return;
     setError(null);
     setNotice(null);
+    requestPending.current = true;
     setBusy('resend');
     try {
       await signIn('resend-otp', { email: pendingEmail.address });
@@ -83,6 +85,7 @@ export default function VerifyEmailScreen() {
     } catch (err) {
       setError(emailDeliveryError(err));
     } finally {
+      requestPending.current = false;
       setBusy(null);
     }
   };
@@ -97,7 +100,7 @@ export default function VerifyEmailScreen() {
       footer={(
         <PrimaryButton
           arrow={false}
-          disabled={code.length !== OTP_CODE_LENGTH || busy !== null}
+          disabled={code.length !== OTP_CODE_LENGTH || busy !== null || !connection.connected}
           label={busy === 'verify' ? 'Signing you in…' : 'Verify and continue'}
           onPress={verify}
         />
@@ -117,6 +120,7 @@ export default function VerifyEmailScreen() {
       />
 
       {error ? <Text accessibilityRole="alert" style={[styles.message, { color: t.danger }]}>{error}</Text> : null}
+      {connection.message ? <Text accessibilityLiveRegion="polite" style={[styles.message, { color: t.muted }]}>{connection.message}</Text> : null}
       {notice ? <Text accessibilityLiveRegion="polite" style={[styles.message, { color: t.success }]}>{notice}</Text> : null}
 
       <View style={[styles.deliveryNote, { backgroundColor: t.soft, borderColor: t.line }]}>
@@ -132,10 +136,10 @@ export default function VerifyEmailScreen() {
         {!isDevelopmentLogin ? (
           <Pressable
             accessibilityRole="button"
-            disabled={resendIn > 0 || busy !== null}
+            disabled={resendIn > 0 || busy !== null || !connection.connected}
             hitSlop={8}
             onPress={resend}
-            style={({ pressed }) => ({ opacity: resendIn > 0 || busy !== null ? 0.5 : pressed ? 0.65 : 1 })}
+            style={({ pressed }) => ({ opacity: resendIn > 0 || busy !== null || !connection.connected ? 0.5 : pressed ? 0.65 : 1 })}
           >
             <Text style={[styles.link, { color: t.accent }]}>
               {busy === 'resend' ? 'Sending a new code…' : resendIn > 0 ? `Resend code in ${resendIn}s` : 'Resend code'}

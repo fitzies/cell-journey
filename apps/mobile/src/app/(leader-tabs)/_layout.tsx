@@ -3,6 +3,7 @@ import { Redirect, Tabs } from 'expo-router';
 import { useMemo } from 'react';
 import type { ColorValue } from 'react-native';
 import { useGroups } from '@/components/group-context';
+import { useLeaderEventsLayout } from '@/components/leader-navigation-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { SolarTabIcon, type SolarTabIconName } from '@/components/solar-tab-icon';
 import { useAppTheme } from '@/constants/tokens';
@@ -23,12 +24,15 @@ const scheduleIcon = tabIcon('schedule');
 const membersIcon = tabIcon('members');
 const homeOptions = { title: 'Home', tabBarIcon: homeIcon };
 const attendanceOptions = { title: 'Events', tabBarIcon: scheduleIcon };
+const splitAttendanceOptions = { title: 'Attendance', tabBarIcon: tabIcon('attendance') };
+const plannedOptions = { title: 'Events', tabBarIcon: scheduleIcon };
 const membersOptions = { title: 'Members', tabBarIcon: membersIcon };
 
 export default function LeaderTabs() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const profile = useQuery(api.profiles.currentOrNull, isAuthenticated ? {} : 'skip');
   const { context } = useGroups();
+  const layout = useLeaderEventsLayout();
   const t = useAppTheme();
   const screenOptions = useMemo(() => ({
     headerShown: false,
@@ -52,11 +56,13 @@ export default function LeaderTabs() {
     return <Redirect href={context.memberGroups.length > 0 ? '/(member-tabs)/home' : '/(onboarding)'} />;
   }
   const canManageAnyMembers = context.ledGroups.some((group) => group.capabilities.manageMembers);
+  if (layout === null) return <LoadingState />;
+  const split = layout === 'split';
   return (
     <Tabs screenOptions={screenOptions}>
       <Tabs.Screen name="home" options={homeOptions} />
-      <Tabs.Screen name="attendance" options={attendanceOptions} />
-      <Tabs.Screen name="schedule" options={{ href: null }} />
+      <Tabs.Screen name="schedule" options={split ? plannedOptions : { href: null }} />
+      <Tabs.Screen name="attendance" options={split ? splitAttendanceOptions : attendanceOptions} />
       <Tabs.Protected guard={canManageAnyMembers}>
         <Tabs.Screen name="members" options={membersOptions} />
       </Tabs.Protected>

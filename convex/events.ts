@@ -1,6 +1,8 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { completionForEvents } from "./attendance";
 import {
   getConnectedMembershipForGroup,
   getLeadershipAccessForGroup,
@@ -56,6 +58,29 @@ export const listForGroup = query({
       args.from ?? 0,
       Math.min(args.limit ?? 50, 100),
     );
+  },
+});
+
+// Both tabs share the exact start-time boundary. This includes ongoing events
+// in attendance and keeps completed attendance available for corrections.
+export const listForLeaderTab = query({
+  args: {
+    groupId: v.id("groups"),
+    phase: v.union(v.literal("upcoming"), v.literal("started")),
+    now: v.number(),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    await requireGroupCapability(ctx, args.groupId, args.phase === "upcoming" ? "readSchedule" : "readAttendance");
+    const page = await ctx.db.query("events")
+      .withIndex("by_group_start", (q) => args.phase === "upcoming"
+        ? q.eq("groupId", args.groupId).gt("startAt", args.now)
+        : q.eq("groupId", args.groupId).lte("startAt", args.now))
+      .order(args.phase === "upcoming" ? "asc" : "desc")
+      .paginate({ ...args.paginationOpts, numItems: Math.min(Math.max(args.paginationOpts.numItems, 1), 50) });
+    const events = page.page.filter((event) => !event.cancelledAt);
+    const completion = args.phase === "started" ? await completionForEvents(ctx, args.groupId, events) : null;
+    return { ...page, page: events.map((event) => ({ ...event, attendanceComplete: completion?.get(event._id) ?? false })) };
   },
 });
 

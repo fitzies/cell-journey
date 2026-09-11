@@ -10,6 +10,7 @@
 
 import type * as accountDeletion from "../accountDeletion.js";
 import type * as admin from "../admin.js";
+import type * as appConfig from "../appConfig.js";
 import type * as attendance from "../attendance.js";
 import type * as attendanceHeatmap from "../attendanceHeatmap.js";
 import type * as auth from "../auth.js";
@@ -40,6 +41,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   accountDeletion: typeof accountDeletion;
   admin: typeof admin;
+  appConfig: typeof appConfig;
   attendance: typeof attendance;
   attendanceHeatmap: typeof attendanceHeatmap;
   auth: typeof auth;

@@ -1,1 +1,1 @@
-export { AppTabStack as default } from '@/components/app-tab-stack';
+export { default, unstable_settings } from '../attendance/_layout';

@@ -6,6 +6,7 @@ import { ActivityIndicator, Alert, Button, KeyboardAvoidingView, Platform, Scrol
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EventCanvas } from '@/components/events/event-canvas';
 import { defaultEventForm, eventToForm, parseEventForm } from '@/components/events/event-form';
+import { useEventPlace } from '@/components/events/event-place-context';
 import { useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { textStyles, useAppTheme } from '@/constants/tokens';
@@ -34,6 +35,7 @@ export default function CreateEventScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const [form, setForm] = useState(defaultEventForm);
+  const { openPlace } = useEventPlace();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const savingRef = useRef(false);
@@ -92,7 +94,7 @@ export default function CreateEventScreen() {
         <Stack.Toolbar.Button accessibilityLabel="Close" icon={Platform.OS === 'ios' ? 'xmark' : require('@/assets/images/toolbar/close.png')} iconRenderingMode="template" disabled={saving} separateBackground onPress={close} />
       </Stack.Toolbar>
       <Stack.Toolbar placement="right" tintColor={t.ink}>
-        <Stack.Toolbar.Button accessibilityLabel={saving ? 'Saving event' : editing ? 'Done, save event' : 'Done, create event'} icon={Platform.OS === 'ios' ? 'checkmark' : undefined} disabled={!ready || saving || saved} separateBackground onPress={submit}>{Platform.OS === 'android' ? 'Done' : null}</Stack.Toolbar.Button>
+        <Stack.Toolbar.Button accessibilityLabel={saving ? 'Saving event' : editing ? 'Done, save event' : 'Done, create event'} icon={Platform.OS === 'ios' ? 'checkmark' : require('@/assets/images/toolbar/checkmark.png')} iconRenderingMode="template" disabled={!ready || saving || saved} separateBackground onPress={submit} />
       </Stack.Toolbar>
     </> : null}
     {isLoading || context === undefined || (editing && (event === undefined || (event && loadedEventId !== event._id))) ? <LoadingState /> : !ready || !group ? (
@@ -103,7 +105,7 @@ export default function CreateEventScreen() {
     ) : (
       <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={headerHeight}>
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[styles.content, { paddingBottom: Math.max(24, insets.bottom + 16) }]}>
-          <EventCanvas autoFocusTitle={!editing} earliestStartAt={earliestStartAt} form={form} saving={saving || saved} onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} />
+          <EventCanvas autoFocusTitle={!editing} earliestStartAt={earliestStartAt} form={form} saving={saving || saved} onOpenPlace={Platform.OS === 'ios' ? () => openPlace(form.venue, (venue) => setForm((current) => ({ ...current, venue }))) : undefined} onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} />
           {saving ? <View accessibilityRole="progressbar" accessibilityLabel="Saving event" style={styles.saving}>
             <ActivityIndicator color={t.ink} />
             <Text style={[textStyles.body, { color: t.muted }]}>Saving event…</Text>

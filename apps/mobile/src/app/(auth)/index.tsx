@@ -1,20 +1,24 @@
 import { useAuthActions } from '@convex-dev/auth/react';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useEmailOtp } from '@/components/auth/email-otp-context';
 import { OnboardingShell, PrimaryButton } from '@/components/onboarding/ui';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
-import { emailDeliveryError, emailOtpProvider, isOfflineNow, isValidEmail, normalizeEmail } from '@/lib/email-auth';
+import { emailDeliveryError, emailOtpProvider, isValidEmail, normalizeEmail } from '@/lib/email-auth';
+import { useAuthConnection } from '@/lib/use-auth-connection';
 
 export default function AuthScreen() {
   const { signIn } = useAuthActions();
   const { beginVerification, draftEmail, setDraftEmail } = useEmailOtp();
   const t = useAppTheme();
   const [busy, setBusy] = useState(false);
+  const requestPending = useRef(false);
+  const connection = useAuthConnection(busy);
   const [error, setError] = useState<string | null>(null);
 
   const handleEmail = async () => {
+    if (requestPending.current) return;
     const email = normalizeEmail(draftEmail);
     const provider = emailOtpProvider(email);
     setDraftEmail(email);
@@ -29,11 +33,9 @@ export default function AuthScreen() {
       router.push('./verify-email');
       return;
     }
-    if (isOfflineNow()) {
-      setError("You're offline. Reconnect, then try again.");
-      return;
-    }
+    if (!connection.connected) return;
 
+    requestPending.current = true;
     setBusy(true);
     try {
       await signIn(provider, { email });
@@ -42,6 +44,7 @@ export default function AuthScreen() {
     } catch (err) {
       setError(emailDeliveryError(err));
     } finally {
+      requestPending.current = false;
       setBusy(false);
     }
   };
@@ -55,7 +58,7 @@ export default function AuthScreen() {
         <View style={styles.footerActions}>
           <PrimaryButton
             arrow={false}
-            disabled={busy}
+            disabled={busy || (!connection.connected && emailOtpProvider(normalizeEmail(draftEmail)) !== 'dev-otp')}
             label={busy ? 'Sending code…' : 'Continue with email'}
             onPress={handleEmail}
           />
@@ -94,6 +97,7 @@ export default function AuthScreen() {
         </Text>
       </View>
       {error ? <Text accessibilityRole="alert" style={[styles.error, { color: t.danger }]}>{error}</Text> : null}
+      {connection.message ? <Text accessibilityLiveRegion="polite" style={[styles.error, { color: t.muted }]}>{connection.message}</Text> : null}
     </OnboardingShell>
   );
 }
