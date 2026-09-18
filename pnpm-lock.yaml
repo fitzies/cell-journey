@@ -199,9 +199,6 @@ importers:
 
   apps/web:
     dependencies:
-      '@cell-journey/theme':
-        specifier: workspace:*
-        version: link:../../packages/theme
       '@convex-dev/auth':
         specifier: ^0.0.95
         version: 0.0.95(@auth/core@0.41.3)(convex@1.39.1(react@19.2.3))(react@19.2.3)
