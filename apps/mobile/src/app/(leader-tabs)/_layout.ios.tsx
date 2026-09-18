@@ -46,11 +46,11 @@ export default function LeaderTabs() {
         <NativeTabs.Trigger.Icon src={nativeIcons.home} renderingMode="template" />
         <NativeTabs.Trigger.Label hidden />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="schedule" accessibilityLabel="Events" hidden={!split}>
+      <NativeTabs.Trigger name="schedule" accessibilityLabel="Upcoming Events" hidden={!split}>
         <NativeTabs.Trigger.Icon src={nativeIcons.schedule} renderingMode="template" />
         <NativeTabs.Trigger.Label hidden />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="attendance" accessibilityLabel={split ? 'Attendance' : 'Events'}>
+      <NativeTabs.Trigger name="attendance" accessibilityLabel={split ? 'Cell Attendance' : 'Upcoming Events'}>
         <NativeTabs.Trigger.Icon src={split ? nativeIcons.attendance : nativeIcons.schedule} renderingMode="template" />
         <NativeTabs.Trigger.Label hidden />
       </NativeTabs.Trigger>

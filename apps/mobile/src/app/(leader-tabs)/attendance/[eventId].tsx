@@ -71,8 +71,8 @@ export default function AttendanceEventScreen() {
   if (!eventId || !detail) {
     return (
       <AttendanceScreenContent>
-        <View style={styles.empty}><EmptyState title="Gathering unavailable." body="Return to Events and choose another gathering." /></View>
-        <ActionButton label="Back to Events" onPress={closeAttendance} />
+        <View style={styles.empty}><EmptyState title="Gathering unavailable." body="Return to Upcoming Events and choose another gathering." /></View>
+        <ActionButton label="Back to Upcoming Events" onPress={closeAttendance} />
       </AttendanceScreenContent>
     );
   }
@@ -244,7 +244,8 @@ function MemberRow({ row, value, touched, disabled, onChoose }: { row: Attendanc
         <Text style={[styles.memberName, { color: t.ink }]} numberOfLines={1}>{row.displayName || 'Unnamed member'}</Text>
         <Text style={[styles.memberDetail, { color: t.muted }]} numberOfLines={1}>{detail}</Text>
       </View>
-      <View style={[styles.statusActions, disabled && styles.disabledActions]}>
+      {/* Keep the native parent stable when saving changes the controls' opacity. */}
+      <View collapsable={false} style={[styles.statusActions, disabled && styles.disabledActions]}>
         <StatusButton
           label={`Mark ${row.displayName} present`}
           icon="checkmark"

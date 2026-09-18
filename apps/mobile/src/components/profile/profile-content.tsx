@@ -155,8 +155,8 @@ export function ProfileContent({
       </ProfileServicesMenu>
       <ProfileRow icon={icons.location} title="Postal district" detail={`${locationSubtitle} · ${locationTitle}`} disabled={editDisabled} onPress={() => onEdit('postal')} divider={false} />
       {groupName && groupSummary ? <ProfileGroupSummary summary={groupSummary} /> : null}
-      <View style={styles.signOut}><ProfileRow icon={icons.signOut} title="Sign out" disabled={busy} onPress={onSignOut} divider={false} /></View>
-      <ProfileRow icon={icons.deleteAccount} title="Delete account" disabled={busy} onPress={onDeleteAccount} divider={false} destructive />
+      <View style={styles.signOut}><ProfileRow icon={icons.signOut} title="Sign out" disabled={busy} onPress={onSignOut} divider={false} destructive /></View>
+      <ProfileRow icon={icons.deleteAccount} title="Delete account" disabled={busy} onPress={onDeleteAccount} divider={false} />
     </View> : <View style={styles.groupSection}>
       <View accessible accessibilityLabel={`${groupName ?? 'No active group'}, ${groupRoleLabel}, ${groupCountLabel}`}
         style={[styles.groupCard, { backgroundColor: t.surface, ...surfaceShadow(t) }]}>

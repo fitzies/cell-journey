@@ -18,7 +18,7 @@ export function formatDay(ms: number) {
 
 export function formatTimeRange(startAt: number, endAt: number) {
   const opts: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
-  return `${new Intl.DateTimeFormat('en-SG', opts).format(startAt)}–${new Intl.DateTimeFormat('en-SG', opts).format(endAt)}`;
+  return `${new Intl.DateTimeFormat('en-SG', opts).format(startAt)} - ${new Intl.DateTimeFormat('en-SG', opts).format(endAt)}`;
 }
 
 export function formatDateParts(ms: number) {

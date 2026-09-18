@@ -23,9 +23,9 @@ const profileOptions = { title: 'Profile', tabBarIcon: tabIcon('profile') };
 const scheduleIcon = tabIcon('schedule');
 const membersIcon = tabIcon('members');
 const homeOptions = { title: 'Home', tabBarIcon: homeIcon };
-const attendanceOptions = { title: 'Events', tabBarIcon: scheduleIcon };
-const splitAttendanceOptions = { title: 'Attendance', tabBarIcon: tabIcon('attendance') };
-const plannedOptions = { title: 'Events', tabBarIcon: scheduleIcon };
+const attendanceOptions = { title: 'Upcoming Events', tabBarIcon: scheduleIcon };
+const splitAttendanceOptions = { title: 'Cell Attendance', tabBarIcon: tabIcon('attendance') };
+const plannedOptions = { title: 'Upcoming Events', tabBarIcon: scheduleIcon };
 const membersOptions = { title: 'Members', tabBarIcon: membersIcon };
 
 export default function LeaderTabs() {

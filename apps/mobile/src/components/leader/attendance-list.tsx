@@ -11,10 +11,10 @@ export function LeaderAttendanceList() {
   const t = useAppTheme();
   const { context, group, results, status, loadMore } = useLeaderTabEvents('started');
   if (context === undefined || (group && status === 'LoadingFirstPage')) {
-    return <LeaderLoadingState title="Attendance" label="Loading events…" />;
+    return <LeaderLoadingState title="Cell Attendance" label="Loading events…" />;
   }
 
-  return <LeaderScreen title="Attendance">
+  return <LeaderScreen title="Cell Attendance">
     <LeaderConnectionNotice />
     {!group ? <EmptyState title="No group assigned." body="Once assigned, your gatherings will appear here." />
       : <>
@@ -24,6 +24,7 @@ export function LeaderAttendanceList() {
             <Text style={[styles.title, { color: t.ink }]}>{event.title}</Text>
           </View>
           <View style={styles.action}>
+            {event.attendanceComplete ? <Text style={[styles.present, { color: t.muted }]}>{event.presentCount} of {event.requiredCount} present</Text> : null}
             <ActionButton filled muted={event.attendanceComplete} label={event.attendanceComplete ? 'Marked' : group.capabilities.markAttendance ? 'Mark attendance' : 'View attendance'}
               onPress={() => router.push({ pathname: '/(leader-tabs)/attendance/[eventId]', params: { eventId: event._id } })} />
           </View>
@@ -41,6 +42,7 @@ const styles = StyleSheet.create({
   copy: { flex: 1, minWidth: 0, gap: 6 },
   date: { fontFamily: fonts.body, fontSize: 12, lineHeight: 17 },
   title: { ...textStyles.body, fontFamily: fonts.bodySemiBold },
-  action: { flexShrink: 0, maxWidth: '55%' },
+  action: { flexShrink: 0, maxWidth: '60%', flexDirection: 'row', alignItems: 'center', gap: 10 },
+  present: { fontFamily: fonts.bodyMedium, fontSize: 12, lineHeight: 16 },
   loadMore: { marginTop: 20 },
 });

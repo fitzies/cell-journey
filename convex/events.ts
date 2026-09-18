@@ -80,7 +80,7 @@ export const listForLeaderTab = query({
       .paginate({ ...args.paginationOpts, numItems: Math.min(Math.max(args.paginationOpts.numItems, 1), 50) });
     const events = page.page.filter((event) => !event.cancelledAt);
     const completion = args.phase === "started" ? await completionForEvents(ctx, args.groupId, events) : null;
-    return { ...page, page: events.map((event) => ({ ...event, attendanceComplete: completion?.get(event._id) ?? false })) };
+    return { ...page, page: events.map((event) => ({ ...event, attendanceComplete: completion?.complete.get(event._id) ?? false, presentCount: completion?.present.get(event._id) ?? 0, requiredCount: completion?.requiredTotal.get(event._id) ?? 0 })) };
   },
 });
 

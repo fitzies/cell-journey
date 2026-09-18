@@ -5,8 +5,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { leaderAccessLabel, useGroups } from '@/components/group-context';
 import { useLeaderEventsLayout } from '@/components/leader-navigation-context';
-import { AttendanceHeatmap } from '@/components/leader/attendance-heatmap';
+import { AttendanceBarChart } from '@/components/leader/attendance-bar-chart';
+// Heatmap replaced by the bar chart; kept for reference until the switch is confirmed.
+// import { AttendanceHeatmap } from '@/components/leader/attendance-heatmap';
 import { EmptyState, LeaderScreen } from '@/components/leader/ui';
+import { SolarIcon } from '@/components/solar-tab-icon';
 import { LeaderConnectionNotice, LeaderLoadError, LeaderLoadingState } from '@/components/leader/query-state';
 import { fonts, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
 import { formatDateParts, formatTimeRange } from '@/lib/date';
@@ -76,7 +79,7 @@ export default function LeaderHomeScreen() {
 
       <PrimaryAction
         label={next ? (canMarkAttendance ? 'Take attendance' : 'View attendance') : (canCreateEvents ? 'Create an event' : 'View events')}
-        icon={next ? 'checkmark' : canCreateEvents ? 'plus' : 'calendar'}
+        icon={next ? 'attendance' : canCreateEvents ? 'plus' : 'calendar'}
         onPress={() => router.push(!next && canCreateEvents ? { pathname: '/create-event', params: { groupId: group._id } } : next ? '/(leader-tabs)/attendance' : eventsRoute)}
       />
 
@@ -90,7 +93,8 @@ export default function LeaderHomeScreen() {
 
       {group.capabilities.readAttendance ? (
         <HomeSection title="Group attendance">
-          <AttendanceHeatmap groupId={group._id} />
+          {/* <AttendanceHeatmap groupId={group._id} /> */}
+          <AttendanceBarChart groupId={group._id} />
         </HomeSection>
       ) : null}
 
@@ -134,7 +138,7 @@ export default function LeaderHomeScreen() {
   );
 }
 
-function PrimaryAction({ label, icon, onPress }: { label: string; icon: 'checkmark' | 'plus' | 'calendar'; onPress: () => void }) {
+function PrimaryAction({ label, icon, onPress }: { label: string; icon: 'attendance' | 'plus' | 'calendar'; onPress: () => void }) {
   const t = useAppTheme();
   return (
     <Pressable
@@ -142,12 +146,16 @@ function PrimaryAction({ label, icon, onPress }: { label: string; icon: 'checkma
       onPress={onPress}
       style={({ pressed }) => [styles.primaryAction, { backgroundColor: t.accent, ...surfaceShadow(t, 'buttonFilled'), transform: [{ scale: pressed ? 0.985 : 1 }] }]}
     >
-      <SymbolView
-        name={{ ios: icon, android: icon === 'plus' ? 'add' : icon === 'calendar' ? 'event' : 'check', web: icon === 'plus' ? 'add' : icon === 'calendar' ? 'event' : 'check' }}
-        size={20}
-        tintColor={t.accentInk}
-        weight="semibold"
-      />
+      {icon === 'attendance' ? (
+        <SolarIcon name="attendance" color={t.accentInk} size={20} />
+      ) : (
+        <SymbolView
+          name={{ ios: icon, android: icon === 'plus' ? 'add' : 'event', web: icon === 'plus' ? 'add' : 'event' }}
+          size={20}
+          tintColor={t.accentInk}
+          weight="semibold"
+        />
+      )}
       <Text style={[styles.primaryLabel, { color: t.accentInk }]}>{label}</Text>
     </Pressable>
   );

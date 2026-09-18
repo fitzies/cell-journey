@@ -16,9 +16,9 @@ function PlannedEvents() {
   const { context, group, results, status, loadMore } = useLeaderTabEvents('upcoming');
   const { eventActions, importModal } = useEventActions(group);
   if (context === undefined || (group && status === 'LoadingFirstPage')) {
-    return <LeaderLoadingState title="Events" label="Loading events…" />;
+    return <LeaderLoadingState title="Upcoming Events" label="Loading events…" />;
   }
-  return <LeaderScreen title="Events" eventActions={eventActions}>
+  return <LeaderScreen title="Upcoming Events" eventActions={eventActions}>
     <LeaderConnectionNotice />
     {!group ? <EmptyState title="No group assigned." body="Once assigned, your gatherings will appear here." /> : <>
       <EventSection showHeading={false} title="Upcoming" rows={results.map((event) => ({ event, kind: 'upcoming' }))} limited={status !== 'Exhausted'} detailTab="schedule" />
@@ -32,5 +32,5 @@ function PlannedEvents() {
 }
 
 export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
-  return <LeaderLoadError title="Events" body="Couldn't load events." retry={retry} />;
+  return <LeaderLoadError title="Upcoming Events" body="Couldn't load events." retry={retry} />;
 }

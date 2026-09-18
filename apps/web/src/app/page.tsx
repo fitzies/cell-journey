@@ -454,7 +454,7 @@ function RateChange({ value }: { value: number | null }) {
   if (points === 0) return <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Minus className="h-3.5 w-3.5" />0 pts</span>;
   const positive = value > 0;
   return (
-    <span className={positive ? "inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400" : "inline-flex items-center gap-1 text-xs text-destructive"}>
+    <span className={positive ? "inline-flex items-center gap-1 text-xs text-muted-foreground" : "inline-flex items-center gap-1 text-xs text-destructive"}>
       {positive ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
       {points} pts
     </span>

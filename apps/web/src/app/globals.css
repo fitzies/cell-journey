@@ -1,25 +1,51 @@
 @import "tailwindcss";
-@import "@cell-journey/theme/index.css";
 
 @custom-variant dark (&:is(.dark *));
 
-:root,
-html[data-cj-theme],
-html.dark[data-cj-theme] {
+/* Monochrome palette matching the mobile app (see apps/mobile/src/constants/tokens.ts). */
+:root {
+  --background: #f7f7f5;
+  --foreground: #111111;
+  --card: #ffffff;
+  --card-foreground: #111111;
+  --popover: #ffffff;
+  --popover-foreground: #111111;
+  --primary: #111111;
+  --primary-foreground: #ffffff;
+  --secondary: #eeeeeb;
+  --secondary-foreground: #111111;
+  --muted: #eeeeeb;
+  --muted-foreground: #666663;
+  --accent: #e4e4e0;
+  --accent-foreground: #111111;
+  --destructive: #b42318;
+  --destructive-foreground: #ffffff;
+  --border: #e5e5e1;
+  --input: #e5e5e1;
+  --ring: #111111;
   --radius: 0.625rem;
-  --cj-font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
-  --cj-font-serif: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
-  --cj-font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-/* Preserve the imported COSBT_01 typography and geometry in the preview. */
-:root:not([data-cj-theme]),
-html[data-cj-theme="cosbt-01"],
-html.dark[data-cj-theme="cosbt-01"] {
-  --radius: 0.75rem;
-  --cj-font-sans: var(--font-inter), sans-serif;
-  --cj-font-serif: var(--font-source-serif), serif;
-  --cj-font-mono: var(--font-roboto-mono), ui-monospace, monospace;
+.dark {
+  --background: #090909;
+  --foreground: #f5f5f3;
+  --card: #151515;
+  --card-foreground: #f5f5f3;
+  --popover: #151515;
+  --popover-foreground: #f5f5f3;
+  --primary: #f5f5f3;
+  --primary-foreground: #111111;
+  --secondary: #222221;
+  --secondary-foreground: #f5f5f3;
+  --muted: #222221;
+  --muted-foreground: #a3a3a0;
+  --accent: #30302f;
+  --accent-foreground: #f5f5f3;
+  --destructive: #ff6b6b;
+  --destructive-foreground: #111111;
+  --border: #292928;
+  --input: #292928;
+  --ring: #f5f5f3;
 }
 
 @theme inline {
@@ -46,9 +72,9 @@ html.dark[data-cj-theme="cosbt-01"] {
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 6px);
-  --font-sans: var(--cj-font-sans);
-  --font-serif: var(--cj-font-serif);
-  --font-mono: var(--cj-font-mono);
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
 * {
@@ -63,7 +89,7 @@ body {
   min-height: 100%;
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--cj-font-sans);
+  font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   font-feature-settings: "rlig" 1, "calt" 1;
 }
 

@@ -1,8 +1,8 @@
 import { useConvexAuth, useMutation, useQuery } from 'convex/react';
 import { Redirect, router, Stack, useLocalSearchParams } from 'expo-router';
-import { useHeaderHeight, usePreventRemove } from 'expo-router/react-navigation';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Button, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useHeaderHeight } from 'expo-router/react-navigation';
+import { useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Button, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EventCanvas } from '@/components/events/event-canvas';
 import { defaultEventForm, eventToForm, parseEventForm } from '@/components/events/event-form';
@@ -50,13 +50,18 @@ export default function CreateEventScreen() {
   const ready = canSave && (!editing || loadedEventId === targetEventId);
   const earliestStartAt = editing ? Number.NEGATIVE_INFINITY : startOfToday();
 
-  // Covers hardware/system back and removal of the parent modal while a write is pending.
-  usePreventRemove(saving, () => {});
-  useEffect(() => {
-    if (saved && !saving) dismissForm();
-  }, [saved, saving]);
+  // Dismiss keyboard before unmounting the full-screen modal. On Android the
+  // IME teardown races the native dismiss and has killed the process on save.
+  const settleKeyboard = () => {
+    Keyboard.dismiss();
+    if (Platform.OS === 'android') return new Promise<void>((resolve) => setTimeout(resolve, 150));
+    return Promise.resolve();
+  };
 
-  const close = () => { if (!savingRef.current) dismissForm(); };
+  const close = () => {
+    if (savingRef.current) return;
+    void settleKeyboard().then(() => dismissForm());
+  };
   const submit = async () => {
     if (savingRef.current || saved) return;
     if (!ready || !group) {
@@ -73,10 +78,15 @@ export default function CreateEventScreen() {
     try {
       if (editing && event) await updateEvent({ eventId: event._id, ...parsed.value });
       else await createEvent({ groupId: group._id, ...parsed.value });
+      // Navigate explicitly after the write settles instead of via a
+      // saved/saving effect racing usePreventRemove on Android.
       setSaved(true);
+      await settleKeyboard();
+      savingRef.current = false;
+      setSaving(false);
+      dismissForm();
     } catch (error) {
       Alert.alert(editing ? 'Could not save event' : 'Could not create event', error instanceof Error ? error.message : 'Please try again.');
-    } finally {
       savingRef.current = false;
       setSaving(false);
     }
@@ -100,7 +110,7 @@ export default function CreateEventScreen() {
     {isLoading || context === undefined || (editing && (event === undefined || (event && loadedEventId !== event._id))) ? <LoadingState /> : !ready || !group ? (
       <View style={styles.unavailable}>
         <Text style={[textStyles.title, { color: t.ink }]}>Event unavailable</Text>
-        <Text style={[textStyles.body, { color: t.muted }]}>This event may have been deleted, or your access may have changed. Return to Events to continue.</Text>
+        <Text style={[textStyles.body, { color: t.muted }]}>This event may have been deleted, or your access may have changed. Return to Upcoming Events to continue.</Text>
       </View>
     ) : (
       <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={headerHeight}>

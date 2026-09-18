@@ -3,14 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "node ../../packages/theme/scripts/generate-mobile-theme.mjs",
     "dev": "node scripts/dev.mjs",
-    "prebuild": "node ../../packages/theme/scripts/generate-mobile-theme.mjs",
     "build": "next build",
     "start": "next start"
   },
   "dependencies": {
-    "@cell-journey/theme": "workspace:*",
     "@convex-dev/auth": "^0.0.95",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-dialog": "^1.1.15",

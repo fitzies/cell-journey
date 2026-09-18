@@ -11,5 +11,5 @@ export default function LeaderAttendanceScreen() {
 
 export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
   const layout = useLeaderEventsLayout();
-  return <LeaderLoadError title={layout === 'split' ? 'Attendance' : 'Events'} body="Couldn't load events." retry={retry} />;
+  return <LeaderLoadError title={layout === 'split' ? 'Cell Attendance' : 'Upcoming Events'} body="Couldn't load events." retry={retry} />;
 }

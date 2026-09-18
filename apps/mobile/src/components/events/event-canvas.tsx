@@ -1,6 +1,6 @@
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { useState } from 'react';
-import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { fonts, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
 import { EventDetailEditor, type EventDetail } from './event-detail-editor';
 import { dateFromInput, formatReadableDate, formatReadableTime, type EventForm } from './event-form';
@@ -33,11 +33,16 @@ export function EventCanvas({ form, saving, onChange, onOpenPlace, earliestStart
     if (field === 'venue' && onOpenPlace) { onOpenPlace(); return; }
     setEditing(field);
   };
-  return <View style={saving && styles.disabled}>
+  // Dimming must not reparent the form's native children on Android Fabric, so
+  // keep the outer native parent stable and skip the opacity transition there.
+  // The saving spinner below the canvas is the Android saving indicator.
+  const dimmed = saving && Platform.OS !== 'android';
+  return <View collapsable={false}>
+    <View pointerEvents={saving ? 'none' : 'auto'} style={dimmed ? styles.disabled : undefined}>
     <View style={styles.titleWrap}>
       <Text accessible={false} aria-hidden importantForAccessibility="no-hide-descendants" style={[styles.title, styles.titleMeasure]}>{form.title || 'Name your gathering'}{'\u200b'}</Text>
       <TextInput
-        autoFocus={autoFocusTitle}
+        autoFocus={autoFocusTitle && Platform.OS !== 'android'}
         accessibilityLabel="Event title"
         value={form.title}
         onChangeText={(title) => onChange({ title })}
@@ -103,6 +108,7 @@ export function EventCanvas({ form, saving, onChange, onOpenPlace, earliestStart
         </Pressable>)}
       </View>
       {form.remarks ? <Text style={[textStyles.body, styles.note, { color: t.muted }]}>{form.remarks}</Text> : null}
+    </View>
     </View>
     {editing ? <EventDetailEditor
       field={editing}

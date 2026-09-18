@@ -3,14 +3,13 @@
 import {
   flexRender,
   getCoreRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   type Column,
   type ColumnDef,
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowUpDown } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -28,7 +27,6 @@ interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   emptyMessage?: string;
-  pageSize?: number;
   getRowId?: (row: TData) => string;
 }
 
@@ -36,7 +34,6 @@ export function DataTable<TData, TValue>({
   columns,
   data,
   emptyMessage = "No results.",
-  pageSize = 10,
   getRowId,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -47,79 +44,45 @@ export function DataTable<TData, TValue>({
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     getRowId,
-    initialState: { pagination: { pageIndex: 0, pageSize } },
   });
-  const firstRow = data.length === 0 ? 0 : table.getState().pagination.pageIndex * pageSize + 1;
-  const lastRow = Math.min(firstRow + pageSize - 1, data.length);
 
   return (
-    <div className="space-y-3">
-      <div className="overflow-hidden rounded-lg border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="hover:bg-transparent">
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
+    <div className="overflow-hidden rounded-lg border">
+      <Table>
+        <TableHeader>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id} className="hover:bg-transparent">
+              {headerGroup.headers.map((header) => (
+                <TableHead key={header.id}>
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(header.column.columnDef.header, header.getContext())}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows.length ? (
+            table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
                 ))}
               </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                  {emptyMessage}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {data.length > pageSize ? (
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>{firstRow}–{lastRow} of {data.length}</span>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-              aria-label="Previous page"
-            >
-              <ChevronLeft />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-              aria-label="Next page"
-            >
-              <ChevronRight />
-            </Button>
-          </div>
-        </div>
-      ) : null}
+            ))
+          ) : (
+            <TableRow className="hover:bg-transparent">
+              <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                {emptyMessage}
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
     </div>
   );
 }

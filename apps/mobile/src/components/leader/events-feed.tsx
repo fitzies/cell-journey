@@ -69,7 +69,7 @@ export default function LeaderEventsScreen() {
 
   if (!group) {
     return (
-      <LeaderScreen title="Events" eventActions={eventActions} contentStyle={styles.pageContent}>
+      <LeaderScreen title="Upcoming Events" eventActions={eventActions} contentStyle={styles.pageContent}>
         <View><EmptyState title="No group assigned." body="Once assigned, your gatherings will appear here." /></View>
       </LeaderScreen>
     );
@@ -79,7 +79,7 @@ export default function LeaderEventsScreen() {
   const total = feed.attention.length + feed.upcoming.length + feed.marked.length;
 
   return (
-    <LeaderScreen title="Events" eventActions={eventActions} contentStyle={styles.pageContent}>
+    <LeaderScreen title="Upcoming Events" eventActions={eventActions} contentStyle={styles.pageContent}>
 
       {total || worklist?.hasMoreToScan || cursor ? (
         <View>
