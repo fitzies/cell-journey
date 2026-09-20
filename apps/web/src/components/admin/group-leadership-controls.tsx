@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { api, type Id } from "@/lib/api";
 
 import { profileDisplayName } from "./profile-display-name";
+import { GroupMembersDialog } from "./group-members-dialog";
 import type { GroupRow, UserRow } from "./types";
 
 export function GroupLeadershipControls({ group, people }: { group: GroupRow; people: UserRow[] }) {
@@ -83,6 +84,8 @@ export function GroupLeadershipControls({ group, people }: { group: GroupRow; pe
           {!group.leaderName && !group.coLeaders.length ? <span className="text-xs text-muted-foreground">Needs leadership</span> : null}
         </div>
       </div>
+      <div className="flex shrink-0 items-center gap-2">
+      <GroupMembersDialog groupId={group.group._id} groupName={group.group.name} groupCode={group.group.code} />
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
           <Button variant="outline" size="sm" className="shrink-0 gap-1.5" aria-label={`Manage leadership for ${group.group.name}`}>
@@ -134,6 +137,7 @@ export function GroupLeadershipControls({ group, people }: { group: GroupRow; pe
           </div>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

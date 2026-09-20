@@ -402,6 +402,45 @@ export const listGroups = query({
   },
 });
 
+export const listGroupMembers = query({
+  args: { groupId: v.id("groups"), limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const group = await ctx.db.get(args.groupId);
+    if (!group) throw new Error("Group not found");
+    const memberships = await ctx.db
+      .query("memberships")
+      .withIndex("by_group_status", (q) =>
+        q.eq("groupId", args.groupId).eq("status", "active"),
+      )
+      .take(Math.min(args.limit ?? 200, 200));
+    const rows = [];
+    for (const membership of memberships) {
+      const profile = await ctx.db.get(membership.profileId);
+      if (!profile || profile.deletedAt !== undefined) continue;
+      const user = profile.userId
+        ? await userSummary(ctx, profile.userId)
+        : {
+            _id: null,
+            name: getProfileDisplayName(profile),
+            email: profile.invitedEmail ?? null,
+            image: null,
+          };
+      const displayName = getProfileDisplayName(profile) || user.email || "Unnamed member";
+      rows.push({
+        membershipId: membership._id,
+        joinedAt: membership.joinedAt,
+        memberClass: membership.memberClass ?? null,
+        profile: await publicProfile(ctx, profile),
+        displayName,
+        email: user.email,
+      });
+    }
+    rows.sort((a, b) => a.displayName.localeCompare(b.displayName));
+    return rows;
+  },
+});
+
 export const listServices = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
