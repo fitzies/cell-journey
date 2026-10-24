@@ -1,6 +1,7 @@
 import { type PropsWithChildren, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { SymbolView } from 'expo-symbols';
 import { AppHeader, type AppHeaderProps } from '@/components/app-header';
 import { fonts, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
 
@@ -34,8 +35,8 @@ export function Card({ children, accent }: PropsWithChildren<{ accent?: boolean 
 export function Mark({ children, success, danger, compact }: PropsWithChildren<{ success?: boolean; danger?: boolean; compact?: boolean }>) {
   const t = useAppTheme();
   return (
-    <View style={[styles.mark, compact && styles.compactMark, { backgroundColor: success ? t.success : danger ? t.danger : t.soft }]}>
-      <Text style={[styles.markText, compact && styles.compactMarkText, { color: success || danger ? t.accentInk : t.accent }]}>{children}</Text>
+    <View style={[styles.mark, compact && styles.compactMark, { backgroundColor: success ? t.success : danger ? t.danger : t.selectedBg }]}>
+      <Text style={[styles.markText, compact && styles.compactMarkText, { color: success || danger ? t.accentInk : t.primary }]}>{children}</Text>
     </View>
   );
 }
@@ -63,13 +64,16 @@ export function ActionButton({ label, onPress, danger, disabled, filled, muted }
         styles.button,
         !muted && surfaceShadow(t, filled ? 'buttonFilled' : 'button'),
         {
-          backgroundColor: muted ? t.soft : filled ? t.accent : t.surface,
+          backgroundColor: muted ? t.selectedBg : filled ? t.primary : t.surface,
           opacity: disabled ? 0.45 : 1,
           transform: [{ scale: pressed && !disabled ? 0.985 : 1 }],
         },
       ]}
     >
-      <Text style={[styles.buttonText, { color: muted ? t.muted : filled ? t.accentInk : danger ? t.danger : t.ink }]}>{label}</Text>
+      <View style={styles.buttonRow}>
+        {muted ? <SymbolView name={{ ios: 'checkmark', android: 'check', web: 'check' }} size={14} weight="bold" tintColor={t.primary} /> : null}
+        <Text style={[styles.buttonText, { color: muted ? t.primary : filled ? t.accentInk : danger ? t.danger : t.ink }]}>{label}</Text>
+      </View>
     </Pressable>
   );
 }
@@ -113,12 +117,13 @@ const styles = StyleSheet.create({
   emptyTitle: { ...textStyles.section, marginTop: 16 },
   emptyBody: { ...textStyles.body, marginTop: 7 },
   button: { minHeight: 46, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 12 },
-  buttonText: { ...textStyles.button, textAlign: 'center' },
+  buttonRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  buttonText: { ...textStyles.button, fontFamily: fonts.bodyBold, textAlign: 'center' },
   statPill: { flex: 1, borderRadius: radius.md, borderCurve: 'continuous', padding: 16 },
-  statValue: { fontFamily: fonts.display, fontSize: 34, lineHeight: 38, letterSpacing: -1 },
-  statLabel: { marginTop: 4, fontFamily: fonts.bodyBold, fontSize: 10.5, letterSpacing: 1.4, textTransform: 'uppercase' },
+  statValue: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40, letterSpacing: -0.5 },
+  statLabel: { marginTop: 4, fontFamily: fonts.bodyBold, fontSize: 10.5, letterSpacing: 1, textTransform: 'uppercase' },
   rowCard: { borderRadius: radius.md, borderCurve: 'continuous', padding: 14, flexDirection: 'row', alignItems: 'center', gap: 13 },
   compactRowCard: { minHeight: 56, borderRadius: 16, paddingVertical: 5, paddingLeft: 10, paddingRight: 4, gap: 10 },
-  rowTitle: { ...textStyles.body, fontFamily: fonts.bodySemiBold, letterSpacing: -0.3 },
+  rowTitle: { ...textStyles.body, fontFamily: fonts.bodySemiBold },
   rowDetail: { ...textStyles.body, marginTop: 4 },
 });

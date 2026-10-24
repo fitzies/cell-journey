@@ -12,9 +12,12 @@ type AppContext = FunctionReturnType<typeof api.profiles.currentContext>;
 type MemberGroup = AppContext['memberGroups'][number];
 type LedGroup = AppContext['ledGroups'][number];
 
+// The primary leader is stored as accessRole 'owner' but is always shown as "Leader".
 export function leaderAccessLabel(accessRole: LedGroup['accessRole']) {
-  return accessRole === 'owner' ? 'Owner' : 'Co-leader';
+  return accessRole === 'owner' ? 'Leader' : 'Co-leader';
 }
+
+export const MEMBER_ACCESS_LABEL = 'Member';
 
 type GroupContextValue = {
   context: AppContext | undefined;

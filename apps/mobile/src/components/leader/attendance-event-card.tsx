@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { Link, router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Alert, Platform, type PressableProps, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
-import { fonts, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
+import { fonts, palettes, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
 import { formatDateParts } from '@/lib/date';
 import { api, type Doc } from '@/lib/api';
 import { useGroups } from '@/components/group-context';
@@ -14,10 +14,11 @@ type FeedSummary = { progressFraction?: number; action?: string };
 export type AttendanceEventKind = 'open' | 'upcoming' | 'complete' | 'needs';
 
 function attendanceStatusColor(kind: AttendanceEventKind, dark: boolean) {
-  if (kind === 'open') return dark ? '#D6BB84' : '#795818';
-  if (kind === 'upcoming') return dark ? '#A4C0D9' : '#3F617F';
-  if (kind === 'complete') return dark ? '#A1CBAA' : '#3E6948';
-  return dark ? '#DEAAA7' : '#914A46';
+  const p = palettes[dark ? 'dark' : 'light'];
+  if (kind === 'open') return p.warmInk;
+  if (kind === 'upcoming') return p.muted;
+  if (kind === 'complete') return p.success;
+  return p.danger;
 }
 
 export function AttendanceEventCard({
@@ -156,9 +157,9 @@ export function AttendanceEventCardContent({
     >
       {feedSummary ? <>
         <View style={[styles.feedTop, plannedOnly && styles.plannedRow]}>
-          <View style={[styles.date, { backgroundColor: t.soft }]}>
-            <Text style={[styles.month, { color: t.muted }]}>{date.month}</Text>
-            <Text style={[styles.day, { color: t.ink }]}>{date.day}</Text>
+          <View style={[styles.date, { backgroundColor: t.warmSoft }]}>
+            <Text style={[styles.month, { color: t.warmInk }]}>{date.month}</Text>
+            <Text style={[styles.day, { color: t.warmInk }]}>{date.day}</Text>
           </View>
           <View style={styles.copy}>
             <Text style={[styles.title, { color: t.ink }]}>{event.title}</Text>
@@ -167,6 +168,7 @@ export function AttendanceEventCardContent({
             {kind === 'open' ? <Text style={[styles.status, { color: attendanceStatusColor('open', dark) }]}>Happening now</Text> : null}
           </View>
         </View>
+        {plannedOnly || kind === 'upcoming' ? <EventDetails event={event} /> : null}
         {!plannedOnly ? <View style={[styles.feedFooter, { borderTopColor: t.line }, kind !== 'open' && kind !== 'needs' && styles.quietFooter]}>
           <View style={styles.copy}>
             <Text style={[styles.feedStatus, { color: kind === 'needs' || kind === 'open' ? t.muted : attendanceStatusColor(kind, dark) }]}>{kind === 'complete' ? '✓ ' : ''}{status}</Text>
@@ -180,16 +182,16 @@ export function AttendanceEventCardContent({
               aria-hidden
               style={[styles.actionProgress, {
                 width: `${feedSummary.progressFraction * 100}%`,
-                backgroundColor: dark ? '#51432B' : '#E9D6AD',
+                backgroundColor: dark ? t.selected : t.secondary,
               }]}
             /> : null}
             <Text style={[styles.feedActionText, { color: t.ink }]}>{feedSummary.action} →</Text>
           </View> : <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={14} tintColor={t.muted} />}
         </View> : null}
       </> : <>
-      <View style={[styles.date, { backgroundColor: t.soft }]}>
-        <Text style={[styles.month, { color: t.muted }]}>{date.month}</Text>
-        <Text style={[styles.day, { color: t.ink }]}>{date.day}</Text>
+      <View style={[styles.date, { backgroundColor: t.warmSoft }]}>
+        <Text style={[styles.month, { color: t.warmInk }]}>{date.month}</Text>
+        <Text style={[styles.day, { color: t.warmInk }]}>{date.day}</Text>
       </View>
       <View style={styles.copy}>
         <Text style={[styles.title, { color: t.ink }]} numberOfLines={1}>{event.title}</Text>
@@ -210,7 +212,33 @@ export function AttendanceEventCardContent({
   );
 }
 
+// Read-only plan details (Word, Worship, note), matching the member event card.
+function EventDetails({ event }: { event: Doc<'events'> }) {
+  const t = useAppTheme();
+  if (!event.word && !event.worship && !event.remarks) return null;
+  return (
+    <View style={[styles.details, { borderTopColor: t.line }]}>
+      {event.word ? <DetailRow label="Word" value={event.word} /> : null}
+      {event.worship ? <DetailRow label="Worship" value={event.worship} /> : null}
+      {event.remarks ? <Text style={[textStyles.body, { color: t.muted }]}>{event.remarks}</Text> : null}
+    </View>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  const t = useAppTheme();
+  return (
+    <View style={styles.detailRow}>
+      <Text style={[textStyles.body, styles.detailLabel, { color: t.muted }]}>{label}</Text>
+      <Text style={[textStyles.body, styles.copy, { color: t.ink }]}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  details: { marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
+  detailRow: { flexDirection: 'row', gap: 12 },
+  detailLabel: { width: 62 },
   feedCard: { flexDirection: 'column', alignItems: 'stretch', padding: 15, gap: 0 },
   feedTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   plannedCard: { justifyContent: 'center' },
@@ -224,10 +252,10 @@ const styles = StyleSheet.create({
   feedActionText: { paddingHorizontal: 14, fontFamily: fonts.bodySemiBold, fontSize: 13, lineHeight: 18 },
   card: { minHeight: 96, paddingVertical: 13, paddingLeft: 15, paddingRight: 13, borderRadius: radius.lg, borderCurve: 'continuous', flexDirection: 'row', alignItems: 'center', gap: 13 },
   date: { width: 54, height: 60, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
-  month: { fontFamily: fonts.bodyBold, fontSize: 9, letterSpacing: 0.75 },
-  day: { marginTop: 2, fontFamily: fonts.bodySemiBold, fontSize: 24, lineHeight: 26, letterSpacing: -0.7 },
+  month: { fontFamily: fonts.bodyBold, fontSize: 10, letterSpacing: 0.6 },
+  day: { marginTop: 1, fontFamily: fonts.bodyBold, fontSize: 24, lineHeight: 28, letterSpacing: -0.3 },
   copy: { flex: 1, minWidth: 0 },
-  title: { ...textStyles.body, fontFamily: fonts.bodySemiBold, letterSpacing: -0.3 },
+  title: { ...textStyles.body, fontFamily: fonts.bodyBold, letterSpacing: 0 },
   meta: { ...textStyles.body, marginTop: 5 },
-  status: { marginTop: 5, fontFamily: fonts.bodyMedium, fontSize: 12, lineHeight: 16, letterSpacing: 0.3 },
+  status: { marginTop: 5, fontFamily: fonts.bodySemiBold, fontSize: 12, lineHeight: 16, letterSpacing: 0 },
 });

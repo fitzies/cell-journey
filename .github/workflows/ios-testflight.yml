@@ -1,0 +1,63 @@
+# Builds the iOS app on a free GitHub-hosted Mac (public repo) instead of EAS cloud,
+# so it doesn't use the EAS build quota, then uploads it to TestFlight.
+#
+# Needs one repo secret: EXPO_TOKEN (expo.dev → Account settings → Access tokens).
+# Signing certificates, the provisioning profile, the App Store Connect key and
+# EXPO_PUBLIC_CONVEX_URL all come from EAS, exactly like a cloud build.
+#
+# Run it by pushing a tag that starts with "ios-build-", e.g.
+#   git tag ios-build-2026-10-24 && git push origin ios-build-2026-10-24
+# or, once this file is on main, from the Actions tab ("Run workflow").
+name: iOS TestFlight (GitHub Mac)
+
+on:
+  workflow_dispatch:
+    inputs:
+      submit:
+        description: Upload to TestFlight after building
+        type: boolean
+        default: true
+  push:
+    tags:
+      - "ios-build-*"
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build iOS app on this runner
+        run: eas build --platform ios --profile production --local --non-interactive --output "$RUNNER_TEMP/cell-journey.ipa"
+
+      - name: Upload to TestFlight
+        if: github.event_name == 'push' || inputs.submit
+        run: eas submit --platform ios --profile production --path "$RUNNER_TEMP/cell-journey.ipa" --non-interactive

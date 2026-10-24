@@ -29,59 +29,78 @@ function supportedNativeFamily(fontStack: string, fallback: string) {
   return fallback;
 }
 
-// Native navigation uses the platform font. Page content uses bundled Inter Tight.
+// Native navigation uses the platform font. Page content uses bundled Nunito Sans.
 export const fonts = {
   system: platformSans,
-  display: 'InterTight_600SemiBold',
-  displayItalic: 'InterTight_400Regular_Italic',
-  body: 'InterTight_400Regular',
-  bodyMedium: 'InterTight_500Medium',
-  bodySemiBold: 'InterTight_600SemiBold',
-  bodyBold: 'InterTight_700Bold',
+  display: 'NunitoSans_700Bold',
+  displayItalic: 'NunitoSans_400Regular_Italic',
+  body: 'NunitoSans_400Regular',
+  bodyMedium: 'NunitoSans_500Medium',
+  bodySemiBold: 'NunitoSans_600SemiBold',
+  bodyBold: 'NunitoSans_700Bold',
   mono: supportedNativeFamily(mobileThemeFonts.mono, platformMono),
 } as const;
 
 export const textStyles = StyleSheet.create({
-  title: { fontFamily: fonts.bodySemiBold, fontSize: typography.title, lineHeight: 28, letterSpacing: -0.7 },
-  section: { fontFamily: fonts.bodySemiBold, fontSize: typography.h2, lineHeight: 24, letterSpacing: -0.6 },
-  body: { fontFamily: fonts.body, fontSize: typography.body, lineHeight: 18, letterSpacing: 0.3 },
-  button: { fontFamily: fonts.bodySemiBold, fontSize: typography.body, lineHeight: 18, letterSpacing: 0.1 },
+  title: { fontFamily: fonts.bodyBold, fontSize: typography.title, lineHeight: 28, letterSpacing: -0.3 },
+  section: { fontFamily: fonts.bodyBold, fontSize: typography.h2, lineHeight: 24, letterSpacing: -0.2 },
+  body: { fontFamily: fonts.body, fontSize: typography.body, lineHeight: 20, letterSpacing: 0 },
+  button: { fontFamily: fonts.bodySemiBold, fontSize: typography.body, lineHeight: 20, letterSpacing: 0 },
 });
 
+// Cell Journey brand palette (design/brand sheet, Oct 2026).
+// primary = forest green actions, secondary = leaf green charts/highlights,
+// selectedBg = pale green selection, warm = orange dates/accents, alert = notifications.
 const originalPalettes = {
   light: {
     name: 'Cell Journey Light',
-    background: '#F7F7F5',
+    background: '#F6F7F3',
     surface: '#FFFFFF',
-    ink: '#111111',
-    text: '#111111',
-    strong: '#111111',
-    muted: '#666663',
-    line: '#E5E5E1',
-    track: '#E5E5E1',
-    accent: '#111111',
+    ink: '#242424',
+    text: '#242424',
+    strong: '#242424',
+    // #74766F darkened slightly so captions keep 4.5:1 on the off-white background.
+    muted: '#6D6F68',
+    line: '#E5E7E0',
+    track: '#E5E7E0',
+    accent: '#3A4D33',
     accentInk: '#FFFFFF',
-    success: '#137333',
-    danger: '#B42318',
-    soft: '#EEEEEB',
-    selected: '#E4E4E0',
+    primary: '#3A4D33',
+    secondary: '#B0DC9E',
+    selectedBg: '#E2F5E1',
+    warm: '#E9A23B',
+    // Deep amber keeps small month labels at 4.5:1 on the cream date tile.
+    warmInk: '#A35D00',
+    warmSoft: '#FDF1DE',
+    alert: '#FF3300',
+    success: '#3A7D3A',
+    danger: '#E02D00',
+    soft: '#EFF1EA',
+    selected: '#E2F5E1',
   },
   dark: {
     name: 'Cell Journey Dark',
-    background: '#090909',
-    surface: '#151515',
-    ink: '#F5F5F3',
-    text: '#F5F5F3',
-    strong: '#F5F5F3',
-    muted: '#A3A3A0',
-    line: '#292928',
-    track: '#292928',
-    accent: '#F5F5F3',
-    accentInk: '#111111',
-    success: '#58C884',
-    danger: '#FF6B6B',
-    soft: '#222221',
-    selected: '#30302F',
+    background: '#0E110D',
+    surface: '#181C16',
+    ink: '#F2F4EF',
+    text: '#F2F4EF',
+    strong: '#F2F4EF',
+    muted: '#A2A59C',
+    line: '#2A3027',
+    track: '#2A3027',
+    accent: '#B0DC9E',
+    accentInk: '#16210F',
+    primary: '#B0DC9E',
+    secondary: '#7FB86A',
+    selectedBg: '#253322',
+    warm: '#F0B35A',
+    warmInk: '#F0B35A',
+    warmSoft: '#33281A',
+    alert: '#FF5A33',
+    success: '#8FD27A',
+    danger: '#FF6B4D',
+    soft: '#222820',
+    selected: '#2C3A28',
   },
 } as const;
 
@@ -89,6 +108,7 @@ const originalPalettes = {
 // Keep success semantic: the source theme's chart colors are not status colors.
 const previewPalettes = {
   light: {
+    ...originalPalettes.light,
     ...mobileTheme.light,
     text: mobileTheme.light.ink,
     strong: mobileTheme.light.ink,
@@ -96,6 +116,7 @@ const previewPalettes = {
     success: '#137333',
   },
   dark: {
+    ...originalPalettes.dark,
     ...mobileTheme.dark,
     text: mobileTheme.dark.ink,
     strong: mobileTheme.dark.ink,

@@ -2,7 +2,7 @@ import { geocodeAsync, reverseGeocodeAsync, type LocationGeocodedAddress } from 
 import { Redirect, router, Stack } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, type LatLng } from 'react-native-maps';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,7 +25,6 @@ function describePlace(coordinate: LatLng, address: LocationGeocodedAddress): Pl
 
 export default function PlacePicker() {
   const t = useAppTheme();
-  const dark = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const reduceMotion = useReducedMotion();
@@ -150,9 +149,9 @@ export default function PlacePicker() {
           <Pressable
             accessibilityRole="button"
             onPress={choose}
-            style={({ pressed }) => [styles.selectButton, { backgroundColor: dark ? '#FFFFFF' : '#000000', opacity: pressed ? 0.75 : 1 }]}
+            style={({ pressed }) => [styles.selectButton, { backgroundColor: t.primary, opacity: pressed ? 0.75 : 1 }]}
           >
-            <Text style={[textStyles.button, { color: dark ? '#000000' : '#FFFFFF' }]}>Select</Text>
+            <Text style={[textStyles.button, { color: t.accentInk }]}>Select</Text>
           </Pressable>
         </> : <Text accessibilityRole={message ? 'alert' : undefined} style={[textStyles.body, { color: t.muted }]}>
           {message || 'Search for an address or tap a place on the map.'}

@@ -1,6 +1,6 @@
 import { router, Stack } from 'expo-router';
 import { Platform } from 'react-native';
-import { leaderAccessLabel, useGroups } from '@/components/group-context';
+import { leaderAccessLabel, MEMBER_ACCESS_LABEL, useGroups } from '@/components/group-context';
 import { useAppTheme } from '@/constants/tokens';
 import { memberMenuSections } from './leader/members/menu-options';
 import type { AppHeaderProps } from './app-header.types';
@@ -80,8 +80,9 @@ function ContextToolbar({ mode, eventActions, membersOptions }: Pick<AppHeaderPr
                   groups.selectMemberGroup(group._id);
                   if (mode !== 'member') router.replace('/(member-tabs)/home');
                 }}
+                subtitle={MEMBER_ACCESS_LABEL}
               >
-                {Platform.OS === 'android' ? `Member · ${group.name}` : group.name}
+                {Platform.OS === 'android' ? `${group.name} · ${MEMBER_ACCESS_LABEL}` : group.name}
               </Stack.Toolbar.MenuAction>
             ))}
           </Stack.Toolbar.Menu>
@@ -99,7 +100,7 @@ function ContextToolbar({ mode, eventActions, membersOptions }: Pick<AppHeaderPr
                 subtitle={leaderAccessLabel(group.accessRole)}
               >
                 {Platform.OS === 'android'
-                  ? `Leader · ${group.name} · ${leaderAccessLabel(group.accessRole)}`
+                  ? `${group.name} · ${leaderAccessLabel(group.accessRole)}`
                   : group.name}
               </Stack.Toolbar.MenuAction>
             ))}

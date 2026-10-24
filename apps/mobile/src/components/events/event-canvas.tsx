@@ -26,6 +26,7 @@ export function EventCanvas({ form, saving, onChange, onOpenPlace, earliestStart
 }) {
   const t = useAppTheme();
   const [editing, setEditing] = useState<EventDetail | null>(null);
+  const hasDate = form.date.trim() !== '';
   const date = dateFromInput(form.date);
   const open = (field: EventDetail) => {
     if (saving) return;
@@ -60,18 +61,22 @@ export function EventCanvas({ form, saving, onChange, onOpenPlace, earliestStart
 
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Change date and times, ${formatReadableDate(form.date)}, ${formatReadableTime(form.startTime)} to ${formatReadableTime(form.endTime)}`}
+      accessibilityLabel={hasDate
+        ? `Change date and times, ${formatReadableDate(form.date)}, ${formatReadableTime(form.startTime)} to ${formatReadableTime(form.endTime)}`
+        : 'Select date and times'}
       disabled={saving}
       onPress={() => open('when')}
       style={({ pressed }) => [styles.dateCard, { backgroundColor: pressed ? t.soft : t.surface, ...surfaceShadow(t) }]}
     >
-      <View style={styles.dateTile}>
-        <Text style={[styles.month, { color: t.muted }]}>{date.toLocaleDateString('en-SG', { month: 'short' }).toUpperCase()}</Text>
-        <Text style={[styles.day, { color: t.ink }]}>{date.getDate()}</Text>
-      </View>
+      {hasDate ? <View style={[styles.dateTile, { backgroundColor: t.warmSoft }]}>
+        <Text style={[styles.month, { color: t.warmInk }]}>{date.toLocaleDateString('en-SG', { month: 'short' }).toUpperCase()}</Text>
+        <Text style={[styles.day, { color: t.warmInk }]}>{date.getDate()}</Text>
+      </View> : <View style={[styles.dateTile, { backgroundColor: t.soft }]}>
+        <CanvasIcon name={{ ios: 'calendar', android: 'calendar_today', web: 'calendar_today' }} size={24} />
+      </View>}
       <View style={[styles.flex, styles.dateCopy]}>
-        <Text style={[textStyles.button, { color: t.ink }]}>{formatReadableDate(form.date)}</Text>
-        <Text style={[styles.caption, { color: t.muted }]}>{formatReadableTime(form.startTime)} – {formatReadableTime(form.endTime)}</Text>
+        <Text style={[textStyles.button, { color: hasDate ? t.ink : t.muted }]}>{hasDate ? formatReadableDate(form.date) : 'Select date'}</Text>
+        <Text style={[styles.caption, { color: t.muted }]}>{hasDate ? `${formatReadableTime(form.startTime)} – ${formatReadableTime(form.endTime)}` : 'Choose when your group will meet'}</Text>
       </View>
       <CanvasIcon name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={12} />
     </Pressable>
@@ -123,14 +128,14 @@ export function EventCanvas({ form, saving, onChange, onOpenPlace, earliestStart
 const styles = StyleSheet.create({
   disabled: { opacity: 0.58 },
   flex: { flex: 1, minWidth: 0 },
-  caption: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, letterSpacing: 0.1 },
-  title: { fontFamily: fonts.bodySemiBold, fontSize: 34, lineHeight: 40, letterSpacing: -1.1, padding: 0, paddingBottom: 5, minHeight: 45 },
+  caption: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, letterSpacing: 0 },
+  title: { fontFamily: fonts.bodySemiBold, fontSize: 34, lineHeight: 40, letterSpacing: -0.5, padding: 0, paddingBottom: 5, minHeight: 45 },
   titleWrap: { minHeight: 45 },
   titleMeasure: { opacity: 0 },
   dateCard: { marginTop: 28, borderRadius: radius.lg, borderCurve: 'continuous', minHeight: 94, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 16 },
-  dateTile: { alignItems: 'center', minWidth: 40 },
-  month: { fontFamily: fonts.bodyMedium, fontSize: 10, letterSpacing: 0.6 },
-  day: { fontFamily: fonts.bodySemiBold, fontSize: 30, lineHeight: 34, letterSpacing: -0.8 },
+  dateTile: { alignItems: 'center', justifyContent: 'center', width: 58, height: 64, borderRadius: radius.sm, borderCurve: 'continuous' },
+  month: { fontFamily: fonts.bodyBold, fontSize: 10, letterSpacing: 0.6 },
+  day: { fontFamily: fonts.bodyBold, fontSize: 28, lineHeight: 32, letterSpacing: -0.4 },
   dateCopy: { gap: 5 },
   place: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 22, minHeight: 82 },
   divider: { height: 1 },

@@ -4,11 +4,12 @@ import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { DynamicColorIOS } from 'react-native';
 import { useGroups } from '@/components/group-context';
 import { LoadingState } from '@/components/onboarding/ui';
+import { palettes } from '@/constants/tokens';
 import { api } from '@/lib/api';
 
-const nativeTint = DynamicColorIOS({ light: '#111111', dark: '#F5F5F3' });
-const nativeMuted = DynamicColorIOS({ light: '#666663', dark: '#A3A3A0' });
-const nativeLine = DynamicColorIOS({ light: '#D9D9D5', dark: '#30302E' });
+const nativeTint = DynamicColorIOS({ light: palettes.light.primary, dark: palettes.dark.primary });
+const nativeMuted = DynamicColorIOS({ light: palettes.light.muted, dark: palettes.dark.muted });
+const nativeLine = DynamicColorIOS({ light: palettes.light.line, dark: palettes.dark.line });
 const nativeIcons = {
   profile: require('../../../assets/images/solar-tabs/profile.png'),
   home: require('../../../assets/images/solar-tabs/home.png'),

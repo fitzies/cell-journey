@@ -33,7 +33,7 @@ export default function ProfileTab() {
       <View style={{ flex: 1, padding: 24, justifyContent: 'space-between' }}>
         <View style={{ gap: 12 }}>
           <Text style={{ color: t.accent, fontFamily: fonts.bodyBold, fontSize: 11, letterSpacing: 2.6 }}>PROFILE</Text>
-          <Text style={{ color: t.ink, fontFamily: fonts.display, fontSize: 32, lineHeight: 38, letterSpacing: -0.6 }}>{displayName}</Text>
+          <Text style={{ color: t.ink, fontFamily: fonts.display, fontSize: 32, lineHeight: 40, letterSpacing: -0.4 }}>{displayName}</Text>
           {profile?.role ? (
             <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 14 }}>
               Signed in as {profile.role}
