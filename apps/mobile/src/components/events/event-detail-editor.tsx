@@ -4,7 +4,7 @@ import { Button, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, S
 import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts, radius, textStyles, useAppTheme } from '@/constants/tokens';
-import { startOfToday } from '@/lib/date';
+import { nextFridayEvening, startOfToday } from '@/lib/date';
 import { dateFromInput, dateFromTimeInput, formatDateInput, formatReadableDate, formatReadableTime, formatTimeInput, parseEventForm, type EventForm } from './event-form';
 
 export type EventDetail = 'when' | 'venue' | 'word' | 'worship' | 'remarks';
@@ -30,7 +30,8 @@ export function EventDetailEditor({ field, form, onClose, onApply, earliestStart
   const reduceMotion = useReducedMotion();
   const buttonColor = Platform.OS === 'android' && dark ? t.accentInk : t.ink;
   const insets = useSafeAreaInsets();
-  const [draft, setDraft] = useState(form);
+  // An unset date opens the picker on the suggested next gathering; nothing is saved until Apply.
+  const [draft, setDraft] = useState(() => form.date ? form : { ...form, date: formatDateInput(Math.max(nextFridayEvening(), earliestStartAt)) });
   const [error, setError] = useState('');
   const [picker, setPicker] = useState<PickerField | null>(null);
   const [shown, setShown] = useState(false);

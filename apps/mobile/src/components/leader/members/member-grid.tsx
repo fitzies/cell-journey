@@ -96,7 +96,7 @@ function MemberSectionGrid({ rows, view, disabled, canReorder, onReorder, onChan
             if (nativeEvent.actionName === 'decrement') move(-1);
             if (nativeEvent.actionName === 'increment') move(1);
           }}
-          style={[styles.avatar, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2, backgroundColor: t.soft }]}
+          style={[styles.avatar, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2, backgroundColor: t.selectedBg }]}
         ><ProfileAvatar photoUrl={item.profile?.photoUrl} name={name} size={avatarSize} /></View>
       </Sortable.Handle>
       <MemberActions
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 110 },
   section: { marginTop: 24 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 8 },
-  sectionTitle: { fontFamily: fonts.bodySemiBold, fontSize: 18, lineHeight: 24 },
+  sectionTitle: { fontFamily: fonts.bodyBold, fontSize: 18, lineHeight: 24 },
   sectionCount: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20 },
   emptyMessage: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, paddingVertical: 12 },
   tile: { minHeight: 148, alignItems: 'center', borderRadius: radius.lg, paddingTop: 16, paddingBottom: 12 },
@@ -161,5 +161,5 @@ const styles = StyleSheet.create({
   nameButton: { minHeight: 44, width: '100%', alignItems: 'center', justifyContent: 'center', paddingTop: 4 },
   rowName: { alignItems: 'flex-start', paddingTop: 0 },
   rowText: { textAlign: 'left', paddingHorizontal: 0 },
-  name: { fontFamily: fonts.body, fontSize: 14.5, lineHeight: 20, letterSpacing: 0.3, textAlign: 'center', paddingHorizontal: 10 },
+  name: { fontFamily: fonts.bodySemiBold, fontSize: 14.5, lineHeight: 20, letterSpacing: 0, textAlign: 'center', paddingHorizontal: 10 },
 });

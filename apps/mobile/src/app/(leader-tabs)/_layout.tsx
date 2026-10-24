@@ -37,7 +37,7 @@ export default function LeaderTabs() {
   const screenOptions = useMemo(() => ({
     headerShown: false,
     tabBarShowLabel: false,
-    tabBarActiveTintColor: t.accent,
+    tabBarActiveTintColor: t.primary,
     tabBarInactiveTintColor: t.muted,
     tabBarStyle: {
       height: 72,
@@ -47,7 +47,7 @@ export default function LeaderTabs() {
       borderTopColor: t.line,
     },
     tabBarItemStyle: { justifyContent: 'center' as const },
-  }), [t.accent, t.line, t.muted, t.surface]);
+  }), [t.primary, t.line, t.muted, t.surface]);
   if (isLoading || (isAuthenticated && profile === undefined)) return <LoadingState />;
   if (!isAuthenticated) return <Redirect href="/(auth)" />;
   if (profile === null) return <Redirect href="/(onboarding)" />;

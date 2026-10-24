@@ -27,7 +27,7 @@ export default function MemberScheduleScreen() {
           <Text accessibilityRole="header" style={[styles.nextHeading, { color: t.text }]}>Next gathering</Text>
           <MemberEventCard event={next} details />
           {rest.length ? (
-            <MemberSection title="Upcoming" action={<Text style={[styles.sorted, { color: t.muted }]}>{rest.length} {rest.length === 1 ? 'event' : 'events'}</Text>}>
+            <MemberSection title="Upcoming events" action={<Text style={[styles.sorted, { color: t.muted }]}>{rest.length} {rest.length === 1 ? 'event' : 'events'}</Text>}>
               <View style={styles.list}>
                 {rest.map((event) => <MemberEventCard key={event._id} event={event} details />)}
               </View>

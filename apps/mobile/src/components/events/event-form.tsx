@@ -53,6 +53,8 @@ export function formatReadableTime(value: string) {
   return new Intl.DateTimeFormat('en-SG', { hour: 'numeric', minute: '2-digit' }).format(dateFromTimeInput(form, value));
 }
 
+// New events start without a date so the leader chooses one deliberately.
+// Times keep a sensible evening default and only apply once a date is chosen.
 export function defaultEventForm(): EventForm {
   const startAt = nextFridayEvening();
   return {
@@ -61,7 +63,7 @@ export function defaultEventForm(): EventForm {
     word: '',
     worship: '',
     remarks: '',
-    date: formatDateInput(startAt),
+    date: '',
     startTime: formatTimeInput(startAt),
     endTime: formatTimeInput(startAt + 2 * 60 * 60 * 1000),
   };
@@ -85,6 +87,7 @@ export function parseEventForm(form: EventForm, earliestStartAt: number): { ok: 
   const title = form.title.trim();
   if (!title) return { ok: false, message: 'Add a title for this gathering.' };
 
+  if (!form.date.trim()) return { ok: false, message: 'Select a date for this gathering.' };
   const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(form.date.trim());
   if (!dateMatch) return { ok: false, message: 'Use the date format YYYY-MM-DD.' };
 

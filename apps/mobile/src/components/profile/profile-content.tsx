@@ -109,9 +109,9 @@ export function ProfileIdentity({ displayName, photoUrl, subtitle }: { displayNa
     .map((part) => Array.from(part)[0]?.toUpperCase() ?? '').join('') || 'CJ';
   return (
     <View style={styles.identity}>
-      <View accessible={false} style={[styles.avatar, { backgroundColor: t.soft, ...surfaceShadow(t) }]}>
+      <View accessible={false} style={[styles.avatar, { backgroundColor: t.selectedBg, ...surfaceShadow(t) }]}>
         {photoUrl ? <Image source={{ uri: photoUrl }} contentFit="cover" cachePolicy="memory" style={styles.avatarPhoto} />
-          : <Text accessible={false} style={[textStyles.title, { color: t.text }]}>{initials}</Text>}
+          : <Text accessible={false} style={[textStyles.title, { color: t.primary }]}>{initials}</Text>}
       </View>
       <View style={styles.identityCopy}>
         <Text accessibilityRole="header" style={[textStyles.title, styles.centered, { color: t.text }]}>{displayName}</Text>

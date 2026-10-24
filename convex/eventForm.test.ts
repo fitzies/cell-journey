@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { Doc } from './_generated/dataModel';
-import { eventToForm, parseEventForm } from '../apps/mobile/src/components/events/event-form';
+import { defaultEventForm, eventToForm, parseEventForm } from '../apps/mobile/src/components/events/event-form';
 
 function eventAt(startAt: number, endAt: number) {
   return {
@@ -28,5 +28,12 @@ describe('event edit form', () => {
     const result = parseEventForm({ ...form, startTime: '18:30' }, -Infinity);
     expect(result.ok && result.value.startAt).toBe(new Date(2025, 0, 10, 18, 30).getTime());
     expect(parseEventForm({ ...form, endTime: '18:00' }, -Infinity).ok).toBe(false);
+  });
+
+  test('new events start without a date and require one before saving', () => {
+    const form = defaultEventForm();
+    expect(form.date).toBe('');
+    expect(parseEventForm({ ...form, title: 'Cell night' }, -Infinity)).toEqual({ ok: false, message: 'Select a date for this gathering.' });
+    expect(parseEventForm({ ...form, title: 'Cell night', date: '2026-11-06' }, -Infinity).ok).toBe(true);
   });
 });

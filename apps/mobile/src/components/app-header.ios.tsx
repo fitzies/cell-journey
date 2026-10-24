@@ -1,6 +1,6 @@
 import { router, Stack } from 'expo-router';
 import { Platform, StyleSheet, Text } from 'react-native';
-import { leaderAccessLabel, useGroups } from '@/components/group-context';
+import { leaderAccessLabel, MEMBER_ACCESS_LABEL, useGroups } from '@/components/group-context';
 import { useAppTheme } from '@/constants/tokens';
 
 import { memberMenuSections } from './leader/members/menu-options';
@@ -11,7 +11,7 @@ const supportsScrollEdgeEffects = Number.parseInt(String(Platform.Version), 10) 
 
 export function AppHeader({ title, mode, profile = false, eventActions, membersOptions }: AppHeaderProps) {
   const t = useAppTheme();
-  const isTabTitle = !profile && ['Home', 'Attendance', 'Cell Attendance', 'Events', 'Upcoming Events', 'Planned Events', 'Mark Attendance', 'Members', 'Profile'].includes(title);
+  const isTabTitle = !profile && ['Home', 'Attendance', 'Cell Attendance', 'Events', 'Upcoming Events', 'Planned Events', 'Mark Attendance', 'Members', 'Cell Members', 'Profile'].includes(title);
 
   return (
     <>
@@ -96,6 +96,7 @@ function ContextToolbar({ mode, eventActions, membersOptions }: Pick<AppHeaderPr
                   groups.selectMemberGroup(group._id);
                   if (mode !== 'member') router.replace('/(member-tabs)/home');
                 }}
+                subtitle={MEMBER_ACCESS_LABEL}
               >
                 {group.name}
               </Stack.Toolbar.MenuAction>

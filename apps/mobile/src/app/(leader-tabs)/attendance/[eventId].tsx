@@ -148,7 +148,7 @@ export default function AttendanceEventScreen() {
           <Text style={[styles.progressTitle, { color: t.ink }]}>{derived.presentCount} of {derived.rows.length} present</Text>
           <Text style={[styles.progressMeta, { color: t.muted }]}>{remaining} remaining</Text>
         </View>
-        <View style={[styles.progressTrack, { backgroundColor: t.soft }]}>
+        <View style={[styles.progressTrack, { backgroundColor: t.selectedBg }]}>
           <View style={[styles.progressFill, { backgroundColor: t.accent, width: `${Math.round(progress * 100)}%` }]} />
         </View>
       </View>
@@ -292,11 +292,11 @@ function StatusButton({ label, icon, selected, outlined = false, disabled, onPre
 
 const styles = StyleSheet.create({
   pageContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 108 },
-  sectionTitle: { marginTop: 24, fontFamily: fonts.bodySemiBold, fontSize: 17 },
+  sectionTitle: { marginTop: 24, fontFamily: fonts.bodyBold, fontSize: 17 },
   context: { marginTop: 13, marginHorizontal: 2, fontFamily: fonts.body, fontSize: 12, lineHeight: 18 },
   progressBlock: { marginTop: 25 },
   progressCopy: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 16 },
-  progressTitle: { fontFamily: fonts.bodySemiBold, fontSize: 22, letterSpacing: -0.75 },
+  progressTitle: { fontFamily: fonts.bodyBold, fontSize: 22, letterSpacing: -0.3 },
   progressMeta: { fontFamily: fonts.bodyMedium, fontSize: 12 },
   progressTrack: { height: 5, marginTop: 10, overflow: 'hidden', borderRadius: radius.pill },
   progressFill: { height: '100%', borderRadius: radius.pill },
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
   disabledActions: { opacity: 0.34 },
   statusButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   saveButton: { minHeight: 56, marginTop: 28, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
-  saveText: { fontFamily: fonts.bodySemiBold, fontSize: 16, letterSpacing: -0.25 },
+  saveText: { fontFamily: fonts.bodyBold, fontSize: 16, letterSpacing: 0 },
   noMatches: { paddingVertical: 38, fontFamily: fonts.body, fontSize: 14, textAlign: 'center' },
   empty: { marginTop: 12, marginBottom: 16 },
 });

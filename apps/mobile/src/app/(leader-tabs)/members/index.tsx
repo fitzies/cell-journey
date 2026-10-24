@@ -16,9 +16,9 @@ import { getProfileDisplayName } from '@/lib/name';
 
 export default function LeaderMembersScreen() {
   const { context, selectedLeaderGroup: group } = useGroups();
-  if (context === undefined) return <LeaderLoadingState title="Members" label="Loading members…" />;
-  if (!group) return <LeaderScreen title="Members"><EmptyState title="No group assigned." body="Once this leader is assigned to a group, members will appear here." /></LeaderScreen>;
-  if (group.accessRole !== 'owner') return <LeaderScreen title="Members"><EmptyState title="Owner-managed roster." body="You can view members while taking attendance. The group owner manages member status and order." /></LeaderScreen>;
+  if (context === undefined) return <LeaderLoadingState title="Cell Members" label="Loading members…" />;
+  if (!group) return <LeaderScreen title="Cell Members"><EmptyState title="No group assigned." body="Once this leader is assigned to a group, members will appear here." /></LeaderScreen>;
+  if (group.accessRole !== 'owner') return <LeaderScreen title="Cell Members"><EmptyState title="Leader-managed roster." body="You can view members while taking attendance. The group leader manages member status and order." /></LeaderScreen>;
   return <GroupMembers key={group._id} groupId={group._id} groupName={group.name} />;
 }
 
@@ -167,7 +167,7 @@ function GroupMembers({ groupId, groupName }: { groupId: Id<'groups'>; groupName
     }
   };
 
-  if (members === undefined) return <LeaderLoadingState title="Members" label="Loading members…" />;
+  if (members === undefined) return <LeaderLoadingState title="Cell Members" label="Loading members…" />;
   const query = search.trim().toLocaleLowerCase();
   const sections: MemberSection[] = ([
     { status: 'active', title: 'Active', emptyMessage: 'No active members yet.' },
@@ -191,7 +191,7 @@ function GroupMembers({ groupId, groupName }: { groupId: Id<'groups'>; groupName
   };
 
   return <SafeAreaView edges={[]} style={[styles.root, { backgroundColor: t.background }]}>
-    <AppHeader title="Members" mode="leader" membersOptions={{
+    <AppHeader title="Cell Members" mode="leader" membersOptions={{
       view, sort, disabled: busy || dragging,
       onView: (value) => changeOptions(() => setView(value)),
       onSort: (value) => changeOptions(() => setSort(value)),
@@ -210,6 +210,7 @@ function GroupMembers({ groupId, groupName }: { groupId: Id<'groups'>; groupName
       onViewProfile={viewProfile}
       onDraggingChange={setDragging}
       header={<MembersToolbar
+        groupName={groupName}
         sort={sort}
         visibleCount={visibleCount}
         totalCount={members.length}
@@ -227,7 +228,7 @@ function GroupMembers({ groupId, groupName }: { groupId: Id<'groups'>; groupName
 }
 
 export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
-  return <LeaderScreen title="Members">
+  return <LeaderScreen title="Cell Members">
     <EmptyState title="Couldn't load members." body="Check your connection and try again." />
     <View style={styles.retry}><ActionButton label="Try again" onPress={() => void retry()} /></View>
   </LeaderScreen>;

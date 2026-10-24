@@ -1,121 +1,171 @@
-import { useQuery } from 'convex/react';
-import { Component, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { fonts, palettes, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
-import { api, type Id } from '@/lib/api';
-import { dayLabel, percent, useAttendanceNow, type HeatmapData } from './attendance-heatmap';
+import type { FunctionReturnType } from 'convex/server';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { fonts, radius, surfaceShadow, textStyles, useAppTheme, type AppTheme } from '@/constants/tokens';
+import type { api } from '@/lib/api';
+import { dayLabel, percent } from './attendance-heatmap';
 
-// Daily bars for the last 3 months (90 days), oldest → newest. Shares the
-// heatmap query so data semantics stay identical: a rate only exists when
-// every event that day is complete. Event days render green by rate;
-// event days without a rate render as a hollow outline (incomplete);
-// days without events render as a short baseline tick (never 0%).
-export function AttendanceBarChart({ groupId }: { groupId: Id<'groups'> }) {
-  return <ChartBoundary key={groupId}><ConnectedChart groupId={groupId} /></ChartBoundary>;
+export type AttendanceYearData = FunctionReturnType<typeof api.attendanceHeatmap.forYear>;
+type YearEvent = AttendanceYearData['events'][number];
+
+const SINGAPORE_OFFSET = 8 * 3_600_000;
+const PLOT_HEIGHT = 140;
+const Y_AXIS_WIDTH = 34;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const GRID = [1, 0.5, 0];
+
+export const shortDate = (startAt: number) => new Intl.DateTimeFormat('en-SG', {
+  timeZone: 'Asia/Singapore', day: 'numeric', month: 'short',
+}).format(startAt).replace('Sept', 'Sep');
+
+function barLabel(event: YearEvent) {
+  const when = `${dayLabel(event.startAt)}, ${event.title}`;
+  if (event.required === 0) return `${when}. No eligible members`;
+  if (event.rate === null) return `${when}. ${event.marked} of ${event.required} marked, ${event.present} present. Attendance incomplete`;
+  return `${when}. ${event.present} of ${event.required} present, ${percent(event.rate)}`;
 }
 
-function ConnectedChart({ groupId }: { groupId: Id<'groups'> }) {
-  const now = useAttendanceNow();
-  const data = useQuery(api.attendanceHeatmap.forGroup, { groupId, now });
+// Screen Time–style year chart: one thin bar per gathering placed at its date
+// on a Jan → Dec axis. Complete events are filled to their rate; events still
+// being marked render as a hollow dashed outline (never as 0%).
+export function AttendanceBarChartView({ data }: { data: AttendanceYearData }) {
   const t = useAppTheme();
-  if (!data) return <View style={[styles.card, { backgroundColor: t.surface }]}><ActivityIndicator color={t.muted} accessibilityLabel="Loading attendance chart" /></View>;
-  return <AttendanceBarChartView data={data} />;
-}
-
-// Green belongs only to the attendance scale, independent of the app's action
-// accent. Same two stops per band approach as the heatmap ramps.
-const scale = {
-  light: ['#67B981', '#329357', '#137333'],
-  dark: ['#327B4D', '#40A367', '#58C884'],
-};
-
-type BarPoint = {
-  key: string;
-  startAt: number;
-  hasEvents: boolean;
-  rate: number | null;
-  present: number;
-  required: number;
-  incomplete: boolean;
-};
-
-function barColor(rate: number, dark: boolean) {
-  const ramp = dark ? scale.dark : scale.light;
-  if (rate >= 0.8) return ramp[2];
-  if (rate >= 0.65) return ramp[1];
-  return ramp[0];
-}
-
-export function AttendanceBarChartView({ data }: { data: HeatmapData }) {
-  const t = useAppTheme();
-  const dark = t === palettes.dark;
   const [width, setWidth] = useState(0);
-  const points: BarPoint[] = data.days.map(day => ({
-    key: `${day.date}-${day.startAt}`,
-    startAt: day.startAt,
-    hasEvents: day.events.length > 0,
-    rate: day.rate,
-    present: day.present,
-    required: day.required,
-    incomplete: day.events.some(event => !event.complete),
-  }));
-  const gap = 2;
-  const chartHeight = 168;
-  const labelHeight = 14;
-  const barsWidth = Math.max(0, width - 32);
-  const barWidth = points.length ? Math.max(1, (barsWidth - gap * (points.length - 1)) / points.length) : 0;
-  const monthAt = (startAt: number) => new Intl.DateTimeFormat('en-SG', { timeZone: 'Asia/Singapore', month: 'short' }).format(startAt).replace('Sept', 'Sep');
-  const monthTicks = points.filter((point, i) => i === 0 || monthAt(point.startAt) !== monthAt(points[i - 1].startAt));
-  const hasEvents = points.some(point => point.hasEvents);
-  return <View style={[styles.card, { backgroundColor: t.surface, ...surfaceShadow(t) }]} onLayout={event => setWidth(event.nativeEvent.layout.width)}>
-    {hasEvents ? <>
-      <View style={[styles.plot, { height: chartHeight }]} accessible accessibilityLabel="Daily attendance for the last 3 months, oldest to newest.">
-        <View style={[styles.baseline, { backgroundColor: t.track }]} />
-        {points.map(point => {
-          const fillHeight = point.rate === null ? 0 : Math.max(2, Math.round(point.rate * (chartHeight - labelHeight - 8)));
-          const label = !point.hasEvents
-            ? `${dayLabel(point.startAt)}. No gathering`
-            : point.rate === null
-              ? `${dayLabel(point.startAt)}. ${point.required === 0 ? 'No eligible members' : `${point.present} of ${point.required} marked. Attendance incomplete`}`
-              : `${dayLabel(point.startAt)}. ${percent(point.rate)} attendance, ${point.present} of ${point.required} present`;
-          return <View key={point.key} style={[styles.column, { width: barWidth }]} accessible accessibilityRole="text" accessibilityLabel={label}>
-            {point.rate !== null && !point.incomplete
-              ? <View style={[styles.bar, { width: barWidth, height: fillHeight, backgroundColor: barColor(point.rate, dark) }]} />
-              : point.hasEvents
-                ? <View style={[styles.incomplete, { width: barWidth, height: Math.max(fillHeight, 24), borderColor: t.muted }]} />
-                : <View style={[styles.empty, { width: barWidth, backgroundColor: t.muted }]} />}
-          </View>;
-        })}
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = data.events.find(event => event.eventId === selectedId) ?? null;
+  const average = data.summary.rate;
+  const plotWidth = Math.max(0, width - Y_AXIS_WIDTH);
+  const span = data.to - data.from;
+  const xAt = (at: number) => ((at - data.from) / span) * plotWidth;
+  const barWidth = Math.min(6, Math.max(3, plotWidth / 75));
+  const monthStarts = MONTHS.map((_, month) => Date.UTC(data.year, month, 1) - SINGAPORE_OFFSET);
+  const monthWidth = plotWidth / 12;
+  const avgY = average === null ? null : PLOT_HEIGHT * (1 - average);
+  const hasIncomplete = data.events.some(event => event.rate === null && event.required > 0);
+
+  return <View style={[styles.card, { backgroundColor: t.surface, ...surfaceShadow(t) }]}>
+    <Headline t={t} data={data} selected={selected} onClear={() => setSelectedId(null)} />
+    {data.events.length === 0 ? (
+      <Text style={[textStyles.body, { color: t.muted }]}>No gatherings yet this year. Bars appear here after your first event.</Text>
+    ) : <>
+      <View style={{ height: PLOT_HEIGHT }} onLayout={event => setWidth(event.nativeEvent.layout.width)}>
+        {width > 0 ? <>
+          {GRID.map(value => {
+            const y = PLOT_HEIGHT * (1 - value);
+            const nearAvg = avgY !== null && Math.abs(avgY - y) < 12;
+            return <View key={value} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+              {value > 0 ? <View style={[styles.grid, { top: y, width: plotWidth, backgroundColor: t.line }]} /> : null}
+              {nearAvg ? null : <Text style={[styles.yLabel, { top: y - 7, left: plotWidth + 6, color: t.muted }]}>{percent(value)}</Text>}
+            </View>;
+          })}
+          {avgY !== null ? <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+            <DashedLine top={avgY} width={plotWidth} color={t.secondary} />
+            <Text style={[styles.yLabel, styles.avgLabel, { top: avgY - 7, left: plotWidth + 6, color: t.primary }]}>avg</Text>
+          </View> : null}
+          {data.events.map(event => {
+            const isSelected = selected?.eventId === event.eventId;
+            const left = Math.min(Math.max(0, xAt(event.startAt) - barWidth / 2), plotWidth - barWidth);
+            return <Pressable
+              key={event.eventId}
+              accessibilityRole="button"
+              accessibilityLabel={barLabel(event)}
+              accessibilityHint="Shows this gathering above the chart"
+              accessibilityState={{ selected: isSelected }}
+              onPress={() => setSelectedId(isSelected ? null : event.eventId)}
+              hitSlop={{ left: 3, right: 3, top: 0, bottom: 12 }}
+              style={[styles.column, { left, width: barWidth, opacity: selected && !isSelected ? 0.35 : 1 }]}
+            >
+              <Bar event={event} width={barWidth} t={t} />
+            </Pressable>;
+          })}
+        </> : null}
+        <View style={[styles.axis, { width: plotWidth || '100%', backgroundColor: t.muted }]} />
       </View>
-      <View style={styles.months} accessible accessibilityLabel={`Months shown: ${monthTicks.map(point => monthAt(point.startAt)).join(', ')}`}>
-        {monthTicks.map(point => <Text key={point.key} style={[styles.day, { color: t.muted }]}>{monthAt(point.startAt)}</Text>)}
+      <View style={styles.months} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+        {monthStarts.map((start, month) => <View key={month} style={[styles.month, { left: xAt(start), width: monthWidth }]}>
+          <View style={[styles.tick, { backgroundColor: t.muted }]} />
+          <Text style={[styles.monthLabel, { color: t.muted }]} numberOfLines={1}>
+            {monthWidth >= 24 ? MONTHS[month] : MONTHS[month][0]}
+          </Text>
+        </View>)}
       </View>
-    </> : <Text style={[textStyles.body, { color: t.muted }]}>No gatherings yet. Bars appear here after your first event.</Text>}
+      {hasIncomplete ? <View style={styles.legend} accessible accessibilityLabel="Outlined bars are gatherings with attendance not fully marked">
+        <View style={[styles.legendSwatch, { borderColor: t.muted }]} />
+        <Text style={[styles.legendText, { color: t.muted }]}>Attendance not fully marked</Text>
+      </View> : null}
+    </>}
   </View>;
 }
 
-class ChartBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() { return { failed: true }; }
-  render() {
-    return this.state.failed ? <ChartError retry={() => this.setState({ failed: false })} /> : this.props.children;
+function Headline({ t, data, selected, onClear }: { t: AppTheme; data: AttendanceYearData; selected: YearEvent | null; onClear: () => void }) {
+  if (selected) {
+    const value = selected.rate !== null ? percent(selected.rate) : selected.required === 0 ? '—' : `${selected.marked}/${selected.required}`;
+    const detail = selected.required === 0
+      ? 'No eligible members'
+      : selected.rate !== null
+        ? `${selected.present} of ${selected.required} present`
+        : `marked · ${selected.present} present so far`;
+    return <Pressable accessibilityRole="button" accessibilityLabel={`${selected.title}, ${shortDate(selected.startAt)}. ${detail}. Clear selection`} onPress={onClear} style={styles.headline}>
+      <Text style={[styles.caption, { color: t.muted }]} numberOfLines={1}>{shortDate(selected.startAt)} · {selected.title}</Text>
+      <View style={styles.valueRow}>
+        <Text style={[styles.value, { color: t.ink }]}>{value}</Text>
+        <Text style={[styles.valueDetail, { color: t.muted }]} numberOfLines={1}>{detail}</Text>
+      </View>
+    </Pressable>;
   }
+  const count = data.summary.completedEvents;
+  return <View style={styles.headline} accessible accessibilityLabel={data.summary.rate === null
+    ? `Average attendance ${data.year}: not available yet`
+    : `Average attendance ${data.year}: ${percent(data.summary.rate)} across ${count} ${count === 1 ? 'gathering' : 'gatherings'}`}>
+    <Text style={[styles.caption, { color: t.muted }]}>Average attendance · {data.year}</Text>
+    <View style={styles.valueRow}>
+      <Text style={[styles.value, { color: t.ink }]}>{data.summary.rate === null ? '—' : percent(data.summary.rate)}</Text>
+      <Text style={[styles.valueDetail, { color: t.muted }]} numberOfLines={1}>
+        {count ? `across ${count} ${count === 1 ? 'gathering' : 'gatherings'}` : data.events.length ? 'once attendance is marked' : ''}
+      </Text>
+    </View>
+  </View>;
 }
-function ChartError({ retry }: { retry: () => void }) {
-  const t = useAppTheme();
-  return <View style={[styles.card, { backgroundColor: t.surface }]}><Text style={[textStyles.body, { color: t.muted }]}>Couldn&apos;t load attendance.</Text><Pressable accessibilityRole="button" onPress={retry} style={styles.detailsLink}><Text style={[textStyles.button, { color: t.ink }]}>Try again</Text></Pressable></View>;
+
+function Bar({ event, width, t }: { event: YearEvent; width: number; t: AppTheme }) {
+  const corner = { borderTopLeftRadius: width / 2, borderTopRightRadius: width / 2 };
+  if (event.required === 0) return <View style={[styles.stub, { width, backgroundColor: t.muted }]} />;
+  if (event.rate === null) {
+    const height = Math.max(16, Math.round((event.present / event.required) * PLOT_HEIGHT));
+    return <View style={[styles.hollow, corner, { width, height, borderColor: t.muted }]} />;
+  }
+  if (event.rate === 0) return <View style={[styles.stub, { width, backgroundColor: t.primary }]} />;
+  return <View style={[corner, { width, height: Math.max(3, Math.round(event.rate * PLOT_HEIGHT)), backgroundColor: t.primary }]} />;
+}
+
+function DashedLine({ top, width, color }: { top: number; width: number; color: string }) {
+  const count = Math.max(0, Math.floor(width / 6));
+  return <View style={[styles.dashes, { top: top - 0.75, width }]}>
+    {Array.from({ length: count }, (_, i) => <View key={i} style={[styles.dash, { backgroundColor: color }]} />)}
+  </View>;
 }
 
 const styles = StyleSheet.create({
-  card: { padding: 16, borderRadius: radius.xl, gap: 10 },
-  plot: { flexDirection: 'row', alignItems: 'flex-end', gap: 2, paddingTop: 8 },
-  baseline: { position: 'absolute', left: 0, right: 0, bottom: 0.5, height: StyleSheet.hairlineWidth },
-  column: { alignItems: 'center', justifyContent: 'flex-end' },
-  bar: { borderRadius: 1.5, minHeight: 2 },
-  incomplete: { borderRadius: 1.5, borderWidth: 1, borderStyle: 'dashed' },
-  empty: { height: 2, borderRadius: 1, opacity: 0.4 },
-  months: { flexDirection: 'row', justifyContent: 'space-between' },
-  day: { fontFamily: fonts.bodyMedium, fontSize: 10, lineHeight: 14 },
-  caption: { fontFamily: fonts.body, fontSize: 12, lineHeight: 18 },
-  detailsLink: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', marginTop: 6 },
+  card: { padding: 16, borderRadius: radius.xl, gap: 12 },
+  headline: { gap: 2 },
+  caption: { fontFamily: fonts.bodyMedium, fontSize: 12, lineHeight: 16 },
+  valueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  value: { fontFamily: fonts.bodyBold, fontSize: 32, lineHeight: 38, letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
+  valueDetail: { flexShrink: 1, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
+  grid: { position: 'absolute', left: 0, height: StyleSheet.hairlineWidth },
+  yLabel: { position: 'absolute', fontFamily: fonts.body, fontSize: 10, lineHeight: 14, fontVariant: ['tabular-nums'] },
+  avgLabel: { fontFamily: fonts.bodySemiBold },
+  dashes: { position: 'absolute', left: 0, height: 1.5, flexDirection: 'row', gap: 3, overflow: 'hidden' },
+  dash: { width: 3, height: 1.5, borderRadius: 1 },
+  column: { position: 'absolute', top: 0, bottom: 0, justifyContent: 'flex-end' },
+  stub: { height: 2, borderRadius: 1 },
+  hollow: { borderWidth: 1, borderStyle: 'dashed' },
+  axis: { position: 'absolute', left: 0, bottom: 0, height: 1 },
+  months: { height: 18 },
+  month: { position: 'absolute', top: 0, flexDirection: 'row' },
+  tick: { width: 1, height: 5 },
+  monthLabel: { marginLeft: 3, marginTop: 2, fontFamily: fonts.bodyMedium, fontSize: 10, lineHeight: 14 },
+  legend: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendSwatch: { width: 6, height: 12, borderWidth: 1, borderStyle: 'dashed', borderTopLeftRadius: 3, borderTopRightRadius: 3 },
+  legendText: { fontFamily: fonts.body, fontSize: 11, lineHeight: 14 },
 });

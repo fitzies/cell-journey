@@ -4,11 +4,11 @@ import { Platform, StatusBar, Text, useColorScheme, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SecureStore from 'expo-secure-store';
 import { useFonts } from 'expo-font';
-import { InterTight_400Regular } from '@expo-google-fonts/inter-tight/400Regular';
-import { InterTight_400Regular_Italic } from '@expo-google-fonts/inter-tight/400Regular_Italic';
-import { InterTight_500Medium } from '@expo-google-fonts/inter-tight/500Medium';
-import { InterTight_600SemiBold } from '@expo-google-fonts/inter-tight/600SemiBold';
-import { InterTight_700Bold } from '@expo-google-fonts/inter-tight/700Bold';
+import { NunitoSans_400Regular } from '@expo-google-fonts/nunito-sans/400Regular';
+import { NunitoSans_400Regular_Italic } from '@expo-google-fonts/nunito-sans/400Regular_Italic';
+import { NunitoSans_500Medium } from '@expo-google-fonts/nunito-sans/500Medium';
+import { NunitoSans_600SemiBold } from '@expo-google-fonts/nunito-sans/600SemiBold';
+import { NunitoSans_700Bold } from '@expo-google-fonts/nunito-sans/700Bold';
 import { GroupContextProvider } from '@/components/group-context';
 import { LeaderNavigationProvider } from '@/components/leader-navigation-context';
 import { AccountActionsProvider } from '@/components/account-actions';
@@ -49,7 +49,13 @@ const darkNavigationTheme = {
 
 export default function RootLayout() {
   const scheme = useColorScheme();
-  const [fontsLoaded] = useFonts({ InterTight_400Regular, InterTight_400Regular_Italic, InterTight_500Medium, InterTight_600SemiBold, InterTight_700Bold });
+  const [fontsLoaded] = useFonts({
+    NunitoSans_400Regular,
+    NunitoSans_400Regular_Italic,
+    NunitoSans_500Medium,
+    NunitoSans_600SemiBold,
+    NunitoSans_700Bold,
+  });
   if (!fontsLoaded) return <View style={{ flex: 1 }} />;
   if (!convex) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}><Text>Set EXPO_PUBLIC_CONVEX_URL to start Cell Journey.</Text></View>;
   return (

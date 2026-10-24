@@ -46,7 +46,7 @@ export function SolarTabIcon({ name, color, focused }: SolarTabIconProps) {
         borderRadius: radius.pill,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: focused ? t.selected : 'transparent',
+        backgroundColor: focused ? t.selectedBg : 'transparent',
       }}
     >
       <SolarIcon name={name} color={color} />

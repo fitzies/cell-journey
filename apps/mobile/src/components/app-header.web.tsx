@@ -1,7 +1,7 @@
 import { router, Stack } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { leaderAccessLabel, useGroups } from '@/components/group-context';
+import { leaderAccessLabel, MEMBER_ACCESS_LABEL, useGroups } from '@/components/group-context';
 import { SolarIcon } from '@/components/solar-tab-icon';
 import { fonts, radius, surfaceShadow, useAppTheme } from '@/constants/tokens';
 import type { Id } from '@/lib/api';
@@ -143,7 +143,10 @@ function ContextMenuButton({ mode }: { mode: AppMode }) {
             const selected = mode === 'member' && group._id === groups.selectedMemberGroupId;
             return (
               <Pressable key={group._id} accessibilityRole="menuitem" accessibilityState={{ selected }} onPress={() => select('member', group._id)} style={styles.menuItem}>
-                <Text style={[styles.menuText, { color: t.ink }]}>{group.name}</Text>
+                <View style={styles.menuCopy}>
+                  <Text style={[styles.menuText, { color: t.ink }]}>{group.name}</Text>
+                  <Text style={[styles.menuSubtitle, { color: t.muted }]}>{MEMBER_ACCESS_LABEL}</Text>
+                </View>
                 {selected ? <Text style={[styles.check, { color: t.ink }]}>✓</Text> : null}
               </Pressable>
             );
@@ -153,7 +156,10 @@ function ContextMenuButton({ mode }: { mode: AppMode }) {
             const selected = mode === 'leader' && group._id === groups.selectedLeaderGroupId;
             return (
               <Pressable key={group._id} accessibilityRole="menuitem" accessibilityState={{ selected }} onPress={() => select('leader', group._id)} style={styles.menuItem}>
-                <Text style={[styles.menuText, { color: t.ink }]}>{group.name} · {leaderAccessLabel(group.accessRole)}</Text>
+                <View style={styles.menuCopy}>
+                  <Text style={[styles.menuText, { color: t.ink }]}>{group.name}</Text>
+                  <Text style={[styles.menuSubtitle, { color: t.muted }]}>{leaderAccessLabel(group.accessRole)}</Text>
+                </View>
                 {selected ? <Text style={[styles.check, { color: t.ink }]}>✓</Text> : null}
               </Pressable>
             );
@@ -171,6 +177,8 @@ const styles = StyleSheet.create({
   menu: { position: 'absolute', top: 44, right: 0, width: 260, borderRadius: radius.md, padding: 8, shadowColor: '#000000', shadowOpacity: 0.16, shadowRadius: 18 },
   menuLabel: { marginTop: 8, marginBottom: 4, paddingHorizontal: 10, fontFamily: fonts.bodyBold, fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase' },
   menuItem: { minHeight: 42, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  menuCopy: { flex: 1, paddingVertical: 6, gap: 1 },
   menuText: { flex: 1, fontFamily: fonts.bodyMedium, fontSize: 14 },
+  menuSubtitle: { fontFamily: fonts.body, fontSize: 12 },
   check: { fontFamily: fonts.bodyBold, fontSize: 14 },
 });

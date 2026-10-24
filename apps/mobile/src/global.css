@@ -1,6 +1,8 @@
 @import "../../../packages/theme/index.css";
 
 :root {
+  /* Nunito Sans is registered by expo-font in src/app/_layout.tsx. */
+  --font-sans: NunitoSans_400Regular, system-ui, sans-serif;
   --font-display: var(--font-sans);
   --font-rounded: var(--font-sans);
 }

@@ -63,6 +63,9 @@ importers:
       '@expo-google-fonts/inter-tight':
         specifier: ^0.4.2
         version: 0.4.2
+      '@expo-google-fonts/nunito-sans':
+        specifier: ^0.4.2
+        version: 0.4.2
       '@expo/dom-webview':
         specifier: ~57.0.1
         version: 57.0.1(expo@57.0.18)(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
@@ -931,6 +934,9 @@ packages:
 
   '@expo-google-fonts/material-symbols@0.4.37':
     resolution: {integrity: sha512-ll8twI7PcfxmjG2hMDS+QNEZ3qYmMERG0YVSJxgYHPlx3VqSNGCasMDAOgPzCE+RhKAVNqlrgTUcIFc8XrHqZQ==}
+
+  '@expo-google-fonts/nunito-sans@0.4.2':
+    resolution: {integrity: sha512-e4+jUhgXNC6Zahf3MQwiiUimjWPp/Noe5v7CxBDbvXED+E7p7/egDaXKTbLwSBJku/mP3N+vNdJwk5xKAjkQmg==}
 
   '@expo/cli@57.0.20':
     resolution: {integrity: sha512-ZjWz7SA5TBTyKq4+aFRUPgMFxmqHtKkDMv6d85J2UAAjdRhkNRf+B80t+rr5IFo2ywuTvyrPRBth4ei4w08olA==}
@@ -6220,6 +6226,8 @@ snapshots:
 
   '@expo-google-fonts/material-symbols@0.4.37': {}
 
+  '@expo-google-fonts/nunito-sans@0.4.2': {}
+
   '@expo/cli@57.0.20(@expo/dom-webview@57.0.1)(@expo/metro-runtime@57.0.14)(expo-constants@57.0.16)(expo-font@57.0.2)(expo-router@57.0.17)(expo@57.0.18)(react-dom@19.2.3(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)':
     dependencies:
       '@expo/code-signing-certificates': 0.0.6
@@ -7564,9 +7572,7 @@ snapshots:
       metro-runtime: 0.84.5
     transitivePeerDependencies:
       - '@babel/core'
-      - bufferutil
       - supports-color
-      - utf-8-validate
 
   '@react-native/normalize-colors@0.74.89': {}
 

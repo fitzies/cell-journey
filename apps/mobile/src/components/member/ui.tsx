@@ -35,9 +35,9 @@ export function MemberDateTile({ startAt }: { startAt: number }) {
   const t = useAppTheme();
   const date = formatDateParts(startAt);
   return (
-    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.date, { backgroundColor: t.soft }]}>
-      <Text style={[styles.month, { color: t.muted }]}>{date.month}</Text>
-      <Text style={[styles.day, { color: t.text }]}>{date.day}</Text>
+    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.date, { backgroundColor: t.warmSoft }]}>
+      <Text style={[styles.month, { color: t.warmInk }]}>{date.month}</Text>
+      <Text style={[styles.day, { color: t.warmInk }]}>{date.day}</Text>
     </View>
   );
 }
@@ -139,10 +139,10 @@ const styles = StyleSheet.create({
   card: { padding: 15, borderRadius: radius.lg, borderCurve: 'continuous' },
   eventRow: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: 13 },
   date: { width: 54, height: 60, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
-  month: { fontFamily: fonts.bodyBold, fontSize: 9, letterSpacing: 0.75 },
-  day: { marginTop: 2, fontFamily: fonts.bodySemiBold, fontSize: 24, lineHeight: 26, letterSpacing: -0.7 },
+  month: { fontFamily: fonts.bodyBold, fontSize: 10, letterSpacing: 0.6 },
+  day: { marginTop: 1, fontFamily: fonts.bodyBold, fontSize: 24, lineHeight: 28, letterSpacing: -0.3 },
   copy: { flex: 1, minWidth: 0 },
-  rowTitle: { ...textStyles.body, fontFamily: fonts.bodySemiBold, letterSpacing: -0.3 },
+  rowTitle: { ...textStyles.body, fontFamily: fonts.bodyBold },
   meta: { ...textStyles.body, marginTop: 5 },
   eventDetails: { borderTopWidth: 1, marginTop: 15, paddingTop: 13, gap: 8 },
   detailRow: { flexDirection: 'row', gap: 12 },
@@ -150,5 +150,5 @@ const styles = StyleSheet.create({
   empty: { padding: 18, borderRadius: radius.lg, gap: 3 },
   historyRow: { paddingVertical: 15, borderBottomWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 13 },
   status: { marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  statusText: { fontFamily: fonts.bodyMedium, fontSize: 12, lineHeight: 16, letterSpacing: 0.3 },
+  statusText: { fontFamily: fonts.bodySemiBold, fontSize: 12, lineHeight: 16, letterSpacing: 0 },
 });

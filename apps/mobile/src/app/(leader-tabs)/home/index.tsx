@@ -5,7 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { leaderAccessLabel, useGroups } from '@/components/group-context';
 import { useLeaderEventsLayout } from '@/components/leader-navigation-context';
-import { AttendanceBarChart } from '@/components/leader/attendance-bar-chart';
+import { AttendanceOverview } from '@/components/leader/attendance-overview';
 // Heatmap replaced by the bar chart; kept for reference until the switch is confirmed.
 // import { AttendanceHeatmap } from '@/components/leader/attendance-heatmap';
 import { EmptyState, LeaderScreen } from '@/components/leader/ui';
@@ -67,7 +67,8 @@ export default function LeaderHomeScreen() {
   const pendingRows = pending ?? [];
   const activeMemberCount = (members ?? []).filter(({ membership }) => membership.status === 'active').length;
   const next = events?.[0];
-  const later = (events ?? []).slice(1, 3);
+  // Upcoming lists the next gathering too, so the section reads as a full schedule preview.
+  const upcoming = (events ?? []).slice(0, 3);
   const groupMeta = canManageMembers
     ? `${activeMemberCount} ${activeMemberCount === 1 ? 'member' : 'members'}${canManageJoinRequests ? ` · ${pendingRows.length} ${pendingRows.length === 1 ? 'request' : 'requests'}` : ''}`
     : leaderAccessLabel(group.accessRole);
@@ -85,7 +86,11 @@ export default function LeaderHomeScreen() {
 
       <HomeSection title="Next gathering">
         {next ? (
-          <NextEventCard event={next} onPress={() => router.push(eventsRoute)} />
+          <NextEventCard
+            event={next}
+            // Leaders jump straight to this gathering's attendance in the Attendance tab.
+            onPress={() => router.push({ pathname: '/(leader-tabs)/attendance/[eventId]', params: { eventId: next._id } })}
+          />
         ) : (
           <EmptyEventCard onPress={() => router.push(eventsRoute)} />
         )}
@@ -94,7 +99,7 @@ export default function LeaderHomeScreen() {
       {group.capabilities.readAttendance ? (
         <HomeSection title="Group attendance">
           {/* <AttendanceHeatmap groupId={group._id} /> */}
-          <AttendanceBarChart groupId={group._id} />
+          <AttendanceOverview groupId={group._id} />
         </HomeSection>
       ) : null}
 
@@ -124,13 +129,13 @@ export default function LeaderHomeScreen() {
         </HomeSection>
       ) : null}
 
-      {later.length ? (
+      {upcoming.length ? (
         <HomeSection
-          title="Upcoming"
+          title="Upcoming events"
           action={<Pressable accessibilityRole="button" onPress={() => router.push(eventsRoute)} hitSlop={8}><Text style={[styles.sectionAction, { color: t.ink }]}>See events</Text></Pressable>}
         >
           <View style={[styles.upcomingList, { borderTopColor: t.track }]}>
-            {later.map((event) => <UpcomingRow key={event._id} event={event} onPress={() => router.push(eventsRoute)} />)}
+            {upcoming.map((event) => <UpcomingRow key={event._id} event={event} onPress={() => router.push(eventsRoute)} />)}
           </View>
         </HomeSection>
       ) : null}
@@ -228,9 +233,9 @@ function UpcomingRow({ event, onPress }: { event: Doc<'events'>; onPress: () => 
 function DateTile({ month, day, large = false }: { month: string; day: string; large?: boolean }) {
   const t = useAppTheme();
   return (
-    <View style={[styles.dateTile, large && styles.largeDateTile, { backgroundColor: t.surface, ...surfaceShadow(t) }]}>
-      <Text style={[styles.dateMonth, { color: t.muted }]}>{month}</Text>
-      <Text style={[styles.dateDay, large && styles.largeDateDay, { color: t.ink }]}>{day}</Text>
+    <View style={[styles.dateTile, large && styles.largeDateTile, { backgroundColor: t.warmSoft }]}>
+      <Text style={[styles.dateMonth, { color: t.warmInk }]}>{month}</Text>
+      <Text style={[styles.dateDay, large && styles.largeDateDay, { color: t.warmInk }]}>{day}</Text>
     </View>
   );
 }
@@ -244,7 +249,7 @@ const styles = StyleSheet.create({
   pageContent: { paddingHorizontal: 20 },
   groupMeta: { ...textStyles.body },
   primaryAction: { minHeight: 46, marginTop: 20, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 20 },
-  primaryLabel: { fontFamily: fonts.bodySemiBold, fontSize: 17, letterSpacing: -0.3 },
+  primaryLabel: { fontFamily: fonts.bodyBold, fontSize: 17, letterSpacing: 0 },
   section: { marginTop: 30 },
   sectionHeading: { minHeight: 18, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
   sectionTitle: { ...textStyles.section },
@@ -252,9 +257,9 @@ const styles = StyleSheet.create({
   nextCard: { minHeight: 132, paddingHorizontal: 18, paddingVertical: 20, borderRadius: radius.xl, flexDirection: 'row', alignItems: 'center', gap: 16 },
   dateTile: { width: 54, height: 60, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   largeDateTile: { width: 68, height: 82, borderRadius: 19 },
-  dateMonth: { fontFamily: fonts.bodyBold, fontSize: 10, letterSpacing: 0.8 },
-  dateDay: { marginTop: 2, fontFamily: fonts.bodySemiBold, fontSize: 24, lineHeight: 26, letterSpacing: -0.8 },
-  largeDateDay: { fontSize: 32, lineHeight: 34, letterSpacing: -1.2 },
+  dateMonth: { fontFamily: fonts.bodyBold, fontSize: 10, letterSpacing: 0.6 },
+  dateDay: { marginTop: 1, fontFamily: fonts.bodyBold, fontSize: 24, lineHeight: 28, letterSpacing: -0.3 },
+  largeDateDay: { fontSize: 32, lineHeight: 36, letterSpacing: -0.5 },
   eventCopy: { flex: 1, minWidth: 0 },
   nextTitle: { ...textStyles.section },
   nextMeta: { ...textStyles.body, marginTop: 5 },
