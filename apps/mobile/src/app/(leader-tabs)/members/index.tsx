@@ -1,7 +1,7 @@
 import { useConvexConnectionState, useMutation, useQuery } from 'convex/react';
 import { router, useFocusEffect, type ErrorBoundaryProps } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Alert, Platform, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Alert, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/app-header';
 import { useGroups } from '@/components/group-context';
@@ -10,13 +10,14 @@ import { MembersToolbar } from '@/components/leader/members/members-controls';
 import { memberStatus, type MemberStatus, type MemberRow, type MemberSection, type MemberSort, type MemberView } from '@/components/leader/members/types';
 import { ActionButton, EmptyState, LeaderScreen } from '@/components/leader/ui';
 import { LeaderLoadingState } from '@/components/leader/query-state';
+import { MembersSkeleton } from '@/components/screen-skeletons';
 import { useAppTheme } from '@/constants/tokens';
 import { api, type Id } from '@/lib/api';
 import { getProfileDisplayName } from '@/lib/name';
 
 export default function LeaderMembersScreen() {
   const { context, selectedLeaderGroup: group } = useGroups();
-  if (context === undefined) return <LeaderLoadingState title="Cell Members" label="Loading members…" />;
+  if (context === undefined) return <LeaderLoadingState title="Cell Members"><MembersSkeleton /></LeaderLoadingState>;
   if (!group) return <LeaderScreen title="Cell Members"><EmptyState title="No group assigned." body="Once this leader is assigned to a group, members will appear here." /></LeaderScreen>;
   if (group.accessRole !== 'owner') return <LeaderScreen title="Cell Members"><EmptyState title="Leader-managed roster." body="You can view members while taking attendance. The group leader manages member status and order." /></LeaderScreen>;
   return <GroupMembers key={group._id} groupId={group._id} groupName={group.name} />;
@@ -167,7 +168,14 @@ function GroupMembers({ groupId, groupName }: { groupId: Id<'groups'>; groupName
     }
   };
 
-  if (members === undefined) return <LeaderLoadingState title="Cell Members" label="Loading members…" />;
+  if (members === undefined) {
+    return <SafeAreaView edges={[]} style={[styles.root, { backgroundColor: t.background }]}>
+      <AppHeader title="Cell Members" mode="leader" membersOptions={{ view, sort, disabled: true, onView: () => {}, onSort: () => {} }} />
+      <ScrollView contentInsetAdjustmentBehavior="automatic" showsVerticalScrollIndicator={false} contentContainerStyle={styles.loadingContent}>
+        <MembersSkeleton />
+      </ScrollView>
+    </SafeAreaView>;
+  }
   const query = search.trim().toLocaleLowerCase();
   const sections: MemberSection[] = ([
     { status: 'active', title: 'Active', emptyMessage: 'No active members yet.' },
@@ -234,4 +242,9 @@ export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
   </LeaderScreen>;
 }
 
-const styles = StyleSheet.create({ root: { flex: 1 }, retry: { marginTop: 16 } });
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  retry: { marginTop: 16 },
+  // Matches the member grid's padding so the roster replaces the skeleton in place.
+  loadingContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 110 },
+});

@@ -6,6 +6,7 @@ import { useGroups } from '@/components/group-context';
 import { ActionButton, EmptyState, LeaderScreen, RowCard } from '@/components/leader/ui';
 import { type ErrorBoundaryProps } from 'expo-router';
 import { LeaderConnectionNotice, LeaderLoadError, LeaderLoadingState } from '@/components/leader/query-state';
+import { JoinRequestsSkeleton } from '@/components/screen-skeletons';
 import { fonts, useAppTheme } from '@/constants/tokens';
 import { formatDay } from '@/lib/date';
 import { api, type Doc, type Id } from '@/lib/api';
@@ -29,7 +30,12 @@ export default function LeaderJoinRequestsScreen() {
   const reject = useMutation(api.groups.rejectJoinRequest);
   const serviceMap = useMemo(() => new Map((services ?? []).map((service) => [service._id, service.name])), [services]);
 
-  if (context === undefined || (group && canManage && (pending === undefined || services === undefined))) return <LeaderLoadingState title="Join requests" label="Loading join requests…" />;
+  if (context === undefined || (group && canManage && (pending === undefined || services === undefined))) return (
+    <LeaderLoadingState title="" contentStyle={styles.pageContent}>
+      <Text style={[styles.title, { color: t.ink }]}>Join requests</Text>
+      <JoinRequestsSkeleton />
+    </LeaderLoadingState>
+  );
 
   const profileDetail = (profile: Doc<'userProfiles'> | null) => {
     if (!profile) return 'Profile unavailable';

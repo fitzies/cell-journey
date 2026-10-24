@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/cell-journey-icon.png",
     "scheme": "cell-journey",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/images/cell-journey-icon.png",
       "bundleIdentifier": "com.ojf.celljourney",

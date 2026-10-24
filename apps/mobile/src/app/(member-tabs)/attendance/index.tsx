@@ -2,7 +2,7 @@ import { useQuery } from 'convex/react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useGroups } from '@/components/group-context';
 import { MemberEmptyState, MemberHistoryRow, MemberScreen, MemberSection } from '@/components/member/ui';
-import { LoadingState } from '@/components/onboarding/ui';
+import { MemberAttendanceSkeleton } from '@/components/screen-skeletons';
 import { fonts, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
 import { api } from '@/lib/api';
 
@@ -12,7 +12,7 @@ export default function MemberAttendanceScreen() {
   const group = selectedMemberGroup?.group ?? null;
   const history = useQuery(api.attendance.historyForGroup, group ? { groupId: group._id, limit: 30 } : 'skip');
 
-  if (context === undefined || !group || history === undefined) return <LoadingState />;
+  if (context === undefined || !group || history === undefined) return <MemberScreen title="Attendance"><MemberAttendanceSkeleton /></MemberScreen>;
 
   const rows = history.rows;
   const rate = history.attendanceRate === null ? '—' : `${Math.round(history.attendanceRate * 100)}%`;

@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { useRef, useState } from 'react';
 import { Link, router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { Alert, Platform, type PressableProps, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Alert, Platform, type PressableProps, Pressable, StyleSheet, Text, View } from 'react-native';
 import { fonts, palettes, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
 import { formatDateParts } from '@/lib/date';
 import { api, type Doc } from '@/lib/api';
@@ -13,8 +13,8 @@ type FeedSummary = { progressFraction?: number; action?: string };
 
 export type AttendanceEventKind = 'open' | 'upcoming' | 'complete' | 'needs';
 
-function attendanceStatusColor(kind: AttendanceEventKind, dark: boolean) {
-  const p = palettes[dark ? 'dark' : 'light'];
+function attendanceStatusColor(kind: AttendanceEventKind) {
+  const p = palettes.light;
   if (kind === 'open') return p.warmInk;
   if (kind === 'upcoming') return p.muted;
   if (kind === 'complete') return p.success;
@@ -133,7 +133,6 @@ export function AttendanceEventCardContent({
 } & Omit<PressableProps, 'children' | 'style'>) {
   const t = useAppTheme();
   const date = formatDateParts(event.startAt);
-  const dark = useColorScheme() === 'dark';
   const time = new Intl.DateTimeFormat('en-SG', { hour: 'numeric', minute: '2-digit' }).format(event.startAt);
   const place = event.venue || event.location || 'Venue TBC';
   return (
@@ -165,13 +164,13 @@ export function AttendanceEventCardContent({
             <Text style={[styles.title, { color: t.ink }]}>{event.title}</Text>
             <Text style={[styles.feedMeta, { color: t.muted }]}>{new Intl.DateTimeFormat('en-SG', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(event.startAt)} · {time}</Text>
             <Text style={[styles.feedMeta, { color: t.muted }]}>{place}</Text>
-            {kind === 'open' ? <Text style={[styles.status, { color: attendanceStatusColor('open', dark) }]}>Happening now</Text> : null}
+            {kind === 'open' ? <Text style={[styles.status, { color: attendanceStatusColor('open') }]}>Happening now</Text> : null}
           </View>
         </View>
         {plannedOnly || kind === 'upcoming' ? <EventDetails event={event} /> : null}
         {!plannedOnly ? <View style={[styles.feedFooter, { borderTopColor: t.line }, kind !== 'open' && kind !== 'needs' && styles.quietFooter]}>
           <View style={styles.copy}>
-            <Text style={[styles.feedStatus, { color: kind === 'needs' || kind === 'open' ? t.muted : attendanceStatusColor(kind, dark) }]}>{kind === 'complete' ? '✓ ' : ''}{status}</Text>
+            <Text style={[styles.feedStatus, { color: kind === 'needs' || kind === 'open' ? t.muted : attendanceStatusColor(kind) }]}>{kind === 'complete' ? '✓ ' : ''}{status}</Text>
 
           </View>
           {feedSummary.action ? <View testID="attendance-progress-action" style={[styles.feedAction, { backgroundColor: t.soft }]}>
@@ -182,7 +181,7 @@ export function AttendanceEventCardContent({
               aria-hidden
               style={[styles.actionProgress, {
                 width: `${feedSummary.progressFraction * 100}%`,
-                backgroundColor: dark ? t.selected : t.secondary,
+                backgroundColor: t.secondary,
               }]}
             /> : null}
             <Text style={[styles.feedActionText, { color: t.ink }]}>{feedSummary.action} →</Text>
@@ -196,7 +195,7 @@ export function AttendanceEventCardContent({
       <View style={styles.copy}>
         <Text style={[styles.title, { color: t.ink }]} numberOfLines={1}>{event.title}</Text>
         <Text style={[styles.meta, { color: t.muted }]} numberOfLines={1}>{time} · {place}</Text>
-        <Text style={[styles.status, { color: attendanceStatusColor(kind, dark) }]} numberOfLines={1}>{status}</Text>
+        <Text style={[styles.status, { color: attendanceStatusColor(kind) }]} numberOfLines={1}>{status}</Text>
       </View>
       <SymbolView
         name={tail === 'down'

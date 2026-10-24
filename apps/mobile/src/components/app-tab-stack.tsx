@@ -1,5 +1,7 @@
-import { Stack } from 'expo-router';
+import { Stack, type NativeStackNavigationOptions } from 'expo-router';
+
+export const tabHeaderOptions: NativeStackNavigationOptions = { headerShown: false, title: '' };
 
 export function AppTabStack() {
-  return <Stack screenOptions={{ headerShown: false, title: '' }} />;
+  return <Stack screenOptions={tabHeaderOptions} />;
 }

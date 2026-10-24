@@ -7,7 +7,7 @@ import { Alert, Platform, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, type AppMode } from '@/components/app-header';
 import { leaderAccessLabel, useGroups } from '@/components/group-context';
-import { LoadingState } from '@/components/onboarding/ui';
+import { ProfileSkeleton } from '@/components/screen-skeletons';
 import { useAppTheme } from '@/constants/tokens';
 import { api, type Id } from '@/lib/api';
 import { getProfileDisplayName } from '@/lib/name';
@@ -39,7 +39,14 @@ export function ProfileScreen({ mode }: { mode: AppMode }) {
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
 
-  if (profile === undefined || services === undefined || groups.context === undefined || details === undefined) return <LoadingState />;
+  if (profile === undefined || services === undefined || groups.context === undefined || details === undefined) {
+    return <SafeAreaView edges={[]} style={[styles.root, { backgroundColor: t.background }]}>
+      <AppHeader title="Profile" mode={mode} />
+      <ScrollView contentInsetAdjustmentBehavior="automatic" showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <ProfileSkeleton />
+      </ScrollView>
+    </SafeAreaView>;
+  }
 
   const entries = leader
     ? groups.ledGroups.map((group) => ({ id: group._id, name: group.name, role: leaderAccessLabel(group.accessRole) }))

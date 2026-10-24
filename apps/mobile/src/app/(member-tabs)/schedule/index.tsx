@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { useGroups } from '@/components/group-context';
 import { MemberEmptyState, MemberEventCard, MemberScreen, MemberSection } from '@/components/member/ui';
-import { LoadingState } from '@/components/onboarding/ui';
+import { MemberScheduleSkeleton } from '@/components/screen-skeletons';
 import { fonts, textStyles, useAppTheme } from '@/constants/tokens';
 import { useMemberUpcomingEvents } from '@/components/member/use-upcoming-events';
 
@@ -11,7 +11,7 @@ export default function MemberScheduleScreen() {
   const group = selectedMemberGroup?.group ?? null;
   const events = useMemberUpcomingEvents(group?._id);
 
-  if (context === undefined || !group || events === undefined) return <LoadingState />;
+  if (context === undefined || !group || events === undefined) return <MemberScreen title="Events"><MemberScheduleSkeleton /></MemberScreen>;
 
   const next = events[0];
   const rest = events.slice(1);

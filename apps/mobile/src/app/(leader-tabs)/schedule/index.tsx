@@ -5,6 +5,7 @@ import { useEventActions } from '@/components/events/event-actions';
 import { EventSection } from '@/components/leader/events-feed';
 import { ActionButton, EmptyState, LeaderScreen } from '@/components/leader/ui';
 import { LeaderConnectionNotice, LeaderLoadError, LeaderLoadingState } from '@/components/leader/query-state';
+import { LeaderEventsSkeleton } from '@/components/screen-skeletons';
 import { LEADER_EVENT_PAGE_SIZE, useLeaderTabEvents } from '@/components/leader/use-tab-events';
 
 export default function LeaderScheduleScreen() {
@@ -16,7 +17,7 @@ function PlannedEvents() {
   const { context, group, results, status, loadMore } = useLeaderTabEvents('upcoming');
   const { eventActions, importModal } = useEventActions(group);
   if (context === undefined || (group && status === 'LoadingFirstPage')) {
-    return <LeaderLoadingState title="Upcoming Events" label="Loading events…" />;
+    return <LeaderLoadingState title="Upcoming Events" eventActions={eventActions}><LeaderEventsSkeleton headings={false} /></LeaderLoadingState>;
   }
   return <LeaderScreen title="Upcoming Events" eventActions={eventActions}>
     <LeaderConnectionNotice />

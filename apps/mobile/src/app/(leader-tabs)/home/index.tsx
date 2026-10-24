@@ -11,6 +11,7 @@ import { AttendanceOverview } from '@/components/leader/attendance-overview';
 import { EmptyState, LeaderScreen } from '@/components/leader/ui';
 import { SolarIcon } from '@/components/solar-tab-icon';
 import { LeaderConnectionNotice, LeaderLoadError, LeaderLoadingState } from '@/components/leader/query-state';
+import { LeaderHomeSkeleton } from '@/components/screen-skeletons';
 import { fonts, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
 import { formatDateParts, formatTimeRange } from '@/lib/date';
 import { api, type Doc } from '@/lib/api';
@@ -54,7 +55,11 @@ export default function LeaderHomeScreen() {
     (group && events === undefined) ||
     (canManageJoinRequests && pending === undefined) ||
     (canManageMembers && members === undefined)
-  ) return <LeaderLoadingState title="Home" label="Loading your group…" />;
+  ) return (
+    <LeaderLoadingState title="Home" contentStyle={styles.pageContent}>
+      <LeaderHomeSkeleton showAttendance={group?.capabilities.readAttendance === true} />
+    </LeaderLoadingState>
+  );
 
   if (!group) {
     return (

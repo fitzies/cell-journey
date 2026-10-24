@@ -1,8 +1,9 @@
 import { useQuery } from 'convex/react';
 import { Component, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { radius, textStyles, useAppTheme } from '@/constants/tokens';
 import { api, type Id } from '@/lib/api';
+import { AttendanceOverviewSkeleton } from '@/components/screen-skeletons';
 import { AttendanceBarChartView } from './attendance-bar-chart';
 import { AttendanceStatCards } from './attendance-stat-cards';
 import { useAttendanceNow } from './attendance-heatmap';
@@ -16,12 +17,7 @@ export function AttendanceOverview({ groupId }: { groupId: Id<'groups'> }) {
 function ConnectedOverview({ groupId }: { groupId: Id<'groups'> }) {
   const now = useAttendanceNow();
   const data = useQuery(api.attendanceHeatmap.forYear, { groupId, now });
-  const t = useAppTheme();
-  if (!data) {
-    return <View style={[styles.placeholder, { backgroundColor: t.surface }]}>
-      <ActivityIndicator color={t.muted} accessibilityLabel="Loading attendance" />
-    </View>;
-  }
+  if (!data) return <AttendanceOverviewSkeleton />;
   return <View style={styles.stack}>
     <AttendanceStatCards summary={data.summary} />
     <AttendanceBarChartView data={data} />
@@ -48,7 +44,6 @@ function OverviewError({ retry }: { retry: () => void }) {
 
 const styles = StyleSheet.create({
   stack: { gap: 12 },
-  placeholder: { minHeight: 280, borderRadius: radius.xl, alignItems: 'center', justifyContent: 'center' },
   error: { padding: 16, borderRadius: radius.xl, gap: 4 },
   retry: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
 });
