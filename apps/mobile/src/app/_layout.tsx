@@ -1,6 +1,6 @@
 import { ConvexAuthProvider } from '@convex-dev/auth/react';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
-import { Platform, StatusBar, Text, useColorScheme, View } from 'react-native';
+import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { Appearance, Platform, StatusBar, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SecureStore from 'expo-secure-store';
 import { useFonts } from 'expo-font';
@@ -34,21 +34,11 @@ const lightNavigationTheme = {
   },
 };
 
-const darkNavigationTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    primary: palettes.dark.accent,
-    background: palettes.dark.background,
-    card: palettes.dark.surface,
-    text: palettes.dark.ink,
-    border: palettes.dark.line,
-    notification: palettes.dark.danger,
-  },
-};
+// Light mode only. app.json sets this for native builds; this also covers
+// native views (menus, pickers, blur) in builds made before that change.
+if (Platform.OS !== 'web') Appearance.setColorScheme('light');
 
 export default function RootLayout() {
-  const scheme = useColorScheme();
   const [fontsLoaded] = useFonts({
     NunitoSans_400Regular,
     NunitoSans_400Regular_Italic,
@@ -67,13 +57,13 @@ export default function RootLayout() {
         <AccountActionsProvider>
         <GroupContextProvider>
           <LeaderNavigationProvider>
-          <ThemeProvider value={scheme === 'dark' ? darkNavigationTheme : lightNavigationTheme}>
+          <ThemeProvider value={lightNavigationTheme}>
             {/* React Native also updates the separate windows used by Android dialogs. */}
-            {Platform.OS === 'android' ? <StatusBar barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'} /> : null}
+            {Platform.OS === 'android' ? <StatusBar barStyle="dark-content" /> : null}
             <Stack screenOptions={{
               headerShown: false,
               // Native Android screens inherit this, including full-screen event modals.
-              statusBarStyle: Platform.OS === 'android' ? (scheme === 'dark' ? 'light' : 'dark') : undefined,
+              statusBarStyle: Platform.OS === 'android' ? 'dark' : undefined,
             }}>
               <Stack.Screen name="index" />
               <Stack.Screen name="create-event" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false }} />

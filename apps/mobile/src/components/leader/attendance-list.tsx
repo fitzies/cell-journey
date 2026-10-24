@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { ActionButton, EmptyState, LeaderScreen } from '@/components/leader/ui';
 import { LeaderConnectionNotice, LeaderLoadingState } from '@/components/leader/query-state';
+import { LeaderAttendanceListSkeleton } from '@/components/screen-skeletons';
 import { LEADER_EVENT_PAGE_SIZE, useLeaderTabEvents } from '@/components/leader/use-tab-events';
 import { fonts, textStyles, useAppTheme } from '@/constants/tokens';
 
@@ -11,7 +12,7 @@ export function LeaderAttendanceList() {
   const t = useAppTheme();
   const { context, group, results, status, loadMore } = useLeaderTabEvents('started');
   if (context === undefined || (group && status === 'LoadingFirstPage')) {
-    return <LeaderLoadingState title="Cell Attendance" label="Loading events…" />;
+    return <LeaderLoadingState title="Cell Attendance"><LeaderAttendanceListSkeleton /></LeaderLoadingState>;
   }
 
   return <LeaderScreen title="Cell Attendance">

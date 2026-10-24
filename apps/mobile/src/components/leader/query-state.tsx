@@ -1,16 +1,19 @@
 import { useConvexConnectionState } from 'convex/react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import type { PropsWithChildren } from 'react';
+import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import type { AppHeaderProps } from '@/components/app-header';
 import { textStyles, useAppTheme } from '@/constants/tokens';
 import { ActionButton, EmptyState, LeaderScreen } from './ui';
 
-export function LeaderLoadingState({ title, label }: { title: string; label: string }) {
-  const t = useAppTheme();
-  const { isWebSocketConnected: online } = useConvexConnectionState();
-  return <LeaderScreen title={title} contentStyle={styles.loadingContent}>
-    <View accessibilityLiveRegion="polite" style={styles.loading}>
-      <ActivityIndicator color={t.muted} accessibilityLabel={label} />
-      <Text style={[textStyles.section, styles.loadingTitle, { color: t.ink }]}>{online ? label : 'Connecting…'}</Text>
-    </View>
+// Keeps the real header in place and shows a skeleton of the screen while data loads.
+export function LeaderLoadingState({ title, eventActions, contentStyle, children }: PropsWithChildren<{
+  title: string;
+  eventActions?: AppHeaderProps['eventActions'];
+  contentStyle?: StyleProp<ViewStyle>;
+}>) {
+  return <LeaderScreen title={title} eventActions={eventActions} contentStyle={contentStyle}>
+    <LeaderConnectionNotice />
+    {children}
   </LeaderScreen>;
 }
 
@@ -31,9 +34,6 @@ export function LeaderLoadError({ title, body, retry }: { title: string; body: s
 }
 
 const styles = StyleSheet.create({
-  loadingContent: { flexGrow: 1, justifyContent: 'center', paddingTop: 24, paddingBottom: 24 },
-  loading: { gap: 14, alignItems: 'center' },
-  loadingTitle: { textAlign: 'center' },
   notice: { marginVertical: 12, lineHeight: 22 },
   retry: { marginTop: 16 },
 });

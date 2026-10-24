@@ -1,6 +1,6 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useState } from 'react';
-import { Button, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useColorScheme, View } from 'react-native';
+import { Button, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts, radius, textStyles, useAppTheme } from '@/constants/tokens';
@@ -26,9 +26,7 @@ export function EventDetailEditor({ field, form, onClose, onApply, earliestStart
   onApply: (patch: Partial<EventForm>) => void;
 }) {
   const t = useAppTheme();
-  const dark = useColorScheme() === 'dark';
   const reduceMotion = useReducedMotion();
-  const buttonColor = Platform.OS === 'android' && dark ? t.accentInk : t.ink;
   const insets = useSafeAreaInsets();
   // An unset date opens the picker on the suggested next gathering; nothing is saved until Apply.
   const [draft, setDraft] = useState(() => form.date ? form : { ...form, date: formatDateInput(Math.max(nextFridayEvening(), earliestStartAt)) });
@@ -54,8 +52,8 @@ export function EventDetailEditor({ field, form, onClose, onApply, earliestStart
       <Pressable accessibilityLabel="Cancel editing" accessibilityRole="button" style={StyleSheet.absoluteFill} onPress={onClose} />
       <View accessibilityViewIsModal style={[styles.sheet, { backgroundColor: t.surface, marginTop: insets.top + 16, marginBottom: Math.max(insets.bottom, 16) }]}>
         <View style={styles.toolbar}>
-          <Button title="Cancel" color={buttonColor} onPress={onClose} />
-          <Button title="Apply" color={buttonColor} onPress={apply} />
+          <Button title="Cancel" color={t.ink} onPress={onClose} />
+          <Button title="Apply" color={t.ink} onPress={apply} />
         </View>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
           <Text accessibilityRole="header" style={[textStyles.title, { color: t.ink }]}>{details.title}</Text>
@@ -72,7 +70,7 @@ export function EventDetailEditor({ field, form, onClose, onApply, earliestStart
                   mode={key === 'date' ? 'date' : 'time'}
                   display="compact"
                   minimumDate={key === 'date' && Number.isFinite(earliestStartAt) ? new Date(earliestStartAt) : undefined}
-                  themeVariant={dark ? 'dark' : 'light'}
+                  themeVariant="light"
                   onChange={(event, selected) => { if (event.type !== 'dismissed' && selected) changeDate(key, selected); }}
                 /> : Platform.OS === 'android' ? <Pressable accessibilityRole="button" accessibilityLabel={`Change ${label}`} onPress={() => setPicker(key)} style={styles.pickerButton}>
                   <Text style={[textStyles.button, { color: t.ink }]}>{key === 'date' ? formatReadableDate(draft.date) : formatReadableTime(draft[key])}</Text>

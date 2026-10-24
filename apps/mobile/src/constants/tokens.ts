@@ -1,6 +1,6 @@
 import { PREVIEW_SHARED_THEME } from './theme-preview';
 import { mobileTheme, mobileThemeFonts } from '@cell-journey/theme/mobile';
-import { Platform, StyleSheet, useColorScheme, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, type ViewStyle } from 'react-native';
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const;
 export const radius = { sm: 12, md: 16, lg: 18, xl: 18, pill: 999 } as const;
@@ -127,8 +127,9 @@ const previewPalettes = {
 
 export const palettes = __DEV__ && PREVIEW_SHARED_THEME ? previewPalettes : originalPalettes;
 
+// The app is light mode only, whatever the device setting.
 export function useAppTheme() {
-  return palettes[useColorScheme() === 'dark' ? 'dark' : 'light'];
+  return palettes.light;
 }
 
 export type AppTheme = (typeof palettes)[keyof typeof palettes];

@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MemberChevron, MemberEmptyState, MemberEventCard, MemberHistoryRow, MemberScreen, MemberSection } from '@/components/member/ui';
 import { useGroups } from '@/components/group-context';
-import { LoadingState } from '@/components/onboarding/ui';
+import { MemberHomeSkeleton } from '@/components/screen-skeletons';
 import { fonts, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
 import { api } from '@/lib/api';
 import { useMemberUpcomingEvents } from '@/components/member/use-upcoming-events';
@@ -15,7 +15,7 @@ export default function MemberHomeScreen() {
   const events = useMemberUpcomingEvents(group?._id);
   const attendance = useQuery(api.attendance.historyForGroup, group ? { groupId: group._id, limit: 3 } : 'skip');
 
-  if (context === undefined || !group || events === undefined || attendance === undefined) return <LoadingState />;
+  if (context === undefined || !group || events === undefined || attendance === undefined) return <MemberScreen title="Home"><MemberHomeSkeleton /></MemberScreen>;
 
   const next = events[0];
   const rate = attendance.attendanceRate === null ? '—' : `${Math.round(attendance.attendanceRate * 100)}%`;

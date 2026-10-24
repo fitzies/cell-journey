@@ -1,16 +1,15 @@
 import { useConvexAuth, useQuery } from 'convex/react';
 import { Redirect } from 'expo-router';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { DynamicColorIOS } from 'react-native';
 import { useGroups } from '@/components/group-context';
 import { useLeaderEventsLayout } from '@/components/leader-navigation-context';
 import { LoadingState } from '@/components/onboarding/ui';
 import { palettes } from '@/constants/tokens';
 import { api } from '@/lib/api';
 
-const nativeTint = DynamicColorIOS({ light: palettes.light.primary, dark: palettes.dark.primary });
-const nativeMuted = DynamicColorIOS({ light: palettes.light.muted, dark: palettes.dark.muted });
-const nativeLine = DynamicColorIOS({ light: palettes.light.line, dark: palettes.dark.line });
+const nativeTint = palettes.light.primary;
+const nativeMuted = palettes.light.muted;
+const nativeLine = palettes.light.line;
 const nativeIcons = {
   profile: require('../../../assets/images/solar-tabs/profile.png'),
   home: require('../../../assets/images/solar-tabs/home.png'),

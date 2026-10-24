@@ -6,7 +6,8 @@ import { useEventActions } from '@/components/events/event-actions';
 import { useGroups } from '@/components/group-context';
 import { AttendanceEventCard, type AttendanceEventKind } from '@/components/leader/attendance-event-card';
 import { EmptyState, LeaderScreen } from '@/components/leader/ui';
-import { LoadingState } from '@/components/onboarding/ui';
+import { LeaderLoadingState } from '@/components/leader/query-state';
+import { LeaderEventsSkeleton } from '@/components/screen-skeletons';
 import { fonts, textStyles, useAppTheme } from '@/constants/tokens';
 import { api, type Doc } from '@/lib/api';
 
@@ -65,7 +66,9 @@ export default function LeaderEventsScreen() {
     return () => clearTimeout(timer);
   }, [nearestBoundary]);
 
-  if (context === undefined || (group && (worklist === undefined || upcoming === undefined || completed === undefined))) return <LoadingState />;
+  if (context === undefined || (group && (worklist === undefined || upcoming === undefined || completed === undefined))) {
+    return <LeaderLoadingState title="Upcoming Events" eventActions={eventActions} contentStyle={styles.pageContent}><LeaderEventsSkeleton /></LeaderLoadingState>;
+  }
 
   if (!group) {
     return (

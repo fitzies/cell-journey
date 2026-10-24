@@ -2,7 +2,7 @@ import { useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
 import { Component, useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
-import { fonts, palettes, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
+import { fonts, radius, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
 import { api, type Id } from '@/lib/api';
 
 export type HeatmapData = FunctionReturnType<typeof api.attendanceHeatmap.forGroup>;
@@ -53,7 +53,7 @@ const weekdayLabels = [
 
 export function AttendanceHeatmapChart({ data }: { data: HeatmapData }) {
   const t = useAppTheme();
-  const greens = t === palettes.dark ? scale.dark : scale.light;
+  const greens = scale.light;
   const [width, setWidth] = useState(0);
   const offset = (new Date(data.days[0].startAt + 8 * 3_600_000).getUTCDay() + 6) % 7;
   const daysPerRow = 14;
