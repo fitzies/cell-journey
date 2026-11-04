@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { useGroups } from '@/components/group-context';
+import { EventCalendar } from '@/components/member/event-calendar';
 import { MemberEmptyState, MemberEventCard, MemberScreen, MemberSection } from '@/components/member/ui';
 import { MemberScheduleSkeleton } from '@/components/screen-skeletons';
 import { fonts, textStyles, useAppTheme } from '@/constants/tokens';
@@ -18,6 +19,7 @@ export default function MemberScheduleScreen() {
 
   return (
     <MemberScreen title="Events">
+      <EventCalendar events={events} />
       {next ? (
         <>
           <View style={styles.overview}>

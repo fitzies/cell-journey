@@ -151,7 +151,7 @@ function ContextMenuButton({ mode }: { mode: AppMode }) {
               </Pressable>
             );
           })}
-          {groups.ledGroups.length ? <Text style={[styles.menuLabel, { color: t.muted }]}>Leader</Text> : null}
+          {groups.ledGroups.length ? <Text style={[styles.menuLabel, { color: t.muted }]}>Leader roles</Text> : null}
           {groups.ledGroups.map((group) => {
             const selected = mode === 'leader' && group._id === groups.selectedLeaderGroupId;
             return (

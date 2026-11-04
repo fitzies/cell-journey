@@ -104,7 +104,7 @@ function ContextToolbar({ mode, eventActions, membersOptions }: Pick<AppHeaderPr
           </Stack.Toolbar.Menu>
         ) : null}
         {groups.ledGroups.length ? (
-          <Stack.Toolbar.Menu inline title="Leader">
+          <Stack.Toolbar.Menu inline title="Leader roles">
             {groups.ledGroups.map((group) => (
               <Stack.Toolbar.MenuAction
                 key={`leader:${group._id}`}
