@@ -1,7 +1,14 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { leaderEventsLayoutValidator, postalDistrictCodeValidator } from "./validators";
+import {
+  groupDemographicValidator,
+  groupFrequencyValidator,
+  groupLanguageValidator,
+  leaderEventsLayoutValidator,
+  postalDistrictCodeValidator,
+  sexValidator,
+} from "./validators";
 
 const role = v.union(v.literal("member"), v.literal("leader"));
 const onboardingStatus = v.union(
@@ -102,6 +109,11 @@ export default defineSchema({
     postalDistrict: v.optional(postalDistrictCodeValidator),
     serviceIds: v.array(v.id("services")),
 
+    // Optional personal details. Date is YYYY-MM-DD; phone is E.164 (+65XXXXXXXX).
+    dateOfBirth: v.optional(v.string()),
+    sex: v.optional(sexValidator),
+    phone: v.optional(v.string()),
+
     currentGroupId: v.optional(v.id("groups")),
     activeMembershipId: v.optional(v.id("memberships")),
     leaderGroupId: v.optional(v.id("groups")),
@@ -133,22 +145,46 @@ export default defineSchema({
     code: v.string(),
     leaderProfileId: v.optional(v.id("userProfiles")),
     isActive: v.boolean(),
+    regionId: v.optional(v.id("regions")),
+    languages: v.optional(v.array(groupLanguageValidator)),
+    frequency: v.optional(groupFrequencyValidator),
+    demographic: v.optional(groupDemographicValidator),
+    // Free text the group uses to describe where it meets.
+    location: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_code", ["code"])
     .index("by_leader", ["leaderProfileId"])
-    .index("by_active", ["isActive"]),
+    .index("by_active", ["isActive"])
+    .index("by_region", ["regionId"]),
+
+  regions: defineTable({
+    name: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_name", ["name"]),
+
+  // Regional leaders see and manage every group in their regions on the dashboard.
+  regionalLeaderAssignments: defineTable({
+    regionId: v.id("regions"),
+    profileId: v.id("userProfiles"),
+    assignedAt: v.number(),
+    assignedByUserId: v.optional(v.id("users")),
+  })
+    .index("by_region", ["regionId"])
+    .index("by_profile", ["profileId"])
+    .index("by_profile_and_region", ["profileId", "regionId"]),
 
   coLeaderAssignments: defineTable({
     groupId: v.id("groups"),
     profileId: v.id("userProfiles"),
     status: coLeaderAssignmentStatus,
     assignedAt: v.number(),
-    assignedByKind: v.union(v.literal("admin"), v.literal("developer")),
+    assignedByKind: v.union(v.literal("admin"), v.literal("developer"), v.literal("regionalLeader")),
     assignedByUserId: v.optional(v.id("users")),
     revokedAt: v.optional(v.number()),
-    revokedByKind: v.optional(v.union(v.literal("admin"), v.literal("developer"))),
+    revokedByKind: v.optional(v.union(v.literal("admin"), v.literal("developer"), v.literal("regionalLeader"))),
     revokedByUserId: v.optional(v.id("users")),
     revocationReason: v.optional(v.string()),
     createdAt: v.number(),
@@ -226,11 +262,14 @@ export default defineSchema({
     cancelledAt: v.optional(v.number()),
     cancelledByProfileId: v.optional(v.id("userProfiles")),
     cancellationReason: v.optional(v.string()),
+    // Set once the 3-hours-after-end attendance reminder check has run.
+    attendanceReminderCheckedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_group_start", ["groupId", "startAt"])
-    .index("by_group_cancelled_start", ["groupId", "cancelledAt", "startAt"]),
+    .index("by_group_cancelled_start", ["groupId", "cancelledAt", "startAt"])
+    .index("by_attendanceReminderCheckedAt_and_endAt", ["attendanceReminderCheckedAt", "endAt"]),
 
   attendance: defineTable({
     eventId: v.id("events"),

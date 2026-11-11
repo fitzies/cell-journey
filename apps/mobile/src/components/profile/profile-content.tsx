@@ -1,9 +1,11 @@
+import { formatDateOfBirth, formatSingaporePhone, sexLabels, type Sex } from '@cell-journey/domain';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { radius, spacing, surfaceShadow, textStyles, useAppTheme } from '@/constants/tokens';
 import type { ProfileField } from './profile-field-model';
+import type { PersonalDetailField } from '@/components/personal-details-fields';
 import { ProfileServicesMenu, type ProfileServicesMenuProps } from './profile-services-menu';
 import { ProfileGroupMenu, type ProfileGroupMenuProps } from './profile-group-menu';
 
@@ -28,6 +30,10 @@ export type ProfileContentProps = {
   busy: boolean;
   canEdit: boolean;
   onEdit: (field: ProfileField) => void;
+  personalDetails: PersonalDetails;
+  onEditPersonal: (field: PersonalDetailField) => void;
+  /** Leader mode: the selected group's details row. */
+  groupDetails?: { summary: string; onPress: () => void };
   serviceMenu: Omit<ProfileServicesMenuProps, 'children' | 'disabled'>;
   groupMenu: Omit<ProfileGroupMenuProps, 'children' | 'disabled'>;
   onGroups: () => void;
@@ -36,7 +42,13 @@ export type ProfileContentProps = {
   onSignOut: () => void;
 };
 
+export type PersonalDetails = { dateOfBirth: string | null; sex: Sex | null; phone: string | null };
+
 const icons = {
+  dateOfBirth: { ios: 'gift', android: 'cake', web: 'cake' },
+  sex: { ios: 'person.text.rectangle', android: 'badge', web: 'badge' },
+  phone: { ios: 'phone', android: 'call', web: 'call' },
+  groupDetails: { ios: 'info.circle', android: 'info_outline', web: 'info_outline' },
   name: { ios: 'person', android: 'person_outline', web: 'person_outline' },
   photo: { ios: 'photo', android: 'photo', web: 'photo' },
   services: { ios: 'calendar', android: 'calendar_today', web: 'calendar_today' },
@@ -86,6 +98,24 @@ export function ProfileEmailRow({ email }: { email: string | null }) {
     } : undefined} />;
 }
 
+export function ProfilePhoneRow({ phone, divider = true, onEdit, disabled }: { phone: string | null; divider?: boolean; onEdit?: () => void; disabled?: boolean }) {
+  const display = formatSingaporePhone(phone);
+  if (onEdit) return <ProfileRow icon={icons.phone} title="Phone" detail={display ?? 'Not set'} disabled={disabled} onPress={onEdit} divider={divider} />;
+  return <ProfileRow icon={icons.phone} title="Phone" detail={display ?? 'Not set'} divider={divider}
+    actionIcon={{ ios: 'arrow.up.right', android: 'open_in_new', web: 'open_in_new' }}
+    onPress={phone ? () => {
+      void Linking.openURL(`tel:${phone}`).catch(() => Alert.alert('Couldn’t start a call', 'This device can’t make phone calls.'));
+    } : undefined} />;
+}
+
+/** Read-only date of birth and sex rows. */
+export function PersonalDetailRows({ details, divider = true }: { details: PersonalDetails; divider?: boolean }) {
+  return <>
+    <ProfileRow icon={icons.dateOfBirth} title="Date of birth" detail={formatDateOfBirth(details.dateOfBirth) ?? 'Not set'} />
+    <ProfileRow icon={icons.sex} title="Sex" detail={details.sex ? sexLabels[details.sex] : 'Not set'} divider={divider} />
+  </>;
+}
+
 type ProfileGroupSummaryData = {
   joinedAt: number;
   attendanceRate: number | null;
@@ -124,7 +154,7 @@ export function ProfileIdentity({ displayName, photoUrl, subtitle }: { displayNa
 export function ProfileContent({
   displayName, fullName = displayName, email, groupSummary, photoUrl, uploadingPhoto, onPhoto, onDeleteAccount, roleLabel, serviceNames, locationTitle, locationSubtitle,
   groupName, groupRoleLabel, groupCount, mode, pendingCount, busy, canEdit,
-  onEdit, serviceMenu, groupMenu, onGroups, onJoin, onPending, onSignOut,
+  onEdit, personalDetails, onEditPersonal, groupDetails, serviceMenu, groupMenu, onGroups, onJoin, onPending, onSignOut,
 }: ProfileContentProps) {
   const t = useAppTheme();
   const [section, setSection] = useState<'details' | 'groups'>('details');
@@ -153,7 +183,10 @@ export function ProfileContent({
       <ProfileServicesMenu {...serviceMenu} disabled={editDisabled}>
         <ProfileRow icon={icons.services} title="Services" detail={serviceNames.join(', ') || 'Not set'} disabled={editDisabled} onPress={() => onEdit('services')} />
       </ProfileServicesMenu>
-      <ProfileRow icon={icons.location} title="Postal district" detail={`${locationSubtitle} · ${locationTitle}`} disabled={editDisabled} onPress={() => onEdit('postal')} divider={false} />
+      <ProfileRow icon={icons.location} title="Postal district" detail={`${locationSubtitle} · ${locationTitle}`} disabled={editDisabled} onPress={() => onEdit('postal')} />
+      <ProfileRow icon={icons.dateOfBirth} title="Date of birth" detail={formatDateOfBirth(personalDetails.dateOfBirth) ?? 'Not set'} disabled={editDisabled} onPress={() => onEditPersonal('dateOfBirth')} />
+      <ProfileRow icon={icons.sex} title="Sex" detail={personalDetails.sex ? sexLabels[personalDetails.sex] : 'Not set'} disabled={editDisabled} onPress={() => onEditPersonal('sex')} />
+      <ProfilePhoneRow phone={personalDetails.phone} disabled={editDisabled} onEdit={() => onEditPersonal('phone')} divider={false} />
       {groupName && groupSummary ? <ProfileGroupSummary summary={groupSummary} /> : null}
       <View style={styles.signOut}><ProfileRow icon={icons.signOut} title="Sign out" disabled={busy} onPress={onSignOut} divider={false} destructive /></View>
       <ProfileRow icon={icons.deleteAccount} title="Delete account" disabled={busy} onPress={onDeleteAccount} divider={false} />
@@ -170,6 +203,7 @@ export function ProfileContent({
           <Text style={[textStyles.body, styles.flex, { color: t.muted }]}>{groupCountLabel}</Text>
         </View>
       </View>
+      {groupDetails ? <ProfileRow icon={icons.groupDetails} title="Group details" detail={groupDetails.summary} disabled={busy} onPress={groupDetails.onPress} /> : null}
       <ProfileGroupMenu {...groupMenu} disabled={busy}>
         <ProfileRow icon={icons.groups} title="Switch group or mode" disabled={busy} onPress={onGroups} />
       </ProfileGroupMenu>

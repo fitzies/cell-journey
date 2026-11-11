@@ -1,5 +1,6 @@
 "use client";
 
+import { formatSingaporePhone } from "@cell-journey/domain";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo } from "react";
 
@@ -7,14 +8,19 @@ import { DataTable, DataTableColumnHeader } from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { api } from "@/lib/api";
+import { Progress } from "@/components/ui/progress";
 
+import { useDashboardRole } from "./access-context";
 import { ProfileAvatar } from "./profile-avatar";
 import { PanelLoading, SearchInput } from "./panel-ui";
 import { PeopleManagementControls } from "./people-management-controls";
 import { DeleteUserDialog } from "./delete-user-dialog";
 import { profileDisplayName } from "./profile-display-name";
-import type { GroupRow, UserRow } from "./types";
+import type { GroupRow, PersonAttendance, UserRow } from "./types";
+
+function attendanceRate(stats: PersonAttendance | undefined) {
+  return stats && stats.expected > 0 ? stats.present / stats.expected : null;
+}
 
 export function PeoplePanel({
   search,
@@ -22,19 +28,54 @@ export function PeoplePanel({
   users,
   groups,
   loading,
+  attendance,
+  attendanceLoading,
+  periodLabel,
 }: {
   search: string;
   setSearch: (value: string) => void;
   users: UserRow[];
   groups: GroupRow[] | undefined;
   loading: boolean;
+  attendance: Map<string, PersonAttendance>;
+  attendanceLoading: boolean;
+  periodLabel: string;
 }) {
+  const { isAdmin } = useDashboardRole();
   const columns = useMemo<ColumnDef<UserRow>[]>(() => [
     {
       accessorFn: (row) => profileDisplayName(row.profile, row.displayName),
       id: "user",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Person" />,
       cell: ({ row }) => <PersonIdentity row={row.original} />,
+    },
+    {
+      accessorFn: (row) => attendanceRate(attendance.get(row.profile._id)) ?? -1,
+      id: "attendance",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Attendance" />,
+      cell: ({ row }) => {
+        if (attendanceLoading) return <span className="text-xs text-muted-foreground" role="status">Loading…</span>;
+        const stats = attendance.get(row.original.profile._id);
+        const rate = attendanceRate(stats);
+        if (!stats || rate === null) {
+          return (
+            <div className="min-w-32">
+              <span className="text-muted-foreground">—</span>
+              <p className="text-xs text-muted-foreground">No events</p>
+            </div>
+          );
+        }
+        const name = profileDisplayName(row.original.profile, row.original.displayName);
+        return (
+          <div className="min-w-32 space-y-2" title={`${stats.present} of ${stats.expected} events in the ${periodLabel}`}>
+            <div className="flex items-center justify-between gap-4 tabular-nums">
+              <span className="font-medium">{Math.round(rate * 100)}%</span>
+              <span className="text-xs text-muted-foreground">{stats.present}/{stats.expected}</span>
+            </div>
+            <Progress value={rate * 100} aria-label={`${name} attendance`} />
+          </div>
+        );
+      },
     },
     {
       accessorKey: "accountStatus",
@@ -58,7 +99,15 @@ export function PeoplePanel({
             {row.original.memberGroups.length ? <Badge variant="secondary">Member</Badge> : null}
             {primaryGroups.length ? <Badge className="border-transparent bg-primary/15 text-primary">Primary leader</Badge> : null}
             {coLeaderGroups.length ? <Badge variant="outline" className="text-muted-foreground">Co-leader</Badge> : null}
-            {!row.original.memberGroups.length && !row.original.ledGroups.length ? <span className="text-muted-foreground">None</span> : null}
+            {row.original.regionalRegions.length ? (
+              <Badge
+                className="border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                title={row.original.regionalRegions.map((region) => region.name).join(", ")}
+              >
+                Regional leader
+              </Badge>
+            ) : null}
+            {!row.original.memberGroups.length && !row.original.ledGroups.length && !row.original.regionalRegions.length ? <span className="text-muted-foreground">None</span> : null}
           </div>
         );
       },
@@ -92,10 +141,10 @@ export function PeoplePanel({
       header: () => <span className="sr-only">Actions</span>,
       cell: ({ row }) => <div className="flex justify-end gap-2">
         <PeopleManagementControls person={row.original} groups={groups ?? []} />
-        <DeleteUserDialog person={row.original} />
+        {isAdmin ? <DeleteUserDialog person={row.original} /> : null}
       </div>,
     },
-  ], [groups]);
+  ], [groups, attendance, attendanceLoading, periodLabel, isAdmin]);
 
   return (
     <Card>
@@ -122,6 +171,9 @@ function PersonIdentity({ row }: { row: UserRow }) {
       <div className="min-w-0">
         <p className="truncate font-medium">{name}</p>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">{row.user.email ?? "No email"}</p>
+        {row.profile.phone ? (
+          <p className="mt-0.5 truncate text-xs tabular-nums text-muted-foreground">{formatSingaporePhone(row.profile.phone)}</p>
+        ) : null}
       </div>
     </div>
   );

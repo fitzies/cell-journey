@@ -10,7 +10,7 @@ import type { MembersOptions } from './leader/members/types';
 import type { AppHeaderProps, AppMode } from './app-header.types';
 export type { AppHeaderProps, AppMode } from './app-header.types';
 
-export function AppHeader({ title, mode, eventActions, membersOptions }: AppHeaderProps) {
+export function AppHeader({ title, mode, eventActions, membersOptions, memberActions }: AppHeaderProps) {
   const t = useAppTheme();
 
   return (
@@ -27,12 +27,29 @@ export function AppHeader({ title, mode, eventActions, membersOptions }: AppHead
         headerRight: () => (
           <View style={styles.actions}>
             {eventActions?.onCreate || eventActions?.onImport ? <EventMenuButton actions={eventActions} /> : null}
+            {memberActions ? <AddMemberButton actions={memberActions} /> : null}
             {membersOptions ? <MembersMenuButton options={membersOptions} /> : null}
             <ContextMenuButton mode={mode} />
           </View>
         ),
       }}
     />
+  );
+}
+
+function AddMemberButton({ actions }: { actions: NonNullable<AppHeaderProps['memberActions']> }) {
+  const t = useAppTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Add member"
+      accessibilityState={{ disabled: actions.disabled }}
+      disabled={actions.disabled}
+      onPress={actions.onAdd}
+      style={[styles.iconButton, { opacity: actions.disabled ? 0.45 : 1 }]}
+    >
+      <Text style={{ color: t.ink, fontSize: 26 }}>+</Text>
+    </Pressable>
   );
 }
 

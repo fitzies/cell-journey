@@ -7,6 +7,8 @@ export type AppHeaderProps = {
   mode: AppMode;
   profile?: boolean;
   membersOptions?: MembersOptions;
+  /** Group leaders only: adds a person to the roster by email. */
+  memberActions?: { onAdd: () => void; disabled?: boolean };
   eventActions?: {
     onCreate?: () => void;
     onImport?: () => void;

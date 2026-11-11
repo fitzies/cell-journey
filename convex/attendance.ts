@@ -112,7 +112,8 @@ export async function completionForEvents(
   const complete = new Map<Id<"events">, boolean>();
   const present = new Map<Id<"events">, number>();
   const requiredTotal = new Map<Id<"events">, number>();
-  if (!events.length) return { complete, present, requiredTotal };
+  const marked = new Map<Id<"events">, number>();
+  if (!events.length) return { complete, present, requiredTotal, marked };
   const activity = await loadGroupMembershipActivity(ctx, groupId);
   const existingProfiles = new Set<Id<"userProfiles">>();
   for (const profileId of new Set(activity.memberships.map((membership) => membership.profileId))) {
@@ -126,8 +127,9 @@ export async function completionForEvents(
     complete.set(event._id, required.every((profileId) => effectiveStatus(byProfile.get(profileId)) !== null));
     present.set(event._id, required.filter((profileId) => effectiveStatus(byProfile.get(profileId)) === "present").length);
     requiredTotal.set(event._id, required.length);
+    marked.set(event._id, required.filter((profileId) => effectiveStatus(byProfile.get(profileId)) !== null).length);
   }
-  return { complete, present, requiredTotal };
+  return { complete, present, requiredTotal, marked };
 }
 
 async function rosterForEvent(

@@ -3,7 +3,8 @@ import { useMutation, useQuery } from 'convex/react';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
-import { LoadingState, OnboardingShell, OptionPill } from '@/components/onboarding/ui';
+import { LoadingState, OnboardingShell, OptionPill, PrimaryButton } from '@/components/onboarding/ui';
+import { PersonalDetailsFields, personalDetailsFromProfile, personalDetailsPayload, type PersonalDetailsValues } from '@/components/personal-details-fields';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
 import { api, Id } from '@/lib/api';
 
@@ -12,11 +13,13 @@ export default function ProfileScreen() {
   const profile = useQuery(api.profiles.current, {});
   const services = useQuery(api.groups.listServices, {});
   const update = useMutation(api.profiles.updateOnboardingProfileV3);
+  const updatePersonalDetails = useMutation(api.profiles.updatePersonalDetails);
   const [step, setStep] = useState(0);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [postalSector, setPostalSector] = useState('');
   const [selected, setSelected] = useState<Id<'services'>[]>([]);
+  const [details, setDetails] = useState<PersonalDetailsValues>(personalDetailsFromProfile(null));
   const [saving, setSaving] = useState(false);
   const hydratedProfileId = useRef<string | null>(null);
   const lastNameInput = useRef<TextInput>(null);
@@ -27,14 +30,34 @@ export default function ProfileScreen() {
     setFirstName(profile.firstName ?? '');
     setLastName(profile.lastName ?? '');
     setSelected(profile.serviceIds);
+    // A leader may have entered these when adding the person.
+    setDetails(personalDetailsFromProfile(profile));
   }, [profile]);
 
   if (profile === undefined || services === undefined) return <LoadingState />;
 
   const rows = services ?? [];
+  const finish = () => router.replace('/(onboarding)');
+  const saveDetails = async () => {
+    const payload = personalDetailsPayload(details);
+    if (!payload.ok) return;
+    setSaving(true);
+    try {
+      await updatePersonalDetails(payload.value);
+      finish();
+    } catch (err) {
+      Alert.alert('Could not save your details', err instanceof Error ? err.message : 'Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
   const next = async () => {
     if (step < 2) {
       setStep(step + 1);
+      return;
+    }
+    if (step === 3) {
+      await saveDetails();
       return;
     }
     const district = getPostalDistrictFromSector(postalSector);
@@ -48,7 +71,8 @@ export default function ProfileScreen() {
         postalSector,
         serviceIds: selected,
       });
-      router.replace('/(onboarding)');
+      // The required profile is saved; the extra details step is optional.
+      setStep(3);
     } catch (err) {
       Alert.alert('Could not save your profile', err instanceof Error ? err.message : 'Please try again.');
     } finally {
@@ -58,8 +82,10 @@ export default function ProfileScreen() {
   const back = () => setStep(step - 1);
   const hasName = Boolean(firstName.trim() && lastName.trim());
   const district = getPostalDistrictFromSector(postalSector);
-  const disabled = (step === 0 && !hasName) || (step === 1 && selected.length === 0) || (step === 2 && !district) || saving;
-  const common = { onBack: step > 0 ? back : undefined, fullWidthProgress: step === 0, onCta: next, cta: saving ? 'Saving…' : 'Continue', ctaDisabled: disabled, progress: (step + 1) / 6, animationKey: step };
+  const detailsPayload = personalDetailsPayload(details);
+  const hasDetails = Boolean(details.dateOfBirth || details.sex || details.phone.trim());
+  const disabled = (step === 0 && !hasName) || (step === 1 && selected.length === 0) || (step === 2 && !district) || (step === 3 && !detailsPayload.ok) || saving;
+  const common = { onBack: step > 0 && step < 3 ? back : undefined, fullWidthProgress: step === 0, onCta: next, cta: saving ? 'Saving…' : 'Continue', ctaDisabled: disabled, progress: (step + 1) / 6, animationKey: step };
 
   if (step === 0) {
     return (
@@ -101,6 +127,21 @@ export default function ProfileScreen() {
             />
           </View>
         </View>
+      </OnboardingShell>
+    );
+  }
+  if (step === 3) {
+    return (
+      <OnboardingShell
+        {...common}
+        title="A few more details"
+        hint="Optional. These help your leader keep in touch. You can add or change them later in Profile."
+        footer={<View style={styles.detailActions}>
+          <PrimaryButton label={saving ? 'Saving…' : hasDetails ? 'Save and continue' : 'Continue'} disabled={disabled} onPress={() => { if (hasDetails) void saveDetails(); else finish(); }} />
+          <PrimaryButton ghost arrow={false} label="Skip for now" disabled={saving} onPress={finish} />
+        </View>}
+      >
+        <PersonalDetailsFields tone="onboarding" values={details} onChange={setDetails} disabled={saving} />
       </OnboardingShell>
     );
   }
@@ -168,5 +209,6 @@ const styles = StyleSheet.create({
   districtEyebrow: { fontFamily: fonts.bodyBold, fontSize: 10.5, letterSpacing: 1.5, textTransform: 'uppercase' },
   districtTitle: { marginTop: 7, fontFamily: fonts.display, fontSize: 25, letterSpacing: -0.5 },
   districtArea: { marginTop: 5, fontFamily: fonts.body, fontSize: 14.5, lineHeight: 21 },
+  detailActions: { gap: 10 },
   postalError: { fontFamily: fonts.bodySemiBold, fontSize: 13.5, lineHeight: 19 },
 });

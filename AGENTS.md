@@ -49,6 +49,11 @@ cell-journey/
 - Historical records must remain intact when users leave or are removed from groups.
 - Leaders can classify a connected person as Active, Inactive, or Visitor. Visitors retain active membership access and attendance eligibility, appear in their own markable event section, and appear in the Visitors section of Members. The optional `memberships.memberClass` field stores `visitor`; membership lifecycle status and activity periods retain their existing meaning.
 
+### Admin dashboard roles
+
+- Admins are listed in the `ADMIN_EMAILS` Convex env var and see everything.
+- Regional leaders are profiles assigned to a region (`regionalLeaderAssignments`). Admins create regions, put groups in them and assign regional leaders on the dashboard's Regions tab. Regional leaders sign in to the same dashboard (Google or email code) and get admin tools for the groups in their regions only. Services, regions, account deletion and legacy single-group calls stay admin-only. Access checks live in `convex/dashboardAccess.ts`.
+
 ## Authentication
 
 Use **Convex Auth** with:
@@ -103,6 +108,12 @@ Required for MVP:
   - Use the static URA/SingPost postal-sector mapping. Do not call an external API.
   - Show the matched district and general area before the user continues.
 - Group code for member onboarding
+
+Optional: date of birth, sex (Male/Female) and phone (Singapore, stored as `+65XXXXXXXX`). New users see them as a skippable onboarding step; existing users are not prompted. Everyone can edit them in Profile. The member's leaders, regional leaders and admins can see them.
+
+Cell groups also have optional details: languages, meeting frequency, demographic (Singles/Couples/Mixed) and a free-text location. Group owners edit them in the app; admins and regional leaders edit them on the dashboard.
+
+Group owners can add a member by email from the Members tab. The person joins the group immediately and gets an email; a new person claims the invited profile by signing in with that email.
 
 Preferred name is not part of onboarding for now. It may be added later as an editable profile field.
 
@@ -235,6 +246,7 @@ Push notifications are in MVP:
 
 - Notify leaders when join requests are submitted.
 - Notify members about upcoming events.
+- Attendance reminders (built): every 10 minutes a cron (`convex/crons.ts`) checks events that ended at least 3 hours ago (and no more than 27 hours ago). If any expected member is still unmarked, the owner and every co-leader get one Expo push notification. Tapping it opens that event's attendance screen. Each event is checked once; moving its end time resets the check.
 
 Use online-first behavior. No offline write queue for MVP. Provide clear loading, error, and retry states.
 

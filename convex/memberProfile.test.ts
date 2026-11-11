@@ -27,7 +27,7 @@ test.each(["active", "inactive"] as const)("owner can view a %s member's display
     groupSummary: { joinedAt: expect.any(Number), attendanceRate: null, presentEvents: 0, totalPastEvents: 0 },
     profile: {
       firstName: "Sarah", lastName: "Test", preferredName: "Sarah", fullName: "Sarah Test",
-      postalDistrict: "D18", singaporeRegion: "central",
+      postalDistrict: "D18", singaporeRegion: "central", dateOfBirth: null, sex: null, phone: null,
       photoUrl: await t.run(ctx => ctx.storage.getUrl(storageId)),
     },
   });

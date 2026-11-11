@@ -14,6 +14,7 @@ process.env.NEXT_PUBLIC_CONVEX_URL ??= process.env.CONVEX_URL;
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["forge"],
   reactCompiler: true,
+  transpilePackages: ["@cell-journey/domain"],
 };
 
 export default nextConfig;

@@ -6,6 +6,7 @@ import { useConvexAuth, useMutation, usePaginatedQuery, useQuery } from "convex/
 import {
   ArrowDownRight,
   ArrowUpRight,
+  ChevronRight,
   CircleAlert,
   LogOut,
   Minus,
@@ -16,16 +17,30 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
+import { DashboardRoleProvider, useDashboardRole, type DashboardRole } from "@/components/admin/access-context";
 import { CreateUserDialog } from "@/components/admin/create-user-dialog";
+import { EmailSignIn } from "@/components/admin/email-sign-in";
+import {
+  GroupDetailsFields,
+  GroupDetailsSummary,
+  groupDetailsArgs,
+  initialGroupDetails,
+  useRegionOptions,
+  type GroupDetailsValue,
+} from "@/components/admin/group-form-fields";
+import { MemberAttendanceDialog } from "@/components/admin/member-attendance-dialog";
 import { GroupLeadershipControls } from "@/components/admin/group-leadership-controls";
 import { PanelLoading, SearchInput } from "@/components/admin/panel-ui";
 import { PeoplePanel } from "@/components/admin/people-panel";
+import { RegionsPanel } from "@/components/admin/regions-panel";
 import { ProfileAvatar } from "@/components/admin/profile-avatar";
 import { profileDisplayName } from "@/components/admin/profile-display-name";
 import { CreateServiceDialog, ServicesPanel } from "@/components/admin/services-panel";
 import type {
   AttendanceRow,
+  DashboardMe,
   GroupRow,
+  PersonAttendance,
   RequestRow,
   RequestRows,
   UserRow,
@@ -61,11 +76,14 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api } from "@/lib/api";
+import { api, type Id } from "@/lib/api";
 
 const DAY = 24 * 60 * 60 * 1000;
 
 type Period = "30" | "90" | "180";
+
+const ALL_REGIONS = "all";
+const NO_REGION = "none";
 
 function formatPercent(value: number | null) {
   return value === null ? "—" : `${Math.round(value * 100)}%`;
@@ -81,9 +99,9 @@ export default function AdminPage() {
 
   if (isLoading || (isAuthenticated && me === undefined)) return <LoadingScreen />;
   if (!isAuthenticated) return <SignInScreen />;
-  if (!me?.isAdmin) return <NoAccess reason={me?.reason ?? "notAllowed"} email={me?.email ?? null} />;
+  if (!me?.hasAccess) return <NoAccess reason={me?.reason ?? "notAllowed"} email={me?.email ?? null} />;
 
-  return <AdminDashboard />;
+  return <AdminDashboard me={me} />;
 }
 
 function LoadingScreen() {
@@ -119,10 +137,16 @@ function SignInScreen() {
             <CardDescription>Attendance and group operations in one place.</CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="px-8 pb-8">
+        <CardContent className="space-y-5 px-8 pb-8">
           <Button className="w-full" onClick={handleSignIn} disabled={busy}>
             {busy ? "Opening Google…" : "Continue with Google"}
           </Button>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />
+            or
+            <span className="h-px flex-1 bg-border" />
+          </div>
+          <EmailSignIn />
         </CardContent>
       </Card>
     </main>
@@ -135,7 +159,7 @@ function NoAccess({ reason, email }: { reason: string; email: string | null }) {
     ? "Set ADMIN_EMAILS in your Convex environment variables."
     : reason === "emailNotVerified"
       ? "Verify this account's email before using the admin dashboard."
-      : "This account is not on the admin allowlist.";
+      : "This account isn't an admin or a regional leader. Ask an admin to give you access.";
 
   return (
     <main className="grid min-h-screen place-items-center px-6 py-10">
@@ -158,9 +182,21 @@ function NoAccess({ reason, email }: { reason: string; email: string | null }) {
   );
 }
 
-function AdminDashboard() {
+function AdminDashboard({ me }: { me: DashboardMe }) {
+  const role = useMemo<DashboardRole>(() => ({ isAdmin: me.isAdmin, regions: me.regions }), [me.isAdmin, me.regions]);
+  return (
+    <DashboardRoleProvider value={role}>
+      <Dashboard />
+    </DashboardRoleProvider>
+  );
+}
+
+function Dashboard() {
   const { signOut } = useAuthActions();
+  const { isAdmin, regions: myRegions } = useDashboardRole();
   const [tab, setTab] = useState("attendance");
+  const [regionFilter, setRegionFilter] = useState(ALL_REGIONS);
+  const [memberGroup, setMemberGroup] = useState<{ _id: Id<"groups">; name: string } | null>(null);
   // The query window must survive renders, including React Compiler optimizations.
   const [{ period, to }, setWindow] = useState(() => ({ period: "90" as Period, to: Date.now() }));
   const [attendanceSearch, setAttendanceSearch] = useState("");
@@ -177,19 +213,44 @@ function AdminDashboard() {
     if (attendanceStatus === "CanLoadMore") loadMoreAttendance(10);
   }, [attendanceStatus, loadMoreAttendance]);
   const totalsLoading = attendanceStatus !== "Exhausted";
-  const needsManagementData = tab === "groups" || tab === "people";
+  const needsManagementData = tab === "groups" || tab === "people" || tab === "regions";
   const users = useQuery(api.admin.listUsers, needsManagementData ? { limit: 250 } : "skip");
   const groups = useQuery(api.admin.listGroups, needsManagementData ? { limit: 200 } : "skip");
   const requests = useQuery(api.admin.listPendingJoinRequests, { limit: 100 });
-  const services = useQuery(api.admin.listServices, tab === "services" ? { limit: 250 } : "skip");
+  const services = useQuery(api.admin.listServices, isAdmin && tab === "services" ? { limit: 250 } : "skip");
+  const periodLabel = `last ${period} days`;
+
+  const regionNames = useMemo(
+    () => [...new Set(attendance.map((row) => row.regionName).filter((name): name is string => Boolean(name)))].sort(),
+    [attendance],
+  );
+  const regionRows = useMemo(() => {
+    if (regionFilter === ALL_REGIONS) return attendance;
+    return attendance.filter((row) => (regionFilter === NO_REGION ? !row.regionName : row.regionName === regionFilter));
+  }, [attendance, regionFilter]);
 
   const attendanceRows = useMemo(() => {
     const search = attendanceSearch.trim().toLowerCase();
-    if (!search) return attendance;
-    return attendance.filter((row) =>
-      [row.group.name, row.group.code, row.leaderName].filter(Boolean).join(" ").toLowerCase().includes(search),
+    if (!search) return regionRows;
+    return regionRows.filter((row) =>
+      [row.group.name, row.group.code, row.leaderName, row.regionName].filter(Boolean).join(" ").toLowerCase().includes(search),
     );
-  }, [attendance, attendanceSearch]);
+  }, [regionRows, attendanceSearch]);
+
+  // Combined attendance per person across every group, for the People table.
+  const personAttendance = useMemo(() => {
+    const totals = new Map<string, PersonAttendance>();
+    for (const row of attendance) {
+      for (const stat of row.memberStats) {
+        const current = totals.get(stat.profileId) ?? { present: 0, expected: 0 };
+        totals.set(stat.profileId, {
+          present: current.present + stat.present,
+          expected: current.expected + stat.expected,
+        });
+      }
+    }
+    return totals;
+  }, [attendance]);
 
   const filteredUsers = useMemo(() => {
     const search = userSearch.trim().toLowerCase();
@@ -209,7 +270,7 @@ function AdminDashboard() {
   }, [userSearch, users]);
 
   const totals = useMemo(() => {
-    const rows = attendance.filter((row) => row.group.isActive);
+    const rows = regionRows.filter((row) => row.group.isActive);
     const present = rows.reduce((sum, row) => sum + row.presentCount, 0);
     const expected = rows.reduce((sum, row) => sum + row.expectedCount, 0);
     return {
@@ -218,14 +279,30 @@ function AdminDashboard() {
       expected,
       events: rows.reduce((sum, row) => sum + row.eventCount, 0),
       needsAttention: rows.filter((row) => row.eventCount > 0 && (row.attendanceRate ?? 1) < 0.7).length,
+      activeGroups: rows.length,
     };
-  }, [attendance]);
+  }, [regionRows]);
+
+  const tabs = [
+    { value: "attendance", label: "Attendance" },
+    { value: "groups", label: "Groups" },
+    { value: "people", label: "People" },
+    { value: "requests", label: `Requests${requests?.length ? ` (${requests.length})` : ""}` },
+    ...(isAdmin ? [{ value: "regions", label: "Regions" }, { value: "services", label: "Services" }] : []),
+  ];
 
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <p className="text-sm font-medium tracking-[-0.01em]">Cell Journey</p>
+          <div className="flex min-w-0 items-center gap-3">
+            <p className="text-sm font-medium tracking-[-0.01em]">Cell Journey</p>
+            {!isAdmin ? (
+              <Badge variant="outline" className="truncate text-muted-foreground">
+                Regional leader · {myRegions.map((region) => region.name).join(", ")}
+              </Badge>
+            ) : null}
+          </div>
           <div className="flex items-center gap-2">
             <ModeToggle />
             <Button variant="ghost" size="icon" aria-label="Sign out" onClick={() => void signOut()}>
@@ -241,21 +318,35 @@ function AdminDashboard() {
             <p className="text-sm text-muted-foreground">Overview</p>
             <h1 className="mt-1 text-3xl font-semibold tracking-[-0.04em]">Attendance dashboard</h1>
           </div>
-          <Select value={period} onValueChange={(value) => setWindow({ period: value as Period, to: Date.now() })}>
-            <SelectTrigger className="w-36" aria-label="Attendance period">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="end">
-              <SelectItem value="30">Last 30 days</SelectItem>
-              <SelectItem value="90">Last 90 days</SelectItem>
-              <SelectItem value="180">Last 180 days</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            {regionNames.length ? (
+              <Select value={regionFilter} onValueChange={setRegionFilter}>
+                <SelectTrigger className="w-40" aria-label="Region">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent align="end">
+                  <SelectItem value={ALL_REGIONS}>All regions</SelectItem>
+                  {regionNames.map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}
+                  {isAdmin ? <SelectItem value={NO_REGION}>No region</SelectItem> : null}
+                </SelectContent>
+              </Select>
+            ) : null}
+            <Select value={period} onValueChange={(value) => setWindow({ period: value as Period, to: Date.now() })}>
+              <SelectTrigger className="w-36" aria-label="Attendance period">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end">
+                <SelectItem value="30">Last 30 days</SelectItem>
+                <SelectItem value="90">Last 90 days</SelectItem>
+                <SelectItem value="180">Last 180 days</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </section>
 
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard loading={totalsLoading} label="Attendance" value={formatPercent(totals.rate)} detail={`${totals.present} of ${totals.expected} expected`} />
-          <MetricCard loading={totalsLoading} label="Active groups" value={attendance.filter((row) => row.group.isActive).length} detail="across all groups" />
+          <MetricCard loading={totalsLoading} label="Active groups" value={totals.activeGroups} detail={regionFilter === ALL_REGIONS ? (isAdmin ? "across all groups" : "in your regions") : regionFilter === NO_REGION ? "without a region" : `in ${regionFilter}`} />
           <MetricCard loading={totalsLoading} label="Events" value={totals.events} detail={`last ${period} days`} />
           <MetricCard loading={totalsLoading} label="Below 70%" value={totals.needsAttention} detail="groups to review" />
         </section>
@@ -263,27 +354,19 @@ function AdminDashboard() {
         <Tabs value={tab} onValueChange={setTab}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <TabsList className="hidden w-full justify-start overflow-x-auto sm:flex sm:w-auto">
-              <TabsTrigger value="attendance">Attendance</TabsTrigger>
-              <TabsTrigger value="groups">Groups</TabsTrigger>
-              <TabsTrigger value="people">People</TabsTrigger>
-              <TabsTrigger value="requests">Requests{requests?.length ? ` (${requests.length})` : ""}</TabsTrigger>
-              <TabsTrigger value="services">Services</TabsTrigger>
+              {tabs.map((item) => <TabsTrigger key={item.value} value={item.value}>{item.label}</TabsTrigger>)}
             </TabsList>
             <Select value={tab} onValueChange={setTab}>
               <SelectTrigger className="w-full sm:hidden" aria-label="Dashboard section">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="attendance">Attendance</SelectItem>
-                <SelectItem value="groups">Groups</SelectItem>
-                <SelectItem value="people">People</SelectItem>
-                <SelectItem value="requests">Requests{requests?.length ? ` (${requests.length})` : ""}</SelectItem>
-                <SelectItem value="services">Services</SelectItem>
+                {tabs.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
               </SelectContent>
             </Select>
             {tab === "services" ? (
               <CreateServiceDialog services={services} />
-            ) : (
+            ) : tab === "regions" ? null : (
               <div className="flex w-full gap-2 sm:w-auto">
                 <CreateUserDialog />
                 <CreateGroupDialog />
@@ -298,6 +381,13 @@ function AdminDashboard() {
               loadingMore={attendanceStatus === "LoadingMore" || attendanceStatus === "CanLoadMore"}
               search={attendanceSearch}
               setSearch={setAttendanceSearch}
+              onViewMembers={setMemberGroup}
+            />
+            <MemberAttendanceDialog
+              group={memberGroup}
+              range={range}
+              periodLabel={periodLabel}
+              onOpenChange={(open) => { if (!open) setMemberGroup(null); }}
             />
           </TabsContent>
           <TabsContent value="groups">
@@ -310,14 +400,24 @@ function AdminDashboard() {
               users={filteredUsers}
               groups={groups}
               loading={users === undefined}
+              attendance={personAttendance}
+              attendanceLoading={totalsLoading}
+              periodLabel={periodLabel}
             />
           </TabsContent>
           <TabsContent value="requests">
             <RequestsPanel requests={requests} />
           </TabsContent>
-          <TabsContent value="services">
-            <ServicesPanel services={services} />
-          </TabsContent>
+          {isAdmin ? (
+            <>
+              <TabsContent value="regions">
+                <RegionsPanel groups={groups} users={users} />
+              </TabsContent>
+              <TabsContent value="services">
+                <ServicesPanel services={services} />
+              </TabsContent>
+            </>
+          ) : null}
         </Tabs>
       </main>
     </div>
@@ -342,12 +442,14 @@ function AttendancePanel({
   loadingMore,
   search,
   setSearch,
+  onViewMembers,
 }: {
   rows: AttendanceRow[];
   loading: boolean;
   loadingMore: boolean;
   search: string;
   setSearch: (value: string) => void;
+  onViewMembers: (group: { _id: Id<"groups">; name: string }) => void;
 }) {
   const columns = useMemo<ColumnDef<AttendanceRow>[]>(() => [
     {
@@ -355,10 +457,16 @@ function AttendancePanel({
       id: "group",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Group" />,
       cell: ({ row }) => (
-        <div className="min-w-44">
-          <p className="font-medium">{row.original.group.name}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{row.original.leaderName ?? "No leader"}</p>
-        </div>
+        <button
+          type="button"
+          onClick={() => onViewMembers(row.original.group)}
+          className="min-w-44 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <p className="font-medium underline-offset-4 hover:underline">{row.original.group.name}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {[row.original.leaderName ?? "No leader", row.original.regionName].filter(Boolean).join(" · ")}
+          </p>
+        </button>
       ),
     },
     {
@@ -413,14 +521,25 @@ function AttendancePanel({
         ? <Badge variant="secondary">Active</Badge>
         : <Badge variant="outline">Archived</Badge>,
     },
-  ], []);
+    {
+      id: "members",
+      header: () => <span className="sr-only">Member attendance</span>,
+      cell: ({ row }) => (
+        <div className="text-right">
+          <Button variant="ghost" size="sm" className="gap-1" onClick={() => onViewMembers(row.original.group)}>
+            Members<ChevronRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ),
+    },
+  ], [onViewMembers]);
 
   return (
     <Card>
       <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
         <div>
           <CardTitle>Group attendance</CardTitle>
-          <CardDescription className="mt-1">Weighted by expected attendance across completed events.</CardDescription>
+          <CardDescription className="mt-1">Weighted by expected attendance across completed events. Open a group to see each member.</CardDescription>
         </div>
         <SearchInput value={search} onChange={setSearch} placeholder="Search groups" />
       </CardHeader>
@@ -463,19 +582,31 @@ function RateChange({ value }: { value: number | null }) {
 
 function CreateGroupDialog() {
   const createGroup = useMutation(api.admin.createGroup);
+  const { isAdmin } = useDashboardRole();
   const [open, setOpen] = useState(false);
+  const regions = useRegionOptions(open);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [details, setDetails] = useState<GroupDetailsValue>(() => initialGroupDetails(null, regions, isAdmin));
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const regionMissing = !isAdmin && details.regionId === "none";
+
+  function setDialogOpen(next: boolean) {
+    setOpen(next);
+    setError(null);
+    if (next) {
+      setName("");
+      setCode("");
+      setDetails(initialGroupDetails(null, regions, isAdmin));
+    }
+  }
 
   function submit() {
     setError(null);
     startTransition(async () => {
       try {
-        await createGroup({ name, code: code || undefined });
-        setName("");
-        setCode("");
+        await createGroup({ name, code: code || undefined, ...groupDetailsArgs(details) });
         setOpen(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not create group");
@@ -484,11 +615,11 @@ function CreateGroupDialog() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={setDialogOpen}>
       <DialogTrigger asChild>
         <Button className="flex-1 sm:flex-none"><Plus />Create group</Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create group</DialogTitle>
           <DialogDescription>Members use the six-character code during onboarding.</DialogDescription>
@@ -514,11 +645,12 @@ function CreateGroupDialog() {
               placeholder="BTIMAH"
             />
           </div>
+          <GroupDetailsFields value={details} onChange={setDetails} regions={regions} idPrefix="create-group" />
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={submit} disabled={pending || !name.trim()}>{pending ? "Creating…" : "Create"}</Button>
+          <Button onClick={submit} disabled={pending || !name.trim() || regionMissing}>{pending ? "Creating…" : "Create"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -544,15 +676,14 @@ function GroupsPanel({ groups, users }: { groups: GroupRow[] | undefined; users:
       cell: ({ row }) => <GroupLeadershipControls group={row.original} people={leaders} />,
     },
     {
+      id: "details",
+      header: "Details",
+      cell: ({ row }) => <GroupDetailsSummary group={row.original.group} />,
+    },
+    {
       accessorKey: "activeMemberCount",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Members" />,
       cell: ({ row }) => <span className="inline-flex items-center gap-1.5 tabular-nums"><Users className="h-3.5 w-3.5 text-muted-foreground" />{row.original.activeMemberCount}</span>,
-    },
-    {
-      accessorFn: (row) => row.group.isActive,
-      id: "status",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => row.original.group.isActive ? <Badge variant="secondary">Active</Badge> : <Badge variant="outline">Archived</Badge>,
     },
     {
       id: "actions",
@@ -583,7 +714,7 @@ function GroupIdentity({ group }: { group: GroupRow }) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
-  const leader = group.leaderName ?? "No primary leader";
+  const region = group.region?.name ?? "No region";
 
   return (
     <div className="flex min-w-56 items-center gap-3">
@@ -593,11 +724,12 @@ function GroupIdentity({ group }: { group: GroupRow }) {
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <p className="truncate font-medium">{group.group.name}</p>
+          {!group.group.isActive ? <Badge variant="outline">Archived</Badge> : null}
         </div>
         <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
           <span className="font-mono tracking-wide">{group.group.code}</span>
           <span aria-hidden="true">·</span>
-          <span className="truncate">{leader}</span>
+          <span className="truncate">{region}</span>
         </div>
       </div>
     </div>
@@ -607,10 +739,24 @@ function GroupIdentity({ group }: { group: GroupRow }) {
 function EditGroupDialog({ group }: { group: GroupRow }) {
   const updateGroup = useMutation(api.admin.updateGroup);
   const deleteGroup = useMutation(api.admin.deleteGroup);
+  const { isAdmin } = useDashboardRole();
   const [open, setOpen] = useState(false);
+  const regions = useRegionOptions(open);
   const [name, setName] = useState(group.group.name);
   const [code, setCode] = useState(group.group.code);
   const [active, setActive] = useState(group.group.isActive ? "active" : "archived");
+  const [details, setDetails] = useState<GroupDetailsValue>(() => initialGroupDetails(group, regions, isAdmin));
+
+  function setDialogOpen(next: boolean) {
+    setOpen(next);
+    setError(null);
+    if (next) {
+      setName(group.group.name);
+      setCode(group.group.code);
+      setActive(group.group.isActive ? "active" : "archived");
+      setDetails(initialGroupDetails(group, regions, isAdmin));
+    }
+  }
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -618,7 +764,16 @@ function EditGroupDialog({ group }: { group: GroupRow }) {
     setError(null);
     startTransition(async () => {
       try {
-        await updateGroup({ groupId: group.group._id, name, code, isActive: active === "active" });
+        const { regionId, ...rest } = groupDetailsArgs(details);
+        await updateGroup({
+          groupId: group.group._id,
+          name,
+          code,
+          isActive: active === "active",
+          ...rest,
+          // Regional leaders keep a group in one of their own regions.
+          ...(isAdmin || regionId ? { regionId } : {}),
+        });
         setOpen(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not update group");
@@ -639,9 +794,9 @@ function EditGroupDialog({ group }: { group: GroupRow }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={setDialogOpen}>
       <DialogTrigger asChild><Button variant="ghost" size="sm" className="gap-1.5"><Pencil className="h-3.5 w-3.5" />Edit</Button></DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit group</DialogTitle>
           <DialogDescription>Archive groups to preserve their history.</DialogDescription>
@@ -656,6 +811,7 @@ function EditGroupDialog({ group }: { group: GroupRow }) {
               <SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="archived">Archived</SelectItem></SelectContent>
             </Select>
           </div>
+          <GroupDetailsFields value={details} onChange={setDetails} regions={regions} idPrefix={`edit-${group.group._id}`} />
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
         </div>
         <DialogFooter>

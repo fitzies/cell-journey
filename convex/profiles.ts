@@ -3,6 +3,8 @@ import { getPostalDistrictFromSector } from "@cell-journey/domain";
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { personalDetailsPatch } from "./personalDetails";
+import { sexValidator } from "./validators";
 
 const singaporeRegion = v.union(
   v.literal("north"),
@@ -639,6 +641,9 @@ export const updateProfileField = mutation({
       v.object({ field: v.literal("name"), firstName: v.string(), lastName: v.string() }),
       v.object({ field: v.literal("services"), serviceIds: v.array(v.id("services")) }),
       v.object({ field: v.literal("postal"), postalSector: v.string() }),
+      v.object({ field: v.literal("dateOfBirth"), dateOfBirth: v.union(v.string(), v.null()) }),
+      v.object({ field: v.literal("sex"), sex: v.union(sexValidator, v.null()) }),
+      v.object({ field: v.literal("phone"), phone: v.union(v.string(), v.null()) }),
     ),
   },
   handler: async (ctx, { change }) => {
@@ -648,6 +653,12 @@ export const updateProfileField = mutation({
       patch = validateProfileName(profile, change, false);
     } else if (change.field === "services") {
       patch = { serviceIds: await validateProfileServices(ctx, change.serviceIds) };
+    } else if (change.field === "dateOfBirth") {
+      patch = personalDetailsPatch({ dateOfBirth: change.dateOfBirth });
+    } else if (change.field === "sex") {
+      patch = personalDetailsPatch({ sex: change.sex });
+    } else if (change.field === "phone") {
+      patch = personalDetailsPatch({ phone: change.phone });
     } else {
       const district = getPostalDistrictFromSector(change.postalSector);
       if (!district) throw new Error("Enter a valid two-digit postal sector");
@@ -658,6 +669,20 @@ export const updateProfileField = mutation({
       updatedAt: Date.now(),
       onboardingStatus: getCompatibilityOnboardingStatus({ ...profile, ...patch }),
     });
+    return await ctx.db.get(profile._id);
+  },
+});
+
+/** Saves the optional onboarding details step. Omitted fields are left unchanged. */
+export const updatePersonalDetails = mutation({
+  args: {
+    dateOfBirth: v.optional(v.union(v.string(), v.null())),
+    sex: v.optional(v.union(sexValidator, v.null())),
+    phone: v.optional(v.union(v.string(), v.null())),
+  },
+  handler: async (ctx, args) => {
+    const profile = await requireCurrentProfile(ctx);
+    await ctx.db.patch(profile._id, { ...personalDetailsPatch(args), updatedAt: Date.now() });
     return await ctx.db.get(profile._id);
   },
 });

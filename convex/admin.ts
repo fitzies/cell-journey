@@ -1,5 +1,4 @@
 import { anonymizeProfile, deleteUserAccount } from "./accountDeletion";
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
@@ -11,13 +10,32 @@ import {
   getConnectedMembershipForGroup,
   getProfileDisplayName,
   isProfileComplete,
-  normalizeEmail,
 } from "./profiles";
+import { closeActivityPeriod } from "./membershipActivity";
 import {
-  closeActivityPeriod,
-  isMembershipActiveAtFromRows,
-} from "./membershipActivity";
-import { nextSortOrder } from "./membershipOrdering";
+  accessibleGroups,
+  assignedByKind,
+  canAccessGroup,
+  requireAdmin,
+  requireDashboardAccess,
+  requireDashboardGroup,
+  resolveDashboardAccess,
+  type DashboardAccess,
+} from "./dashboardAccess";
+import {
+  attendanceTotals,
+  attendanceWindow,
+  loadGroupAttendanceWindow,
+  memberAttendanceStats,
+} from "./dashboardAttendance";
+import {
+  addProfileToGroup,
+  insertInvitedProfile,
+  scheduleGroupInviteEmail,
+  syncCompatibilityRole,
+} from "./memberAdding";
+import { groupDetailsArgs, sexValidator } from "./validators";
+import { groupDetailsPatch } from "./groupDetails";
 
 const MAX_ROWS = 250;
 
@@ -26,13 +44,6 @@ type AuthUser = Doc<"users"> & {
   name?: string;
   image?: string;
 };
-
-function allowedAdminEmails() {
-  return (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((email: string) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
 
 function normalizeCode(value: string) {
   return value.replace(/[^a-z0-9]/gi, "").toUpperCase();
@@ -46,25 +57,8 @@ function generatedCode(name: string, now: number) {
   return `${prefix}${String(now).slice(-3)}`;
 }
 
-async function requireAdmin(ctx: QueryCtx | MutationCtx) {
-  const userId = await getAuthUserId(ctx);
-  if (!userId) throw new Error("Not authenticated");
-
-  const user = (await ctx.db.get(userId)) as AuthUser | null;
-  const email = user?.email?.trim().toLowerCase();
-  const allowed = allowedAdminEmails();
-
-  if (allowed.length === 0) {
-    throw new Error("Admin access is not configured. Set ADMIN_EMAILS in Convex env vars.");
-  }
-  if (!email || !allowed.includes(email)) {
-    throw new Error("This account is not allowed to access admin tools.");
-  }
-  if (typeof user?.emailVerificationTime !== "number") {
-    throw new Error("Verify your email before accessing admin tools.");
-  }
-
-  return { userId, user, email };
+async function reviewerProfileId(ctx: MutationCtx, access: DashboardAccess) {
+  return access.profile?._id ?? null;
 }
 
 async function groupName(ctx: QueryCtx, groupId?: Id<"groups">) {
@@ -97,6 +91,9 @@ async function publicProfile(ctx: QueryCtx, profile: Doc<"userProfiles">) {
     profileComplete: isProfileComplete(profile),
     postalDistrict: profile.postalDistrict ?? null,
     singaporeRegion: profile.singaporeRegion ?? null,
+    dateOfBirth: profile.dateOfBirth ?? null,
+    sex: profile.sex ?? null,
+    phone: profile.phone ?? null,
     currentGroupId: profile.currentGroupId ?? null,
     leaderGroupId: profile.leaderGroupId ?? null,
     activeMembershipId: profile.activeMembershipId ?? null,
@@ -105,77 +102,62 @@ async function publicProfile(ctx: QueryCtx, profile: Doc<"userProfiles">) {
   };
 }
 
-function validateInviteEmail(value: string) {
-  const email = normalizeEmail(value);
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new Error("Enter a valid email address");
-  }
-  return email;
-}
-
-function effectiveAttendanceStatus(attendance: Doc<"attendance"> | undefined) {
-  return attendance?.finalStatus ?? attendance?.memberSubmittedStatus ?? null;
-}
-
-function attendanceTotals(
-  events: Doc<"events">[],
-  memberships: Doc<"memberships">[],
-  periodsByMembership: Map<Id<"memberships">, Doc<"membershipActivityPeriods">[]>,
-  attendanceByEventAndProfile: Map<string, Doc<"attendance">>,
-) {
-  let present = 0;
-  let expected = 0;
-
-  for (const event of events) {
-    const eligibleProfiles = new Set(
-      memberships
-        .filter((membership) =>
-          isMembershipActiveAtFromRows(
-            membership,
-            periodsByMembership.get(membership._id) ?? [],
-            event.startAt,
-          ),
-        )
-        .map((membership) => membership.profileId),
-    );
-
-    expected += eligibleProfiles.size;
-    for (const profileId of eligibleProfiles) {
-      const attendance = attendanceByEventAndProfile.get(`${event._id}:${profileId}`);
-      if (effectiveAttendanceStatus(attendance) === "present") present += 1;
-    }
-  }
-
-  return {
-    present,
-    expected,
-    absent: Math.max(expected - present, 0),
-    rate: expected === 0 ? null : present / expected,
-  };
-}
-
 export const me = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return { isAdmin: false, email: null, name: null, reason: "notAuthenticated" as const };
-
-    const user = (await ctx.db.get(userId)) as AuthUser | null;
-    const email = user?.email?.trim().toLowerCase() ?? null;
-    const allowed = allowedAdminEmails();
-    if (allowed.length === 0) {
-      return { isAdmin: false, email, name: user?.name ?? null, reason: "notConfigured" as const };
+    const result = await resolveDashboardAccess(ctx);
+    if (!result.access) {
+      return {
+        isAdmin: false,
+        hasAccess: false,
+        role: null,
+        regions: [],
+        email: result.user?.email?.trim().toLowerCase() ?? null,
+        name: result.user?.name ?? null,
+        reason: result.reason,
+      };
     }
-    if (!email || !allowed.includes(email)) {
-      return { isAdmin: false, email, name: user?.name ?? null, reason: "notAllowed" as const };
-    }
-    if (typeof user?.emailVerificationTime !== "number") {
-      return { isAdmin: false, email, name: user?.name ?? null, reason: "emailNotVerified" as const };
-    }
-
-    return { isAdmin: true, email, name: user?.name ?? null, reason: null };
+    const { access } = result;
+    return {
+      isAdmin: access.kind === "admin",
+      hasAccess: true,
+      role: access.kind === "admin" ? ("admin" as const) : ("regionalLeader" as const),
+      regions: access.kind === "regional"
+        ? access.regions.map((region) => ({ _id: region._id, name: region.name }))
+        : [],
+      email: access.email,
+      name: access.user.name ?? null,
+      reason: null,
+    };
   },
 });
+
+/** Profiles connected to the given groups as members, owners or co-leaders. */
+async function profilesInGroups(ctx: QueryCtx, groupIds: Iterable<Id<"groups">>, limit: number) {
+  const profileIds = new Set<Id<"userProfiles">>();
+  for (const groupId of groupIds) {
+    const group = await ctx.db.get(groupId);
+    if (group?.leaderProfileId) profileIds.add(group.leaderProfileId);
+    for (const status of ["active", "inactive"] as const) {
+      const memberships = await ctx.db
+        .query("memberships")
+        .withIndex("by_group_status", (q) => q.eq("groupId", groupId).eq("status", status))
+        .take(500);
+      for (const membership of memberships) profileIds.add(membership.profileId);
+    }
+    const coLeaders = await ctx.db
+      .query("coLeaderAssignments")
+      .withIndex("by_group_and_status", (q) => q.eq("groupId", groupId).eq("status", "active"))
+      .take(100);
+    for (const assignment of coLeaders) profileIds.add(assignment.profileId);
+  }
+  const profiles: Doc<"userProfiles">[] = [];
+  for (const profileId of profileIds) {
+    const profile = await ctx.db.get(profileId);
+    if (profile && profile.deletedAt === undefined) profiles.push(profile);
+  }
+  return profiles.sort((a, b) => b._creationTime - a._creationTime).slice(0, limit);
+}
 
 export const listUsers = query({
   args: {
@@ -183,11 +165,13 @@ export const listUsers = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
+    const access = await requireDashboardAccess(ctx);
     const limit = Math.min(args.limit ?? MAX_ROWS, MAX_ROWS);
     const search = args.search?.trim().toLowerCase() ?? "";
 
-    const profiles = await ctx.db.query("userProfiles").withIndex("by_deletedAt", (q) => q.eq("deletedAt", undefined)).order("desc").take(limit);
+    const profiles = access.kind === "admin"
+      ? await ctx.db.query("userProfiles").withIndex("by_deletedAt", (q) => q.eq("deletedAt", undefined)).order("desc").take(limit)
+      : await profilesInGroups(ctx, access.groupIds, limit);
     const rows = [];
 
     for (const profile of profiles) {
@@ -215,6 +199,7 @@ export const listUsers = query({
         .take(100);
       const memberGroups = [];
       for (const membership of [...activeMemberships, ...inactiveMemberships]) {
+        if (!canAccessGroup(access, membership.groupId)) continue;
         const group = await ctx.db.get(membership.groupId);
         if (group) memberGroups.push({
           membershipId: membership._id,
@@ -231,7 +216,7 @@ export const listUsers = query({
         groupId: Id<"groups">;
         name: string;
         accessRole: "owner" | "coLeader";
-      }> = ledGroupDocs.map((group) => ({
+      }> = ledGroupDocs.filter((group) => canAccessGroup(access, group._id)).map((group) => ({
         groupId: group._id,
         name: group.name,
         accessRole: "owner" as const,
@@ -244,12 +229,22 @@ export const listUsers = query({
         .take(100);
       for (const assignment of coLeaderAssignments) {
         if (ledGroups.some((group) => group.groupId === assignment.groupId)) continue;
+        if (!canAccessGroup(access, assignment.groupId)) continue;
         const group = await ctx.db.get(assignment.groupId);
         if (group) ledGroups.push({
           groupId: group._id,
           name: group.name,
           accessRole: "coLeader" as const,
         });
+      }
+      const regionalAssignments = await ctx.db
+        .query("regionalLeaderAssignments")
+        .withIndex("by_profile", (q) => q.eq("profileId", profile._id))
+        .take(50);
+      const regionalRegions = [];
+      for (const assignment of regionalAssignments) {
+        const region = await ctx.db.get(assignment.regionId);
+        if (region) regionalRegions.push({ assignmentId: assignment._id, regionId: region._id, name: region.name });
       }
       const haystack = [
         displayName,
@@ -270,6 +265,7 @@ export const listUsers = query({
         displayName,
         memberGroups,
         ledGroups,
+        regionalRegions,
         currentGroupName: memberGroups[0]?.name ?? null,
         leaderGroupName: ledGroups[0]?.name ?? null,
       });
@@ -284,75 +280,32 @@ export const createInvitedProfile = mutation({
     firstName: v.string(),
     lastName: v.string(),
     email: v.string(),
+    // Adds the new person straight into this group and emails them.
+    groupId: v.optional(v.id("groups")),
+    dateOfBirth: v.optional(v.string()),
+    sex: v.optional(sexValidator),
+    phone: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { userId: invitedByUserId } = await requireAdmin(ctx);
-    const firstName = args.firstName.trim();
-    const lastName = args.lastName.trim();
-    if (!firstName || !lastName) {
-      throw new Error("First and last name are required");
+    const access = await requireDashboardAccess(ctx);
+    if (access.kind === "regional" && !args.groupId) {
+      throw new Error("Choose one of your groups for this person");
     }
-    const email = validateInviteEmail(args.email);
+    const group = args.groupId ? await requireDashboardGroup(ctx, access, args.groupId) : null;
+    if (group && !group.isActive) throw new Error("Active group not found");
 
-    const [invitedMatches, identityMatches, authUsers] = await Promise.all([
-      ctx.db
-        .query("userProfiles")
-        .withIndex("by_invitedEmail", (q) => q.eq("invitedEmail", email))
-        .take(2),
-      ctx.db
-        .query("userProfiles")
-        .withIndex("by_identityEmailNormalized", (q) =>
-          q.eq("identityEmailNormalized", email),
-        )
-        .take(2),
-      ctx.db.query("users").withIndex("email", (q) => q.eq("email", email)).take(2),
-    ]);
-
-    const matchingProfiles = new Map(
-      [...invitedMatches, ...identityMatches].map((profile) => [profile._id, profile]),
-    );
-
-    // Transitional safeguard for profiles created before normalized identity
-    // emails were stored. Convex Auth preserves provider casing, so the users
-    // email index alone cannot detect every case-insensitive match.
-    const legacyLinkedProfiles = ctx.db
-      .query("userProfiles")
-      .withIndex("by_identityEmailNormalized", (q) =>
-        q.eq("identityEmailNormalized", undefined),
-      );
-    for await (const profile of legacyLinkedProfiles) {
-      if (!profile.userId) continue;
-      const linkedUser = (await ctx.db.get(profile.userId)) as AuthUser | null;
-      if (linkedUser?.email && normalizeEmail(linkedUser.email) === email) {
-        matchingProfiles.set(profile._id, profile);
-      }
+    const profileId = await insertInvitedProfile(ctx, { ...args, invitedByUserId: access.userId });
+    if (group) {
+      await addProfileToGroup(ctx, profileId, group._id, access.profile?._id);
+      const profile = await ctx.db.get(profileId);
+      await scheduleGroupInviteEmail(ctx, {
+        email: profile!.invitedEmail!,
+        firstName: profile!.firstName!,
+        groupName: group.name,
+        addedByName: access.profile ? getProfileDisplayName(access.profile) : null,
+        isNewAccount: true,
+      });
     }
-
-    for (const authUser of authUsers) {
-      const linkedProfiles = await ctx.db
-        .query("userProfiles")
-        .withIndex("by_userId", (q) => q.eq("userId", authUser._id))
-        .take(2);
-      for (const profile of linkedProfiles) matchingProfiles.set(profile._id, profile);
-    }
-    if (matchingProfiles.size > 0) {
-      throw new Error("A profile already uses this email address");
-    }
-
-    const now = Date.now();
-    const profileId = await ctx.db.insert("userProfiles", {
-      invitedEmail: email,
-      invitedAt: now,
-      invitedByUserId,
-      role: "member",
-      onboardingStatus: "profileIncomplete",
-      firstName,
-      lastName,
-      fullName: `${firstName} ${lastName}`,
-      serviceIds: [],
-      createdAt: now,
-      updatedAt: now,
-    });
     return await ctx.db.get(profileId);
   },
 });
@@ -360,8 +313,8 @@ export const createInvitedProfile = mutation({
 export const listGroups = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
-    const groups = await ctx.db.query("groups").order("desc").take(Math.min(args.limit ?? MAX_ROWS, MAX_ROWS));
+    const access = await requireDashboardAccess(ctx);
+    const groups = await accessibleGroups(ctx, access, Math.min(args.limit ?? MAX_ROWS, MAX_ROWS));
     const rows = [];
 
     for (const group of groups) {
@@ -388,8 +341,10 @@ export const listGroups = query({
         .query("memberships")
         .withIndex("by_group_status", (q) => q.eq("groupId", group._id).eq("status", "active"))
         .take(200);
+      const region = group.regionId ? await ctx.db.get(group.regionId) : null;
       rows.push({
         group,
+        region: region ? { _id: region._id, name: region.name } : null,
         leader: leader ? await publicProfile(ctx, leader) : null,
         leaderName: leader ? getProfileDisplayName(leader) : null,
         leaderCapabilities: leader ? OWNER_CAPABILITIES : null,
@@ -405,9 +360,8 @@ export const listGroups = query({
 export const listGroupMembers = query({
   args: { groupId: v.id("groups"), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
-    const group = await ctx.db.get(args.groupId);
-    if (!group) throw new Error("Group not found");
+    const access = await requireDashboardAccess(ctx);
+    await requireDashboardGroup(ctx, access, args.groupId);
     const memberships = await ctx.db
       .query("memberships")
       .withIndex("by_group_status", (q) =>
@@ -459,7 +413,8 @@ export const listCoLeaderAssignments = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
+    const access = await requireDashboardAccess(ctx);
+    if (args.groupId) await requireDashboardGroup(ctx, access, args.groupId);
     const limit = Math.min(args.limit ?? MAX_ROWS, MAX_ROWS);
     const assignments = args.groupId
       ? await ctx.db
@@ -474,6 +429,7 @@ export const listCoLeaderAssignments = query({
     const rows = [];
     for (const assignment of assignments) {
       if (args.status && assignment.status !== args.status) continue;
+      if (!canAccessGroup(access, assignment.groupId)) continue;
       const profile = await ctx.db.get(assignment.profileId);
       const group = await ctx.db.get(assignment.groupId);
       rows.push({
@@ -491,10 +447,9 @@ export const listCoLeaderAssignments = query({
 export const assignCoLeader = mutation({
   args: { groupId: v.id("groups"), profileId: v.id("userProfiles") },
   handler: async (ctx, args) => {
-    const { userId } = await requireAdmin(ctx);
-    const group = await ctx.db.get(args.groupId);
+    const access = await requireDashboardAccess(ctx);
+    const group = await requireDashboardGroup(ctx, access, args.groupId);
     const profile = await ctx.db.get(args.profileId);
-    if (!group) throw new Error("Group not found");
     if (!profile || profile.deletedAt !== undefined) throw new Error("Profile not found");
     if (group.leaderProfileId === profile._id) {
       throw new Error("The group owner cannot also be assigned as a co-leader");
@@ -516,8 +471,8 @@ export const assignCoLeader = mutation({
       profileId: profile._id,
       status: "active",
       assignedAt: now,
-      assignedByKind: "admin",
-      assignedByUserId: userId,
+      assignedByKind: assignedByKind(access),
+      assignedByUserId: access.userId,
       createdAt: now,
       updatedAt: now,
     });
@@ -532,16 +487,18 @@ export const revokeCoLeader = mutation({
     reason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { userId } = await requireAdmin(ctx);
+    const access = await requireDashboardAccess(ctx);
     const assignment = await ctx.db.get(args.assignmentId);
-    if (!assignment) throw new Error("Co-leader assignment not found");
+    if (!assignment || !canAccessGroup(access, assignment.groupId)) {
+      throw new Error("Co-leader assignment not found");
+    }
     if (assignment.status === "revoked") return assignment;
     const now = Date.now();
     await ctx.db.patch(assignment._id, {
       status: "revoked",
       revokedAt: now,
-      revokedByKind: "admin",
-      revokedByUserId: userId,
+      revokedByKind: assignedByKind(access),
+      revokedByUserId: access.userId,
       revocationReason: args.reason?.trim() || undefined,
       updatedAt: now,
     });
@@ -557,82 +514,20 @@ export const listGroupAttendance = query({
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
-
-    const to = Math.min(args.to, Date.now());
-    const requestedWindow = Math.max(to - args.from, 1);
-    const window = Math.min(requestedWindow, 366 * 24 * 60 * 60 * 1000);
-    const from = to - window;
-    const previousFrom = from - window;
+    const access = await requireDashboardAccess(ctx);
+    const window = attendanceWindow(args);
     const groupPage = await ctx.db.query("groups").order("asc").paginate(args.paginationOpts);
     const rows = [];
 
     for (const group of groupPage.page) {
-      const events = await ctx.db
-        .query("events")
-        .withIndex("by_group_start", (q) =>
-          q.eq("groupId", group._id).gte("startAt", previousFrom).lte("startAt", to),
-        )
-        .order("desc")
-        .take(160);
-      const completedEvents = events.filter((event) => !event.cancelledAt && event.endAt <= to);
-      const currentEvents = completedEvents.filter((event) => event.startAt >= from);
-      const previousEvents = completedEvents.filter(
-        (event) => event.startAt >= previousFrom && event.startAt < from,
-      );
-
-      const memberships = await ctx.db
-        .query("memberships")
-        .withIndex("by_group", (q) => q.eq("groupId", group._id))
-        .take(1000);
-      const activityPeriods = await ctx.db
-        .query("membershipActivityPeriods")
-        .withIndex("by_group_and_startedAt", (q) =>
-          q.eq("groupId", group._id).lte("startedAt", to),
-        )
-        .take(3001);
-      const periodsByMembership = new Map<
-        Id<"memberships">,
-        Doc<"membershipActivityPeriods">[]
-      >();
-      for (const period of activityPeriods) {
-        const rows = periodsByMembership.get(period.membershipId) ?? [];
-        rows.push(period);
-        periodsByMembership.set(period.membershipId, rows);
-      }
-      const attendanceRows = completedEvents.length === 0
-        ? []
-        : await ctx.db
-            .query("attendance")
-            .withIndex("by_group", (q) => q.eq("groupId", group._id))
-            .order("desc")
-            .take(1500);
-      const relevantEventIds = new Set(completedEvents.map((event) => event._id));
-      const attendanceByEventAndProfile = new Map<string, Doc<"attendance">>();
-
-      for (const attendance of attendanceRows) {
-        if (relevantEventIds.has(attendance.eventId)) {
-          attendanceByEventAndProfile.set(
-            `${attendance.eventId}:${attendance.profileId}`,
-            attendance,
-          );
-        }
-      }
-
-      const current = attendanceTotals(
-        currentEvents,
-        memberships,
-        periodsByMembership,
-        attendanceByEventAndProfile,
-      );
-      const previous = attendanceTotals(
-        previousEvents,
-        memberships,
-        periodsByMembership,
-        attendanceByEventAndProfile,
-      );
+      if (!canAccessGroup(access, group._id)) continue;
+      const data = await loadGroupAttendanceWindow(ctx, group._id, window);
+      const current = attendanceTotals(data, data.currentEvents);
+      const previous = attendanceTotals(data, data.previousEvents);
       const leader = group.leaderProfileId ? await ctx.db.get(group.leaderProfileId) : null;
-      const lastEvent = currentEvents[0] ?? null;
+      const region = group.regionId ? await ctx.db.get(group.regionId) : null;
+      const lastEvent = data.currentEvents[0] ?? null;
+      const { byProfile } = memberAttendanceStats(data);
 
       rows.push({
         group: {
@@ -641,9 +536,10 @@ export const listGroupAttendance = query({
           code: group.code,
           isActive: group.isActive,
         },
+        regionName: region?.name ?? null,
         leaderName: leader ? getProfileDisplayName(leader) : null,
-        activeMemberCount: memberships.filter((membership) => membership.status === "active").length,
-        eventCount: currentEvents.length,
+        activeMemberCount: data.memberships.filter((membership) => membership.status === "active").length,
+        eventCount: data.currentEvents.length,
         presentCount: current.present,
         absentCount: current.absent,
         expectedCount: current.expected,
@@ -654,11 +550,13 @@ export const listGroupAttendance = query({
         lastEvent: lastEvent
           ? { _id: lastEvent._id, title: lastEvent.title, startAt: lastEvent.startAt }
           : null,
-        isComplete:
-          events.length < 160 &&
-          memberships.length < 1000 &&
-          activityPeriods.length < 3001 &&
-          attendanceRows.length < 1500,
+        // Per-person totals so the People table can show attendance across groups.
+        memberStats: [...byProfile].map(([profileId, stats]) => ({
+          profileId,
+          present: stats.present,
+          expected: stats.expected,
+        })),
+        isComplete: data.isComplete,
       });
     }
 
@@ -666,14 +564,78 @@ export const listGroupAttendance = query({
   },
 });
 
+/** Per-member attendance for one group, with one status per completed event. */
+export const groupMemberAttendance = query({
+  args: { groupId: v.id("groups"), from: v.number(), to: v.number() },
+  handler: async (ctx, args) => {
+    const access = await requireDashboardAccess(ctx);
+    const group = await requireDashboardGroup(ctx, access, args.groupId);
+    const data = await loadGroupAttendanceWindow(ctx, group._id, attendanceWindow(args));
+    const { events, byProfile } = memberAttendanceStats(data);
+    const membershipByProfile = new Map<Id<"userProfiles">, Doc<"memberships">>();
+    for (const membership of data.memberships) {
+      const existing = membershipByProfile.get(membership.profileId);
+      if (!existing || membership.joinedAt > existing.joinedAt) {
+        membershipByProfile.set(membership.profileId, membership);
+      }
+    }
+
+    const members = [];
+    for (const [profileId, stats] of byProfile) {
+      const profile = await ctx.db.get(profileId);
+      if (!profile || profile.deletedAt !== undefined) continue;
+      const membership = membershipByProfile.get(profileId);
+      const status = !membership
+        ? ("former" as const)
+        : membership.status === "active"
+          ? membership.memberClass === "visitor" ? ("visitor" as const) : ("active" as const)
+          : membership.status === "inactive"
+            ? ("inactive" as const)
+            : ("former" as const);
+      members.push({
+        profileId,
+        displayName: getProfileDisplayName(profile) ?? profile.invitedEmail ?? "Unnamed member",
+        photoUrl: profile.avatarStorageId ? await ctx.storage.getUrl(profile.avatarStorageId) : null,
+        status,
+        joinedAt: membership?.joinedAt ?? null,
+        ...stats,
+        rate: stats.expected === 0 ? null : stats.present / stats.expected,
+      });
+    }
+    members.sort((a, b) => (b.rate ?? -1) - (a.rate ?? -1) || a.displayName.localeCompare(b.displayName));
+
+    const current = attendanceTotals(data, data.currentEvents);
+    return {
+      group: { _id: group._id, name: group.name, code: group.code },
+      totals: current,
+      events: events.map((event) => ({ _id: event._id, title: event.title, startAt: event.startAt })),
+      members,
+      isComplete: data.isComplete,
+    };
+  },
+});
+
 export const listPendingJoinRequests = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
-    const requests = await ctx.db
-      .query("joinRequests")
-      .withIndex("by_status", (q) => q.eq("status", "pending"))
-      .take(Math.min(args.limit ?? 100, 100));
+    const access = await requireDashboardAccess(ctx);
+    const limit = Math.min(args.limit ?? 100, 100);
+    let requests: Doc<"joinRequests">[];
+    if (access.kind === "admin") {
+      requests = await ctx.db
+        .query("joinRequests")
+        .withIndex("by_status", (q) => q.eq("status", "pending"))
+        .take(limit);
+    } else {
+      requests = [];
+      for (const groupId of access.groupIds) {
+        if (requests.length >= limit) break;
+        requests.push(...await ctx.db
+          .query("joinRequests")
+          .withIndex("by_group_status", (q) => q.eq("groupId", groupId).eq("status", "pending"))
+          .take(limit - requests.length));
+      }
+    }
     const rows = [];
     for (const request of requests) {
       const profile = await ctx.db.get(request.profileId);
@@ -687,14 +649,12 @@ export const listPendingJoinRequests = query({
 export const approveJoinRequest = mutation({
   args: { joinRequestId: v.id("joinRequests") },
   handler: async (ctx, args) => {
-    const { userId } = await requireAdmin(ctx);
-    const reviewer = await ctx.db
-      .query("userProfiles")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .unique();
+    const access = await requireDashboardAccess(ctx);
+    const request = await ctx.db.get(args.joinRequestId);
+    if (!request || !canAccessGroup(access, request.groupId)) throw new Error("Join request not found");
 
     return await approvePendingJoinRequest(ctx, args.joinRequestId, {
-      reviewedByProfileId: reviewer?._id ?? null,
+      reviewedByProfileId: await reviewerProfileId(ctx, access),
     });
   },
 });
@@ -702,28 +662,48 @@ export const approveJoinRequest = mutation({
 export const rejectJoinRequest = mutation({
   args: { joinRequestId: v.id("joinRequests"), reason: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const { userId } = await requireAdmin(ctx);
-    const reviewer = await ctx.db
-      .query("userProfiles")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .unique();
+    const access = await requireDashboardAccess(ctx);
+    const request = await ctx.db.get(args.joinRequestId);
+    if (!request || !canAccessGroup(access, request.groupId)) throw new Error("Join request not found");
 
     return await rejectPendingJoinRequest(ctx, args.joinRequestId, {
-      reviewedByProfileId: reviewer?._id ?? null,
+      reviewedByProfileId: await reviewerProfileId(ctx, access),
       reason: args.reason,
     });
   },
 });
 
+async function resolveGroupRegion(
+  ctx: MutationCtx,
+  access: DashboardAccess,
+  regionId: Id<"regions"> | null | undefined,
+) {
+  if (access.kind === "regional") {
+    if (regionId === undefined || regionId === null) {
+      if (access.regions.length === 1) return access.regions[0]._id;
+      throw new Error("Choose one of your regions for this group");
+    }
+    if (!access.regions.some((region) => region._id === regionId)) {
+      throw new Error("Choose one of your regions for this group");
+    }
+    return regionId;
+  }
+  if (regionId && !(await ctx.db.get(regionId))) throw new Error("Region not found");
+  return regionId;
+}
+
 export const createGroup = mutation({
   args: {
     name: v.string(),
     code: v.optional(v.string()),
+    regionId: v.optional(v.union(v.id("regions"), v.null())),
+    ...groupDetailsArgs,
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
+    const access = await requireDashboardAccess(ctx);
     const name = args.name.trim();
     if (!name) throw new Error("Group name is required");
+    const regionId = await resolveGroupRegion(ctx, access, args.regionId);
 
     const now = Date.now();
     const code = normalizeCode(args.code?.trim() || generatedCode(name, now));
@@ -736,6 +716,8 @@ export const createGroup = mutation({
       name,
       code,
       isActive: true,
+      ...(regionId ? { regionId } : {}),
+      ...groupDetailsPatch(args),
       createdAt: now,
       updatedAt: now,
     });
@@ -749,11 +731,13 @@ export const updateGroup = mutation({
     name: v.string(),
     code: v.string(),
     isActive: v.boolean(),
+    // Omit to keep the current region; null removes it (admins only).
+    regionId: v.optional(v.union(v.id("regions"), v.null())),
+    ...groupDetailsArgs,
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
-    const group = await ctx.db.get(args.groupId);
-    if (!group) throw new Error("Group not found");
+    const access = await requireDashboardAccess(ctx);
+    const group = await requireDashboardGroup(ctx, access, args.groupId);
 
     const name = args.name.trim();
     const code = normalizeCode(args.code);
@@ -763,7 +747,17 @@ export const updateGroup = mutation({
     const existing = await ctx.db.query("groups").withIndex("by_code", (q) => q.eq("code", code)).unique();
     if (existing && existing._id !== group._id) throw new Error("Group code is already in use");
 
-    await ctx.db.patch(group._id, { name, code, isActive: args.isActive, updatedAt: Date.now() });
+    const regionPatch = args.regionId === undefined
+      ? {}
+      : { regionId: (await resolveGroupRegion(ctx, access, args.regionId)) ?? undefined };
+    await ctx.db.patch(group._id, {
+      name,
+      code,
+      isActive: args.isActive,
+      ...regionPatch,
+      ...groupDetailsPatch(args),
+      updatedAt: Date.now(),
+    });
     return await ctx.db.get(group._id);
   },
 });
@@ -771,9 +765,8 @@ export const updateGroup = mutation({
 export const deleteGroup = mutation({
   args: { groupId: v.id("groups") },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
-    const group = await ctx.db.get(args.groupId);
-    if (!group) throw new Error("Group not found");
+    const access = await requireDashboardAccess(ctx);
+    const group = await requireDashboardGroup(ctx, access, args.groupId);
     if (group.isActive) throw new Error("Only archived groups can be deleted");
     if (group.leaderProfileId) throw new Error("Remove the group leader before deleting this group");
 
@@ -881,74 +874,14 @@ export const updateService = mutation({
   },
 });
 
-async function syncCompatibilityRole(ctx: MutationCtx, profileId: Id<"userProfiles">) {
-  const profile = await ctx.db.get(profileId);
-  if (!profile) return;
-  const ledGroup = await ctx.db
-    .query("groups")
-    .withIndex("by_leader", (q) => q.eq("leaderProfileId", profileId))
-    .first();
-  const membership = await ctx.db
-    .query("memberships")
-    .withIndex("by_profile_status", (q) =>
-      q.eq("profileId", profileId).eq("status", "active"),
-    )
-    .first();
-  const inactiveMembership = membership
-    ? null
-    : await ctx.db
-        .query("memberships")
-        .withIndex("by_profile_status", (q) =>
-          q.eq("profileId", profileId).eq("status", "inactive"),
-        )
-        .first();
-  const coLeadership = await ctx.db
-    .query("coLeaderAssignments")
-    .withIndex("by_profile_and_status", (q) =>
-      q.eq("profileId", profileId).eq("status", "active"),
-    )
-    .first();
-  const pending = await ctx.db
-    .query("joinRequests")
-    .withIndex("by_profile_status", (q) =>
-      q.eq("profileId", profileId).eq("status", "pending"),
-    )
-    .first();
-  const compatibilityMembership = profile.activeMembershipId
-    ? await ctx.db.get(profile.activeMembershipId)
-    : null;
-  const shouldReplaceCompatibilityMembership =
-    !compatibilityMembership ||
-    compatibilityMembership.profileId !== profile._id ||
-    compatibilityMembership.status !== "active" ||
-    compatibilityMembership.groupId !== profile.currentGroupId;
-  const profileComplete = isProfileComplete(profile);
-  await ctx.db.patch(profileId, {
-    role: ledGroup || coLeadership ? "leader" : "member",
-    leaderGroupId: ledGroup?._id,
-    ...(shouldReplaceCompatibilityMembership
-      ? { activeMembershipId: membership?._id, currentGroupId: membership?.groupId }
-      : {}),
-    onboardingStatus: !profileComplete
-      ? "profileIncomplete"
-      : ledGroup || coLeadership || membership || inactiveMembership
-        ? "approved"
-        : pending
-          ? "pendingApproval"
-          : "needsGroup",
-    updatedAt: Date.now(),
-  });
-}
-
 export const setGroupLeader = mutation({
   args: {
     groupId: v.id("groups"),
     profileId: v.union(v.id("userProfiles"), v.null()),
   },
   handler: async (ctx, args) => {
-    const { userId } = await requireAdmin(ctx);
-    const group = await ctx.db.get(args.groupId);
-    if (!group) throw new Error("Group not found");
+    const access = await requireDashboardAccess(ctx);
+    const group = await requireDashboardGroup(ctx, access, args.groupId);
     const previousLeaderId = group.leaderProfileId;
     if (args.profileId) {
       const profile = await ctx.db.get(args.profileId);
@@ -974,8 +907,8 @@ export const setGroupLeader = mutation({
         await ctx.db.patch(redundantAssignment._id, {
           status: "revoked",
           revokedAt: now,
-          revokedByKind: "admin",
-          revokedByUserId: userId,
+          revokedByKind: assignedByKind(access),
+          revokedByUserId: access.userId,
           revocationReason: "Assigned as primary owner",
           updatedAt: now,
         });
@@ -992,9 +925,8 @@ export const setGroupLeader = mutation({
 export const removeGroupLeader = mutation({
   args: { groupId: v.id("groups") },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
-    const group = await ctx.db.get(args.groupId);
-    if (!group) throw new Error("Group not found");
+    const access = await requireDashboardAccess(ctx);
+    const group = await requireDashboardGroup(ctx, access, args.groupId);
     const previousLeaderId = group.leaderProfileId;
     await ctx.db.patch(group._id, { leaderProfileId: undefined, updatedAt: Date.now() });
     if (previousLeaderId) await syncCompatibilityRole(ctx, previousLeaderId);
@@ -1026,49 +958,12 @@ export const assignMemberToGroup = mutation({
     groupId: v.id("groups"),
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
+    const access = await requireDashboardAccess(ctx);
     const profile = await ctx.db.get(args.profileId);
-    const group = await ctx.db.get(args.groupId);
+    const group = await requireDashboardGroup(ctx, access, args.groupId);
     if (!profile || profile.deletedAt !== undefined) throw new Error("Profile not found");
-    if (!group || !group.isActive) throw new Error("Active group not found");
-
-    const existing = await getConnectedMembershipForGroup(
-      ctx,
-      profile._id,
-      group._id,
-    );
-    const pending = await ctx.db
-      .query("joinRequests")
-      .withIndex("by_profile_and_group_and_status", (q) =>
-        q.eq("profileId", profile._id).eq("groupId", group._id).eq("status", "pending"),
-      )
-      .unique();
-
-    const now = Date.now();
-    if (!existing) {
-      const membershipId = await ctx.db.insert("memberships", {
-        profileId: profile._id,
-        groupId: group._id,
-        status: "active",
-        joinedAt: now,
-        sortOrder: await nextSortOrder(ctx, group._id, "active"),
-        ...(pending ? { joinRequestId: pending._id } : {}),
-      });
-      const membership = await ctx.db.get(membershipId);
-      if (!membership) throw new Error("Membership was not created");
-      await ctx.db.insert("membershipActivityPeriods", {
-        membershipId: membership._id,
-        profileId: membership.profileId,
-        groupId: membership.groupId,
-        startedAt: now,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
-    if (pending) {
-      await ctx.db.patch(pending._id, { status: "approved", reviewedAt: now });
-    }
-    await syncCompatibilityRole(ctx, profile._id);
+    if (!group.isActive) throw new Error("Active group not found");
+    await addProfileToGroup(ctx, profile._id, group._id);
     return null;
   },
 });
@@ -1076,7 +971,8 @@ export const assignMemberToGroup = mutation({
 export const removeMembership = mutation({
   args: { profileId: v.id("userProfiles"), groupId: v.id("groups") },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
+    const access = await requireDashboardAccess(ctx);
+    await requireDashboardGroup(ctx, access, args.groupId);
     const membership = await getConnectedMembershipForGroup(
       ctx,
       args.profileId,
