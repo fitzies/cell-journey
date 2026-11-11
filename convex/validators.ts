@@ -31,3 +31,28 @@ export const postalDistrictCodeValidator = v.union(
   v.literal("D28"),
 );
 export const leaderEventsLayoutValidator = v.union(v.literal("split"), v.literal("combined"));
+export const sexValidator = v.union(v.literal("male"), v.literal("female"));
+export const groupLanguageValidator = v.union(
+  v.literal("english"),
+  v.literal("mandarin"),
+  v.literal("cantonese"),
+  v.literal("hokkien"),
+  v.literal("malay"),
+  v.literal("tamil"),
+);
+export const groupFrequencyValidator = v.union(
+  v.literal("weekly"),
+  v.literal("fortnightly"),
+  v.literal("monthly"),
+);
+export const groupDemographicValidator = v.union(
+  v.literal("singles"),
+  v.literal("couples"),
+  v.literal("mixed"),
+);
+export const groupDetailsArgs = {
+  languages: v.optional(v.array(groupLanguageValidator)),
+  frequency: v.optional(v.union(groupFrequencyValidator, v.null())),
+  demographic: v.optional(v.union(groupDemographicValidator, v.null())),
+  location: v.optional(v.union(v.string(), v.null())),
+};

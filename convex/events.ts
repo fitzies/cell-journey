@@ -340,6 +340,8 @@ export const update = mutation({
       word: normalized.word,
       worship: normalized.worship,
       remarks: normalized.remarks,
+      // A moved end time gets a fresh attendance reminder check.
+      ...(normalized.endAt !== event.endAt ? { attendanceReminderCheckedAt: undefined } : {}),
       updatedAt: Date.now(),
     });
     return await ctx.db.get(event._id);

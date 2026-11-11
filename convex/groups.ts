@@ -17,6 +17,15 @@ import {
 } from "./profiles";
 import { closeActivityPeriod, openActivityPeriod } from "./membershipActivity";
 import {
+  addProfileToGroup,
+  findProfilesByEmail,
+  insertInvitedProfile,
+  scheduleGroupInviteEmail,
+  validateInviteEmail,
+} from "./memberAdding";
+import { groupDetailsPatch } from "./groupDetails";
+import { groupDetailsArgs, sexValidator } from "./validators";
+import {
   connectedMembershipsForGroup,
   memberSection,
   nextSortOrder,
@@ -680,6 +689,9 @@ export const getMemberProfile = query({
         photoUrl: profile.photoUrl,
         postalDistrict: profile.postalDistrict,
         singaporeRegion: profile.singaporeRegion,
+        dateOfBirth: profile.dateOfBirth ?? null,
+        sex: profile.sex ?? null,
+        phone: profile.phone ?? null,
       },
       serviceNames: services.flatMap((service) => service ? [service.name] : []),
     };
@@ -702,5 +714,65 @@ export const listMyMembers = query({
       rows.push({ membership, profile: await withProfilePhoto(ctx, await ctx.db.get(membership.profileId)) });
     }
     return rows;
+  },
+});
+
+/**
+ * Adds someone to the owner's group by email. New people get an invited
+ * profile they claim by signing in; existing accounts join immediately.
+ */
+export const addMemberByEmail = mutation({
+  args: {
+    groupId: v.id("groups"),
+    firstName: v.string(),
+    lastName: v.string(),
+    email: v.string(),
+    dateOfBirth: v.optional(v.string()),
+    sex: v.optional(sexValidator),
+    phone: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { profile: leader, group } = await requireLeadershipForGroup(ctx, args.groupId);
+    const email = validateInviteEmail(args.email);
+    const existing = await findProfilesByEmail(ctx, email);
+    if (existing.length > 1) throw new Error("More than one profile uses this email address");
+
+    let profileId: Id<"userProfiles">;
+    let isNewAccount: boolean;
+    if (existing[0]) {
+      profileId = existing[0]._id;
+      isNewAccount = !existing[0].userId;
+      if (await getConnectedMembershipForGroup(ctx, profileId, group._id)) {
+        throw new Error("This person is already in this group");
+      }
+    } else {
+      profileId = await insertInvitedProfile(ctx, {
+        ...args,
+        email,
+        invitedByUserId: leader.userId,
+      });
+      isNewAccount = true;
+    }
+    await addProfileToGroup(ctx, profileId, group._id, leader._id);
+
+    const profile = await ctx.db.get(profileId);
+    await scheduleGroupInviteEmail(ctx, {
+      email,
+      firstName: profile?.firstName?.trim() || args.firstName.trim(),
+      groupName: group.name,
+      addedByName: getProfileDisplayName(leader),
+      isNewAccount,
+    });
+    return { profileId, status: existing[0] ? ("addedExisting" as const) : ("invited" as const) };
+  },
+});
+
+/** Lets the group owner describe the group: language, frequency, demographic and location. */
+export const updateGroupDetails = mutation({
+  args: { groupId: v.id("groups"), ...groupDetailsArgs },
+  handler: async (ctx, args) => {
+    const { group } = await requireLeadershipForGroup(ctx, args.groupId);
+    await ctx.db.patch(group._id, { ...groupDetailsPatch(args), updatedAt: Date.now() });
+    return await ctx.db.get(group._id);
   },
 });

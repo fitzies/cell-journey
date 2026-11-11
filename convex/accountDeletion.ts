@@ -55,6 +55,11 @@ export async function deleteUserAccount(ctx: MutationCtx, userId: Id<"users">) {
 
 export async function anonymizeProfile(ctx: MutationCtx, profile: Doc<"userProfiles">, deletedAt: number) {
   if (profile.avatarStorageId) await ctx.storage.delete(profile.avatarStorageId);
+  const regionalAssignments = await ctx.db
+    .query("regionalLeaderAssignments")
+    .withIndex("by_profile", (q) => q.eq("profileId", profile._id))
+    .take(100);
+  for (const assignment of regionalAssignments) await ctx.db.delete(assignment._id);
   // Keep the foreign-key target for shared group history, never the identity.
   // Replacing rather than patching also removes future optional personal fields.
   await ctx.db.replace(profile._id, {

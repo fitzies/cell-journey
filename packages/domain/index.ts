@@ -114,3 +114,74 @@ export function formatPostalDistrict(code: PostalDistrictCode | undefined): stri
   const district = getPostalDistrict(code);
   return district ? `District ${district.number} · ${district.area}` : null;
 }
+
+// Personal details. All optional; stored in normalized form.
+
+export const sexOptions = ['male', 'female'] as const;
+export type Sex = (typeof sexOptions)[number];
+export const sexLabels: Record<Sex, string> = { male: 'Male', female: 'Female' };
+
+/** Accepts "9123 4567", "+65 9123 4567" or "6591234567" and returns "+6591234567". */
+export function normalizeSingaporePhone(value: string): string | null {
+  const digits = value.replace(/[\s\-()]/g, '').replace(/^\+/, '');
+  const local = digits.length === 10 && digits.startsWith('65') ? digits.slice(2) : digits;
+  if (!/^[3689]\d{7}$/.test(local)) return null;
+  return `+65${local}`;
+}
+
+/** "+6591234567" → "+65 9123 4567". Unknown formats are returned unchanged. */
+export function formatSingaporePhone(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = /^\+65(\d{4})(\d{4})$/.exec(value);
+  return match ? `+65 ${match[1]} ${match[2]}` : value;
+}
+
+/** Validates a YYYY-MM-DD birth date that is a real day, not in the future and after 1900. */
+export function normalizeDateOfBirth(value: string, now = Date.now()): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  if (year < 1900 || date.getTime() > now) return null;
+  return `${match[1]}-${match[2]}-${match[3]}`;
+}
+
+export function formatDateOfBirth(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return value;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${Number(match[3])} ${months[Number(match[2]) - 1]} ${match[1]}`;
+}
+
+// Cell group details.
+
+export const groupLanguageOptions = ['english', 'mandarin', 'cantonese', 'hokkien', 'malay', 'tamil'] as const;
+export type GroupLanguage = (typeof groupLanguageOptions)[number];
+export const groupLanguageLabels: Record<GroupLanguage, string> = {
+  english: 'English',
+  mandarin: 'Mandarin',
+  cantonese: 'Cantonese',
+  hokkien: 'Hokkien',
+  malay: 'Malay',
+  tamil: 'Tamil',
+};
+
+export const groupFrequencyOptions = ['weekly', 'fortnightly', 'monthly'] as const;
+export type GroupFrequency = (typeof groupFrequencyOptions)[number];
+export const groupFrequencyLabels: Record<GroupFrequency, string> = {
+  weekly: 'Weekly',
+  fortnightly: 'Fortnightly',
+  monthly: 'Monthly',
+};
+
+export const groupDemographicOptions = ['singles', 'couples', 'mixed'] as const;
+export type GroupDemographic = (typeof groupDemographicOptions)[number];
+export const groupDemographicLabels: Record<GroupDemographic, string> = {
+  singles: 'Singles',
+  couples: 'Couples',
+  mixed: 'Mixed',
+};
+
+export const GROUP_LOCATION_MAX_LENGTH = 80;

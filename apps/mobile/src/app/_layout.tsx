@@ -12,6 +12,7 @@ import { NunitoSans_700Bold } from '@expo-google-fonts/nunito-sans/700Bold';
 import { GroupContextProvider } from '@/components/group-context';
 import { LeaderNavigationProvider } from '@/components/leader-navigation-context';
 import { AccountActionsProvider } from '@/components/account-actions';
+import { PushNotificationsManager } from '@/components/push-notifications';
 import { palettes } from '@/constants/tokens';
 import { convex } from '@/lib/convex';
 
@@ -57,6 +58,7 @@ export default function RootLayout() {
         <AccountActionsProvider>
         <GroupContextProvider>
           <LeaderNavigationProvider>
+          <PushNotificationsManager />
           <ThemeProvider value={lightNavigationTheme}>
             {/* React Native also updates the separate windows used by Android dialogs. */}
             {Platform.OS === 'android' ? <StatusBar barStyle="dark-content" /> : null}
@@ -68,6 +70,8 @@ export default function RootLayout() {
               <Stack.Screen name="index" />
               <Stack.Screen name="create-event" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false }} />
               <Stack.Screen name="member-profile" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
+              <Stack.Screen name="add-member" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false }} />
+              <Stack.Screen name="group-details" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false }} />
             </Stack>
           </ThemeProvider>
           </LeaderNavigationProvider>

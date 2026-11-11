@@ -16,8 +16,12 @@ import { ProfileContent } from './profile-content';
 import { ProfileGroupsSheet } from './profile-groups-sheet';
 import { ProfileFieldDialog } from './profile-field-dialog';
 import type { ProfileField, ProfileFieldValues } from './profile-field-model';
+import { PersonalDetailDialog } from './personal-detail-dialog';
+import { personalDetailsFromProfile, personalDetailsPayload, type PersonalDetailField, type PersonalDetailsValues } from '@/components/personal-details-fields';
+import { groupDetailsSummary } from '@/lib/group-details';
 import { pickProfilePhoto } from '@/lib/profile-photo';
 import { useAccountActions } from '@/components/account-actions';
+import { unregisterPushTokenForSignOut } from '@/components/push-notifications';
 
 export function ProfileScreen({ mode }: { mode: AppMode }) {
   const t = useAppTheme();
@@ -35,6 +39,7 @@ export function ProfileScreen({ mode }: { mode: AppMode }) {
   const leaveGroup = useMutation(api.groups.leaveGroup);
   const updateProfile = useMutation(api.profiles.updateProfileField);
   const [editing, setEditing] = useState<ProfileField | null>(null);
+  const [editingPersonal, setEditingPersonal] = useState<PersonalDetailField | null>(null);
   const [groupsOpen, setGroupsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -67,6 +72,19 @@ export function ProfileScreen({ mode }: { mode: AppMode }) {
         ? { field, firstName: values.firstName.trim(), lastName: values.lastName.trim() }
         : field === 'services' ? { field, serviceIds: values.serviceIds }
           : { field, postalSector: values.postalSector };
+      await updateProfile({ change });
+    } finally { busyRef.current = false; setBusy(false); }
+  };
+  const savePersonal = async (field: PersonalDetailField, values: PersonalDetailsValues) => {
+    if (!profile || busyRef.current) throw new Error('Please wait and try again.');
+    const payload = personalDetailsPayload(values);
+    if (!payload.ok) throw new Error(payload.error);
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      const change = field === 'dateOfBirth' ? { field, dateOfBirth: payload.value.dateOfBirth }
+        : field === 'sex' ? { field, sex: payload.value.sex }
+          : { field, phone: payload.value.phone };
       await updateProfile({ change });
     } finally { busyRef.current = false; setBusy(false); }
   };
@@ -145,6 +163,12 @@ export function ProfileScreen({ mode }: { mode: AppMode }) {
         busy={busy}
         canEdit={Boolean(profile)}
         onEdit={field => { if (!busyRef.current) setEditing(field); }}
+        personalDetails={{ dateOfBirth: profile?.dateOfBirth ?? null, sex: profile?.sex ?? null, phone: profile?.phone ?? null }}
+        onEditPersonal={field => { if (!busyRef.current) setEditingPersonal(field); }}
+        groupDetails={leader && groups.selectedLeaderGroup ? {
+          summary: groupDetailsSummary(groups.selectedLeaderGroup),
+          onPress: () => router.push({ pathname: '/group-details', params: { groupId: groups.selectedLeaderGroup!._id } }),
+        } : undefined}
         serviceMenu={{ services, selectedIds: activeServiceIds, onToggle: toggleService }}
         groupMenu={{
           mode, selectedId: selected?._id ?? null,
@@ -164,12 +188,14 @@ export function ProfileScreen({ mode }: { mode: AppMode }) {
         onJoin={() => router.push('/(onboarding)/group-code')}
         onPending={() => router.push('/(onboarding)/pending')}
         onSignOut={() => confirm('Sign out?', 'You can sign back in to access your groups and attendance history.', 'Sign out', () => {
-          void run(async () => { await signOut(); router.replace('/(auth)'); }, 'Could not sign out');
+          void run(async () => { await unregisterPushTokenForSignOut(); await signOut(); router.replace('/(auth)'); }, 'Could not sign out');
         })}
       />
     </ScrollView>
     {editing && profile ? <ProfileFieldDialog key={`${profile._id}:${editing}`} field={editing}
       initial={initialValues} services={services} onSave={values => saveField(editing, values)} onClose={() => setEditing(null)} /> : null}
+    {editingPersonal && profile ? <PersonalDetailDialog key={`${profile._id}:${editingPersonal}`} field={editingPersonal}
+      initial={personalDetailsFromProfile(profile)} onSave={values => savePersonal(editingPersonal, values)} onClose={() => setEditingPersonal(null)} /> : null}
     {groupsOpen ? <ProfileGroupsSheet
       mode={mode}
       entries={entries}

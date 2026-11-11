@@ -20,10 +20,10 @@ export default function LeaderMembersScreen() {
   if (context === undefined) return <LeaderLoadingState title="Cell Members"><MembersSkeleton /></LeaderLoadingState>;
   if (!group) return <LeaderScreen title="Cell Members"><EmptyState title="No group assigned." body="Once this leader is assigned to a group, members will appear here." /></LeaderScreen>;
   if (group.accessRole !== 'owner') return <LeaderScreen title="Cell Members"><EmptyState title="Leader-managed roster." body="You can view members while taking attendance. The group leader manages member status and order." /></LeaderScreen>;
-  return <GroupMembers key={group._id} groupId={group._id} groupName={group.name} />;
+  return <GroupMembers key={group._id} groupId={group._id} groupName={group.name} canAdd={group.capabilities.manageMembers} />;
 }
 
-function GroupMembers({ groupId, groupName }: { groupId: Id<'groups'>; groupName: string }) {
+function GroupMembers({ groupId, groupName, canAdd }: { groupId: Id<'groups'>; groupName: string; canAdd: boolean }) {
   const t = useAppTheme();
   const members = useQuery(api.groups.listMembers, { groupId });
   const { isWebSocketConnected: online } = useConvexConnectionState();
@@ -130,6 +130,12 @@ function GroupMembers({ groupId, groupName }: { groupId: Id<'groups'>; groupName
     }
   };
 
+  const addMember = () => {
+    if (!mounted.current || !focused.current || operationPending.current || dragging) return;
+    router.push({ pathname: '/add-member', params: { groupId } });
+  };
+  const memberActions = canAdd ? { onAdd: addMember, disabled: busy || dragging } : undefined;
+
   const viewProfile = (row: MemberRow) => {
     if (!mounted.current || !focused.current || operationPending.current || dragging) return;
     router.push({ pathname: '/member-profile', params: { groupId, membershipId: row.membership._id } });
@@ -170,7 +176,7 @@ function GroupMembers({ groupId, groupName }: { groupId: Id<'groups'>; groupName
 
   if (members === undefined) {
     return <SafeAreaView edges={[]} style={[styles.root, { backgroundColor: t.background }]}>
-      <AppHeader title="Cell Members" mode="leader" membersOptions={{ view, sort, disabled: true, onView: () => {}, onSort: () => {} }} />
+      <AppHeader title="Cell Members" mode="leader" memberActions={memberActions} membersOptions={{ view, sort, disabled: true, onView: () => {}, onSort: () => {} }} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" showsVerticalScrollIndicator={false} contentContainerStyle={styles.loadingContent}>
         <MembersSkeleton />
       </ScrollView>
@@ -199,7 +205,7 @@ function GroupMembers({ groupId, groupName }: { groupId: Id<'groups'>; groupName
   };
 
   return <SafeAreaView edges={[]} style={[styles.root, { backgroundColor: t.background }]}>
-    <AppHeader title="Cell Members" mode="leader" membersOptions={{
+    <AppHeader title="Cell Members" mode="leader" memberActions={memberActions} membersOptions={{
       view, sort, disabled: busy || dragging,
       onView: (value) => changeOptions(() => setView(value)),
       onSort: (value) => changeOptions(() => setSort(value)),

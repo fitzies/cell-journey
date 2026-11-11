@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LoadingState } from '@/components/onboarding/ui';
+import { unregisterPushTokenForSignOut } from '@/components/push-notifications';
 import { fonts, radius, useAppTheme } from '@/constants/tokens';
 import { api } from '@/lib/api';
 import { getProfileDisplayName } from '@/lib/name';
@@ -18,6 +19,7 @@ export default function ProfileTab() {
   const handleSignOut = async () => {
     setBusy(true);
     try {
+      await unregisterPushTokenForSignOut();
       await signOut();
       router.replace('/(auth)');
     } finally {

@@ -9,7 +9,7 @@ export type { AppHeaderProps, AppMode } from './app-header.types';
 
 const supportsScrollEdgeEffects = Number.parseInt(String(Platform.Version), 10) >= 26;
 
-export function AppHeader({ title, mode, profile = false, eventActions, membersOptions }: AppHeaderProps) {
+export function AppHeader({ title, mode, profile = false, eventActions, membersOptions, memberActions }: AppHeaderProps) {
   const t = useAppTheme();
   const isTabTitle = !profile && ['Home', 'Attendance', 'Cell Attendance', 'Events', 'Upcoming Events', 'Planned Events', 'Mark Attendance', 'Members', 'Cell Members', 'Profile'].includes(title);
 
@@ -30,7 +30,7 @@ export function AppHeader({ title, mode, profile = false, eventActions, membersO
         </Stack.Toolbar>
       ) : null}
       {profile ? <Stack.Screen.BackButton displayMode="minimal" /> : null}
-      <ContextToolbar mode={mode} eventActions={eventActions} membersOptions={membersOptions} />
+      <ContextToolbar mode={mode} eventActions={eventActions} membersOptions={membersOptions} memberActions={memberActions} />
     </>
   );
 }
@@ -40,13 +40,13 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, lineHeight: 28, fontWeight: '600', letterSpacing: -0.7 },
 });
 
-function ContextToolbar({ mode, eventActions, membersOptions }: Pick<AppHeaderProps, 'mode' | 'eventActions' | 'membersOptions'>) {
+function ContextToolbar({ mode, eventActions, membersOptions, memberActions }: Pick<AppHeaderProps, 'mode' | 'eventActions' | 'membersOptions' | 'memberActions'>) {
   const groups = useGroups();
   const t = useAppTheme();
   const canSwitch = groups.memberGroups.length + groups.ledGroups.length > 1;
 
   const hasEventActions = Boolean(eventActions?.onCreate || eventActions?.onImport);
-  if (!canSwitch && !hasEventActions && !membersOptions) return null;
+  if (!canSwitch && !hasEventActions && !membersOptions && !memberActions) return null;
 
   return (
     <Stack.Toolbar placement="right" tintColor={t.ink}>
@@ -61,6 +61,15 @@ function ContextToolbar({ mode, eventActions, membersOptions }: Pick<AppHeaderPr
           {eventActions.onCreate ? <Stack.Toolbar.MenuAction onPress={eventActions.onCreate}>Create event</Stack.Toolbar.MenuAction> : null}
           {eventActions.onImport ? <Stack.Toolbar.MenuAction onPress={eventActions.onImport}>Import CSV / XLSX</Stack.Toolbar.MenuAction> : null}
         </Stack.Toolbar.Menu>
+      ) : null}
+      {memberActions ? (
+        <Stack.Toolbar.Button
+          accessibilityLabel="Add member"
+          icon={'person.badge.plus'}
+          separateBackground
+          disabled={memberActions.disabled}
+          onPress={memberActions.onAdd}
+        />
       ) : null}
       {membersOptions ? (
         <Stack.Toolbar.Menu
